@@ -39,7 +39,7 @@ namespace IISWithBindings
                         try
                         {
                             X509Certificate2 x509Cert = new X509Certificate2(Convert.FromBase64String(config.Job.EntryContents), config.Job.PfxPassword, X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
-                            x509Cert.Export(X509ContentType.)
+
                             using (Runspace runspace = RunspaceFactory.CreateRunspace(new WSManConnectionInfo(new Uri($"http://{config.Store.ClientMachine}:5985/wsman"))))
                             {
                                 runspace.Open();
