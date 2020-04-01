@@ -14,31 +14,18 @@ namespace IISWithBindings
         public string HostName { get; set; }
         public string Protocol { get; set; }
 
-        public static StorePath Split(string strStorePath)
+        public StorePath (string siteName, string ipAddress, string port, string hostName)
         {
-            string [] aryStorePath = strStorePath.Split('/');
-            if (aryStorePath.Length < 3)
-                throw new InvalidStorePathException("Invalid StorePath Format");
-
-            return new StorePath()
-            {
-                SiteName = aryStorePath[0],
-                IP = aryStorePath[1],
-                Port = aryStorePath[2],
-                HostName = aryStorePath.Length > 3 ? aryStorePath[3] : string.Empty,
-                Protocol = "https"
-            };
+            SiteName = siteName;
+            IP = ipAddress;
+            Port = port;
+            HostName = hostName;
+            Protocol = "https";
         }
 
         public string FormatForIIS()
         {
             return $@"{IP}:{Port}:{HostName}";
         }
-    }
-
-    public class InvalidStorePathException : ApplicationException
-    {
-        public InvalidStorePathException(string message) : base(message)
-        { }
     }
 }

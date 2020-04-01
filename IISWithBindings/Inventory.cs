@@ -10,6 +10,8 @@ using Keyfactor.Platform.Extensions.Agents.Interfaces;
 
 using Microsoft.Web.Administration;
 
+using Newtonsoft.Json;
+
 namespace IISWithBindings
 {
     public class Inventory : IAgentJobExtension
@@ -26,6 +28,9 @@ namespace IISWithBindings
 
         public AnyJobCompleteInfo processJob(AnyJobConfigInfo config, SubmitInventoryUpdate submitInventory, SubmitEnrollmentRequest submitEnrollmentRequest, SubmitDiscoveryResults sdr)
         {
+            dynamic properties = JsonConvert.DeserializeObject(config.Store.Properties.ToString());
+            StorePath storePath = new StorePath(properties.siteName.Value, properties.ipAddress.Value, properties.port.Value, properties.hostName.Value);
+
             List<AgentCertStoreInventoryItem> inventoryItems = new List<AgentCertStoreInventoryItem>();
 
             using (X509Store certStore = new X509Store($@"\\{config.Store.ClientMachine}\My", StoreLocation.LocalMachine))
@@ -41,16 +46,6 @@ namespace IISWithBindings
 
                 using (ServerManager serverManager = ServerManager.OpenRemote(config.Store.ClientMachine))
                 {
-                    StorePath storePath = new StorePath();
-                    try
-                    { 
-                        storePath = StorePath.Split(config.Store.StorePath);
-                    }
-                    catch (InvalidStorePathException ex)
-                    {
-                        return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ex.Message}" };
-                    }
-
                     try
                     { 
                         Site site = serverManager.Sites[storePath.SiteName];

@@ -15,6 +15,8 @@ using Keyfactor.Platform.Extensions.Agents.Interfaces;
 
 using Microsoft.Web.Administration;
 
+using Newtonsoft.Json;
+
 namespace IISWithBindings
 {
     public class Management : IAgentJobExtension
@@ -31,6 +33,9 @@ namespace IISWithBindings
 
         public AnyJobCompleteInfo processJob(AnyJobConfigInfo config, SubmitInventoryUpdate submitInventory, SubmitEnrollmentRequest submitEnrollmentRequest, SubmitDiscoveryResults sdr)
         {
+            dynamic properties = JsonConvert.DeserializeObject(config.Store.Properties.ToString());
+            StorePath storePath = new StorePath(properties.siteName.Value, properties.ipAddress.Value, properties.port.Value, properties.hostName.Value);
+
             using (X509Store certStore = new X509Store($@"\\{config.Store.ClientMachine}\My", StoreLocation.LocalMachine))
             {
                 switch (config.Job.OperationType)
@@ -73,9 +78,6 @@ namespace IISWithBindings
                                 }
                                 runspace.Close();
                             }
-
-                            StorePath storePath = new StorePath();
-                            storePath = StorePath.Split(config.Store.StorePath);
 
                             using (Runspace runspace = RunspaceFactory.CreateRunspace(new WSManConnectionInfo(new Uri($"http://{config.Store.ClientMachine}:5985/wsman"))))
                             {
@@ -125,9 +127,6 @@ namespace IISWithBindings
                             {
                                 using (ServerManager serverManager = ServerManager.OpenRemote(config.Store.ClientMachine))
                                 {
-                                    StorePath storePath = new StorePath();
-                                    storePath = StorePath.Split(config.Store.StorePath);
-
                                     Site site = serverManager.Sites[storePath.SiteName];
                                     if (site == null)
                                     {
