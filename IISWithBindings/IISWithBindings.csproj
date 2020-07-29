@@ -36,8 +36,8 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Keyfactor.Platform.Extensions.Agents, Version=1.0.1.0, Culture=neutral, PublicKeyToken=0ed89d330114ab09, processorArchitecture=MSIL">
-      <HintPath>..\packages\Keyfactor.Platform.Extensions.Agents.1.0.1\lib\net462\Keyfactor.Platform.Extensions.Agents.dll</HintPath>
+    <Reference Include="Keyfactor.Platform.Extensions.Agents, Version=1.3.0.0, Culture=neutral, PublicKeyToken=0ed89d330114ab09, processorArchitecture=MSIL">
+      <HintPath>..\packages\Keyfactor.Platform.Extensions.Agents.1.3.0\lib\net462\Keyfactor.Platform.Extensions.Agents.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Web.Administration, Version=7.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL" />
     <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -64,7 +64,6 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="Doc\IIS With Bindings AnyAgent Configuration.docx" />
-    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
