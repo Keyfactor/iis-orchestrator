@@ -11,7 +11,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding2
+namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
     [Job(JobTypes.INVENTORY)]
     public class Inventory: AgentJob, IAgentJobExtension

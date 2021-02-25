@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding2
+namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
     [AttributeUsage(AttributeTargets.Class)]
     public class JobAttribute : Attribute
