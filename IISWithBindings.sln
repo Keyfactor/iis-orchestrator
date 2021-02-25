@@ -7,6 +7,24 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IISWithBindings", "IISWithB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IISWithBindingsTestHarness", "IISWithBindingsTestHarness\IISWithBindingsTestHarness.csproj", "{17DF03D3-B74F-4A87-B98B-EC2E17259B41}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1A6C93E7-24FD-47FD-883D-EDABF5CEE4C6}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{6302034E-DF8C-4B65-AC36-CED24C068999}"
+	ProjectSection(SolutionItems) = preProject
+		Images\Image1.png = Images\Image1.png
+		Images\Image2.png = Images\Image2.png
+		Images\Image3.png = Images\Image3.png
+		Images\Image4.png = Images\Image4.png
+		Images\Image5.png = Images\Image5.png
+		Images\Image6.png = Images\Image6.png
+		Images\Image7.png = Images\Image7.png
+		Images\Image8.png = Images\Image8.png
+		Images\Image9.png = Images\Image9.png
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,6 +41,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6302034E-DF8C-4B65-AC36-CED24C068999} = {1A6C93E7-24FD-47FD-883D-EDABF5CEE4C6}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {05D96C70-6482-4130-B82B-8B6C511A9C97}

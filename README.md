@@ -12,16 +12,23 @@ In Keyfactor Command create a new Certificate Store Type similar to the one belo
 
 ![](Images/Image1.png)
 
-- **Name** – Required. The display name of the new Certificate Store Type
-- **Short Name** – Required. **MUST** be &quot;IISBinding&quot;
-- **Needs Server, Blueprint Allowed, Requires Store Password, Supports Entry Password** – unchecked
-- **Supports Custom Alias** – Not applicable, so &quot;Optional&quot; is fine
-- **Use PowerShell** – Unchecked
-- **Store PathType** – Fixed
-- **Store Path Value** – IIS Personal (READ ONLY – this value is display only)
-- **Private Keys** – Required (the private key must be delivered to the certificate store for IIS binding)
-- **PFX Password Style** – Default
-- **Job Types** – Inventory, Add, and Remove are the 3 job types implemented by this AnyAgent
+####STORE TYPE CONFIGURATION
+CONFIG ELEMENT	| DESCRIPTION
+---------------------|------------------
+Name	|Descriptive name for the Store Type
+Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be IISBinding
+Needs Server	|Must be checked
+Blueprint Allowed	|Unchecked
+Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be unchecked.
+Supports Entry Password	|Determined if an individual entry within a store can have a password.  This must be unchecked.
+Supports Custom Alias	|Determines if an induvial entry within a store can have a custom Alias.  This is optional.
+Uses PowerShell	|Unchecked
+Store Path Type	|Determines what restrictions are applied to the store path field when configuring a new store.  This must be Multiple Choice
+Store Path Value|A comma separated list of options to select from for the Store Path. This, combined with the hostname, will determine the location used for the certificate store management and inventory.  Must be My, WebHosting
+Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is requried since IIS will need the private key material to establish TLS connections.
+PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
+Job Types	|Inventory, Add, and Remove are the supported job types. 
+Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/><table><tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr><tr><td>port</td><td>String</td><td>443</td><td>Yes</td><tr><tr><td>ipAddress</td><td>String</td><td>*</td><td>Yes</td><tr><tr><td>hostName</td><td>String</td><td></td><td>No</td><tr><tr><td>siteName</td><td>String</td><td>Default Web Site</td><td>Yes</td><tr>
 
 **Parameters:**
 
@@ -67,3 +74,17 @@ Open the Keyfactor Windows Agent Configuration Wizard and perform the tasks as i
 In Keyfactor Command create a new Certificate Store similar to the one below, selecting IIS With Binding as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS-With-Bindings AnyAgent&quot;.
 
 ![](Images/Image9.png)
+
+####STORE CONFIGURATION 
+CONFIG ELEMENT	|DESCRIPTION
+----------------|---------------
+Category	|The type of certificate store to be configured. Select category based on the display name configured above.
+Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
+Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password.A username and password are always required, however are ignored.  The service account running the agent must have administrative rights to the server in order to manage the bindings.  This is a limition of the Microsoft.Web.Administration SDK that is used to manage the binding. 
+Store Path	|My or WebHosting
+port| Default (443) or other port for TLS bindings
+ipAddress| Default (*) or ipAddress to be used for TLS bindings
+hostName|Default(blank) or Hostname of server for TLS binding
+siteName| Default (Default Web Site) or IIS Web Site name for TLS bindings
+Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
+Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
