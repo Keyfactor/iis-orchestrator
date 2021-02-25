@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding2
+namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
     static class IISWithBinding2Constants
     {
