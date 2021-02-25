@@ -13,7 +13,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding2.Jobs
+namespace Keyfactor.Extensions.Orchestrator.IISWithBinding2
 {
     [Job(JobTypes.MANAGEMENT)]
     public class Management: AgentJob, IAgentJobExtension
