@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 using Keyfactor.Platform.Extensions.Agents;
 using Keyfactor.Platform.Extensions.Agents.Enums;
 
-using IISWithBindings;
+
+using Keyfactor.Extensions.Orchestrator.IISWithBinding;
 
 namespace IISWithBindingsTestHarness
 {

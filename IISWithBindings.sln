@@ -20,7 +20,6 @@ Global
 		{17DF03D3-B74F-4A87-B98B-EC2E17259B41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{17DF03D3-B74F-4A87-B98B-EC2E17259B41}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{17DF03D3-B74F-4A87-B98B-EC2E17259B41}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{17DF03D3-B74F-4A87-B98B-EC2E17259B41}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
