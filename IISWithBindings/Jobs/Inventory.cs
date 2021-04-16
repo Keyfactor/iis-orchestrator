@@ -1,15 +1,15 @@
-﻿using Keyfactor.Platform.Extensions.Agents;
+﻿
+using Keyfactor.Platform.Extensions.Agents;
 using Keyfactor.Platform.Extensions.Agents.Delegates;
 using Keyfactor.Platform.Extensions.Agents.Enums;
 using Keyfactor.Platform.Extensions.Agents.Interfaces;
-using Microsoft.Web.Administration;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
+using System.Net;
+using System.Security;
 
 namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
@@ -23,76 +23,87 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 
         private AnyJobCompleteInfo PerformInventory(AnyJobConfigInfo config,SubmitInventoryUpdate submitInventory)
         {
-            dynamic properties = JsonConvert.DeserializeObject(config.Store.Properties.ToString());
-            StorePath storePath = new StorePath(properties.siteName.Value, properties.ipAddress.Value, properties.port.Value, properties.hostName.Value);
-
-            List<AgentCertStoreInventoryItem> inventoryItems = new List<AgentCertStoreInventoryItem>();
-
-            Logger.Trace($"Begin Inventory for Cert Store {$@"\\{config.Store.ClientMachine}\{config.Store.StorePath}"}");
-
-            using (X509Store certStore = new X509Store($@"\\{config.Store.ClientMachine}\{config.Store.StorePath}", StoreLocation.LocalMachine))
+            try
             {
-                try
-                {
-                    certStore.Open(OpenFlags.MaxAllowed);
-                }
-                catch (System.Security.Cryptography.CryptographicException ex)
-                {
-                    Logger.Trace(ex);
-                    return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ex.Message}" };
-                }
+                StorePath storePath = JsonConvert.DeserializeObject<StorePath>(config.Store.Properties.ToString(), new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                List<AgentCertStoreInventoryItem> inventoryItems = new List<AgentCertStoreInventoryItem>();
 
-                using (ServerManager serverManager = ServerManager.OpenRemote(config.Store.ClientMachine))
+                Logger.Trace($"Begin Inventory for Cert Store {$@"\\{config.Store.ClientMachine}\{config.Store.StorePath}"}");
+
+                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"http://{config.Store.ClientMachine}:5985/wsman"));
+                connInfo.IncludePortInSPN = storePath.SPNPortFlag;
+                SecureString pw = new NetworkCredential(config.Server.Username, config.Server.Password).SecurePassword;
+                connInfo.Credential = new PSCredential(config.Server.Username, pw);
+
+                using (Runspace runspace = RunspaceFactory.CreateRunspace(connInfo))
                 {
-                    try
+                    runspace.Open();
+                    PowerShellCertStore psCertStore = new PowerShellCertStore(config.Store.ClientMachine, config.Store.StorePath, runspace);
+                    using (PowerShell ps = PowerShell.Create())
                     {
-                        Site site = serverManager.Sites[storePath.SiteName];
-                        if (site == null)
-                        {
-                            return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine} not found." };
+                        ps.Runspace = runspace;
+
+                        ps.AddCommand("Import-Module")
+                            .AddParameter("Name", "WebAdministration")
+                            .AddStatement();
+                        ps.AddCommand("Get-WebBinding")
+                            .AddParameter("Name", storePath.SiteName)
+                            .AddParameter("Protocol", storePath.Protocol)
+                            .AddParameter("Port", storePath.Port)
+                            .AddParameter("HostHeader", storePath.HostName)
+                            .AddStatement();
+
+                        var iisBindings = ps.Invoke();
+
+                        if (ps.HadErrors) { 
+                            return new AnyJobCompleteInfo() { Status = 4, Message = $"Inventory for Site {storePath.SiteName} on server {config.Store.ClientMachine} failed." };
                         }
 
-                        foreach (Binding binding in site.Bindings.Where(p => p.Protocol.Equals("https", StringComparison.CurrentCultureIgnoreCase) &&
-                                                                             p.BindingInformation.Equals(storePath.FormatForIIS(), StringComparison.CurrentCultureIgnoreCase)).ToList())
-                        {
-                            string thumbPrint = binding.GetAttributeValue("CertificateHash").ToString();
+                        if (iisBindings.Count == 0){
+                            submitInventory.Invoke(inventoryItems);
+                            return new AnyJobCompleteInfo() { Status = 3, Message = $"{storePath.Protocol} binding for Site {storePath.SiteName} on server {config.Store.ClientMachine} not found." };
+                        }
 
+                        //in theory should only be one, but keeping for future update to chance inventory
+                        foreach (var binding in iisBindings)
+                        {
+                            var thumbPrint = $"{(binding.Properties["certificateHash"]?.Value)}";
                             if (string.IsNullOrEmpty(thumbPrint))
                                 continue;
 
-                            X509Certificate2Collection x509Certs = certStore.Certificates.Find(X509FindType.FindByThumbprint, thumbPrint, true);
-                            if (x509Certs.Count == 0)
+                            var foundCert = psCertStore.Certificates.Find(m => m.Thumbprint.Equals(thumbPrint));
+
+                            if (foundCert == null)
                                 continue;
 
                             inventoryItems.Add(
                                 new AgentCertStoreInventoryItem()
                                 {
-                                    Certificates = new string[] { Convert.ToBase64String(x509Certs[0].RawData) },
+                                    Certificates = new string[] { foundCert.CertificateData },
                                     Alias = thumbPrint,
-                                    PrivateKeyEntry = x509Certs[0].HasPrivateKey,
+                                    PrivateKeyEntry = foundCert.HasPrivateKey,
                                     UseChainLevel = false,
                                     ItemStatus = AgentInventoryItemStatus.Unknown
                                 }
                             );
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        Logger.Trace(ex);
-                        return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ex.Message}" };
-                    }
+                    runspace.Close();
                 }
-            }
 
-            try
-            {
                 submitInventory.Invoke(inventoryItems);
                 return new AnyJobCompleteInfo() { Status = 2, Message = "Successful" };
+            }
+            catch (PSCertStoreException psEx)
+            {
+                Logger.Trace(psEx);
+                return new AnyJobCompleteInfo() { Status = 4, Message = $"Unable to open remote certificate store: {psEx.Message}" };
             }
             catch (Exception ex)
             {
                 Logger.Trace(ex);
                 return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ex.Message}" };
+
             }
         }
     }

@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{F57D07DB-613D-4837-B709-6E943CD4BA10}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>IISDemo</RootNamespace>
+    <RootNamespace>Keyfactor.Extensions.Orchestrator.IISWithBinding</RootNamespace>
     <AssemblyName>IISWithBindings</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -47,9 +47,6 @@
     </Reference>
     <Reference Include="Keyfactor.Platform.Extensions.Agents, Version=1.0.1.0, Culture=neutral, PublicKeyToken=0ed89d330114ab09, processorArchitecture=MSIL">
       <HintPath>..\packages\Keyfactor.Platform.Extensions.Agents.1.0.1\lib\net462\Keyfactor.Platform.Extensions.Agents.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Web.Administration, Version=10.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Web.Administration.11.1.0\lib\netstandard1.5\Microsoft.Web.Administration.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Win32.Primitives, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Win32.Primitives.4.0.1\lib\net46\Microsoft.Win32.Primitives.dll</HintPath>
@@ -220,7 +217,10 @@
     <Compile Include="Jobs\AgentJob.cs" />
     <Compile Include="Jobs\Inventory.cs" />
     <Compile Include="Jobs\Management.cs" />
+    <Compile Include="PowerShellCertStore.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PSCertificate.cs" />
+    <Compile Include="PSCertStoreException.cs" />
     <Compile Include="StorePath.cs" />
   </ItemGroup>
   <ItemGroup>

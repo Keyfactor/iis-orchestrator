@@ -8,7 +8,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
     static class IISWithBinding2Constants
     {
-        public const string STORE_TYPE_NAME = "IISBind2";
+        public const string STORE_TYPE_NAME = "IISBinding";
     }
 
     static class JobTypes

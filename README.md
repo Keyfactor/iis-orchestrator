@@ -21,7 +21,7 @@ Needs Server	|Must be checked
 Blueprint Allowed	|Unchecked
 Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be unchecked.
 Supports Entry Password	|Determined if an individual entry within a store can have a password.  This must be unchecked.
-Supports Custom Alias	|Determines if an induvial entry within a store can have a custom Alias.  This is optional.
+Supports Custom Alias	|Determines if an individual entry within a store can have a custom Alias.  This must be Forbidden.
 Uses PowerShell	|Unchecked
 Store Path Type	|Determines what restrictions are applied to the store path field when configuring a new store.  This must be Multiple Choice
 Store Path Value|A comma separated list of options to select from for the Store Path. This, combined with the hostname, will determine the location used for the certificate store management and inventory.  Must be My, WebHosting
@@ -80,11 +80,11 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category	|The type of certificate store to be configured. Select category based on the display name configured above.
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
-Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password.A username and password are always required, however are ignored.  The service account running the agent must have administrative rights to the server in order to manage the bindings.  This is a limition of the Microsoft.Web.Administration SDK that is used to manage the binding. 
+Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
 Store Path	|My or WebHosting
 port| Default (443) or other port for TLS bindings
 ipAddress| Default (*) or ipAddress to be used for TLS bindings
-hostName|Default(blank) or Hostname of server for TLS binding
+hostName|Default(blank) or Host Header value to be used in for TLS binding
 siteName| Default (Default Web Site) or IIS Web Site name for TLS bindings
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
 Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
