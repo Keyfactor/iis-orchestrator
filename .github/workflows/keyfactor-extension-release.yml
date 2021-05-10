@@ -8,8 +8,8 @@ on:
   push:
     #only run this workflow when pushing to a branch that contains a release number. ignore -pre
     branches: 
-        - 'release-[12].[0-9]+.[0-9]+' 
-        - '!release--[12].[0-9]+.[0-9]+-pre*' 
+        - 'release-[12].[0-9]+' 
+        - '!release-[12].[0-9]+.[0-9]+-pre*' 
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -66,8 +66,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          release_name: Release ${{ env.RELEASE_NAME  }}
+          release_name: Release 1.0.3
           body: |
+            Add SNI support for new bindings when adding certificates to an IIS Store
             [Changelog](../CHANGELOG.MD)
           draft: false
           prerelease: false
