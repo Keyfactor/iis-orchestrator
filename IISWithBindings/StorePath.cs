@@ -23,10 +23,12 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
         [JsonProperty("protocol")]
         [DefaultValue("https")]
         public string Protocol { get; set; }
-
         [JsonProperty("spnwithport")]
         [DefaultValue(false)]
         public bool SPNPortFlag { get; set; }
+        [JsonProperty("sniflag")]
+        [DefaultValue(SniFlag.None)]
+        public SniFlag SniFlag { get; set; }
 
         public StorePath()
         {
@@ -45,5 +47,13 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
         {
             return $@"{IP}:{Port}:{HostName}";
         }
+    }
+
+    enum SniFlag
+    {
+        None = 0,
+        SNI = 1,
+        NoneCentral = 2,
+        SniCentral = 3
     }
 }
