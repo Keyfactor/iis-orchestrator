@@ -121,7 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
                 Logger.Trace($"Begin Add for Cert Store {$@"\\{config.Store.ClientMachine}\{config.Store.StorePath}"}");
 
                 using (Runspace runspace = RunspaceFactory.CreateRunspace(connInfo))
-                {
+                {   
                     runspace.Open();
                     PowerShellCertStore psCertStore = new PowerShellCertStore(config.Store.ClientMachine, config.Store.StorePath, runspace);
                     using (PowerShell ps = PowerShell.Create())
@@ -162,10 +162,17 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
                                                 Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -Port ""{2}"" -Protocol ""{3}"" |
                                                     ForEach-Object {{ Remove-WebBinding -BindingInformation  $_.bindingInformation }}
 
-                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}""
+                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
                                                 Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
                                                     ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", storePath.SiteName, storePath.IP, storePath.Port, storePath.Protocol, storePath.HostName, x509Cert.Thumbprint, config.Store.StorePath);
+                                            }}", storePath.SiteName,        //{0} 
+                                                 storePath.IP,              //{1}
+                                                 storePath.Port,            //{2}
+                                                 storePath.Protocol,        //{3}
+                                                 storePath.HostName,        //{4}
+                                                 x509Cert.Thumbprint,       //{5} 
+                                                 config.Store.StorePath,    //{6}
+                                                 (int)storePath.SniFlag);   //{7}
 
                         ps.AddScript(funcScript);
                         ps.Invoke();

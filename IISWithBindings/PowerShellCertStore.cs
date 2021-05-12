@@ -62,6 +62,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
             {
                 using (PowerShell ps = PowerShell.Create())
                 {
+                   
                     ps.Runspace = Runspace;
                     //todo: accept StoreType and Store Name enum for which to open
                     string certStoreScript = $@"
