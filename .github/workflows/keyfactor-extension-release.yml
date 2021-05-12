@@ -80,7 +80,7 @@ jobs:
       - name: Increment Assembly Version
         run: |
             $VersionRegex = "\d+\.\d+\.\d+"
-            $assemlyFilePath = (Get-ChildItem -Include AssemblyInfo.cs -File -Recurse).fullname
+            $assemlyFilePath = (Get-ChildItem -Include AssemblyInfo.cs -File -Recurse -Path .\IISWithBindings\).fullname
             $filecontent = Get-Content($assemlyFilePath)
             $newVer = "${{ steps.create_release.outputs.current_tag }}".TrimStart('v')
             attrib $assemlyFilePath -r
