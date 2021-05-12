@@ -94,7 +94,7 @@ jobs:
         if: ${{ success() }}
         run: |
            md ${{ github.workspace }}\zip\Keyfactor
-           Compress-Archive -Path ${{ github.workspace }}\PEMStoreSSH\bin\Release\*.dll,${{ github.workspace }}\PEMStoreSSH\bin\Release\config.json -DestinationPath ${{ github.workspace }}\zip\Keyfactor\$Env:REPO_NAME.zip -Force      
+           Compress-Archive -Path ${{ github.workspace }}\IISWithBindings\bin\Release\*.dll -DestinationPath ${{ github.workspace }}\zip\Keyfactor\$Env:REPO_NAME.zip -Force      
       
       - name: Upload Release Asset (x64)
         if: ${{ success() }}
