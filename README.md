@@ -12,7 +12,7 @@ In Keyfactor Command create a new Certificate Store Type similar to the one belo
 
 ![](Images/Image1.png)
 
-####STORE TYPE CONFIGURATION
+#### STORE TYPE CONFIGURATION
 CONFIG ELEMENT	| DESCRIPTION
 ---------------------|------------------
 Name	|Descriptive name for the Store Type
@@ -30,19 +30,18 @@ PFX Password Style	|This determines how the platform generate passwords to prote
 Job Types	|Inventory, Add, and Remove are the supported job types. 
 Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/><table><tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr><tr><td>port</td><td>String</td><td>443</td><td>Yes</td><tr><tr><td>ipAddress</td><td>String</td><td>*</td><td>Yes</td><tr><tr><td>hostName</td><td>String</td><td></td><td>No</td><tr><tr><td>siteName</td><td>String</td><td>Default Web Site</td><td>Yes</td><tr><tr><td>sniflag</td><td>String</td><td>0</td><td>No</td><tr><tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td><tr>
 
-    **Parameters:**
-
-    - **Site Name** – Required. The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
-    - **IP Address** – Required. The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
-    - **Port** – Required. The port for the web site being bound to. Default is &quot;443&quot;.
-    - **Host Name** – Optional. The host name for the web site being bound to.
-    - **SPN with Port** - Optional. Determine if the SPN assoicated with the remote connection contains the connection's port number (5985). Default is &quot;false&quot;.
-    - **SNI Enabled** – Optional. Set the SNI flag assoicated with the binding being created.Default is &quot;0&quot;. Acceptable values are:
-        - 0  No SNI
-        - 1  SNI Enabled
-        - 2  Non SNI binding which uses Central Certificate Store
-        - 3  SNI binding which uses Central Certificate Store
-
+**Parameters:**
+- **Site Name** – Required. The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
+- **IP Address** – Required. The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
+- **Port** – Required. The port for the web site being bound to. Default is &quot;443&quot;.
+- **Host Name** – Optional. The host name for the web site being bound to.
+- **SPN with Port** - Optional. Determine if the SPN assoicated with the remote connection contains the connection's port number (5985). Default is &quot;false&quot;.
+- **SNI Enabled** – Optional. Set the SNI flag assoicated with the binding being created.Default is &quot;0&quot;. Acceptable values are:
+   - 0  No SNI
+   - 1  SNI Enabled
+   - 2  Non SNI binding which uses Central Certificate Store
+   - 3  SNI binding which uses Central Certificate Store
+</table>
 
 **2. Register the IIS-With-Bindings AnyAgent with Keyfactor**
 
@@ -82,7 +81,7 @@ In Keyfactor Command create a new Certificate Store similar to the one below, se
 
 ![](Images/Image9.png)
 
-####STORE CONFIGURATION 
+#### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category	|The type of certificate store to be configured. Select category based on the display name configured above.
