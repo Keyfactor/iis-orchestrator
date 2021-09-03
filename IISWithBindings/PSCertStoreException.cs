@@ -4,21 +4,21 @@ using System.Runtime.Serialization;
 namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
     [Serializable]
-    internal class PSCertStoreException : Exception
+    internal class PsCertStoreException : Exception
     {
-        public PSCertStoreException()
+        public PsCertStoreException()
         {
         }
 
-        public PSCertStoreException(string message) : base(message)
+        public PsCertStoreException(string message) : base(message)
         {
         }
 
-        public PSCertStoreException(string message, Exception innerException) : base(message, innerException)
+        public PsCertStoreException(string message, Exception innerException) : base(message, innerException)
         {
         }
 
-        protected PSCertStoreException(SerializationInfo info, StreamingContext context) : base(info, context)
+        protected PsCertStoreException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }
     }
