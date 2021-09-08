@@ -1,48 +1,47 @@
-﻿using System;
+﻿
+using Keyfactor.Platform.Extensions.Agents;
+using Keyfactor.Platform.Extensions.Agents.Delegates;
+using Keyfactor.Platform.Extensions.Agents.Enums;
+using Keyfactor.Platform.Extensions.Agents.Interfaces;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Security;
-using Keyfactor.Orchestrators.Common.Enums;
-using Keyfactor.Orchestrators.Extensions;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
+namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
-    public class Inventory : IInventoryJobExtension
+    [Job(JobTypes.INVENTORY)]
+    public class Inventory: AgentJob, IAgentJobExtension
     {
-        private readonly ILogger<Inventory> _logger;
+        public override AnyJobCompleteInfo processJob(AnyJobConfigInfo config, SubmitInventoryUpdate submitInventory, SubmitEnrollmentRequest submitEnrollmentRequest, SubmitDiscoveryResults sdr)
+        {
+            return PerformInventory(config,submitInventory);
+        }
 
-        public Inventory(ILogger<Inventory> logger) =>
-            _logger = logger;
-
-        private JobResult PerformInventory(InventoryJobConfiguration config, SubmitInventoryUpdate submitInventory)
+        private AnyJobCompleteInfo PerformInventory(AnyJobConfigInfo config,SubmitInventoryUpdate submitInventory)
         {
             try
             {
-                StorePath storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-                var inventoryItems = new List<CurrentInventoryItem>();
+                StorePath storePath = JsonConvert.DeserializeObject<StorePath>(config.Store.Properties.ToString(), new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                List<AgentCertStoreInventoryItem> inventoryItems = new List<AgentCertStoreInventoryItem>();
 
-                _logger.LogTrace($"Begin Inventory for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
+                Logger.Trace($"Begin Inventory for Cert Store {$@"\\{config.Store.ClientMachine}\{config.Store.StorePath}"}");
 
-                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
-                if (storePath != null)
+                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"http://{config.Store.ClientMachine}:5985/wsman"));
+                connInfo.IncludePortInSPN = storePath.SPNPortFlag;
+                SecureString pw = new NetworkCredential(config.Server.Username, config.Server.Password).SecurePassword;
+                connInfo.Credential = new PSCredential(config.Server.Username, pw);
+
+                using (Runspace runspace = RunspaceFactory.CreateRunspace(connInfo))
                 {
-                    connInfo.IncludePortInSPN = storePath.SpnPortFlag;
-                    SecureString pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
-                        .SecurePassword;
-                    connInfo.Credential = new PSCredential(config.ServerUsername, pw);
-
-                    using Runspace runSpace = RunspaceFactory.CreateRunspace(connInfo);
-                    runSpace.Open();
-                    PowerShellCertStore psCertStore = new PowerShellCertStore(
-                        config.CertificateStoreDetails.ClientMachine, config.CertificateStoreDetails.StorePath,
-                        runSpace);
+                    runspace.Open();
+                    PowerShellCertStore psCertStore = new PowerShellCertStore(config.Store.ClientMachine, config.Store.StorePath, runspace);
                     using (PowerShell ps = PowerShell.Create())
                     {
-                        ps.Runspace = runSpace;
+                        ps.Runspace = runspace;
 
                         ps.AddCommand("Import-Module")
                             .AddParameter("Name", "WebAdministration")
@@ -56,25 +55,13 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                         var iisBindings = ps.Invoke();
 
-                        if (ps.HadErrors)
-                        {
-                            return new JobResult
-                            {
-                                Result = OrchestratorJobStatusJobResult.Failure,
-                                FailureMessage =
-                                    $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}:  failed."
-                            };
+                        if (ps.HadErrors) { 
+                            return new AnyJobCompleteInfo() { Status = 4, Message = $"Inventory for Site {storePath.SiteName} on server {config.Store.ClientMachine} failed." };
                         }
 
-                        if (iisBindings.Count == 0)
-                        {
+                        if (iisBindings.Count == 0){
                             submitInventory.Invoke(inventoryItems);
-                            return new JobResult
-                            {
-                                Result = OrchestratorJobStatusJobResult.Warning,
-                                FailureMessage =
-                                    $"{storePath.Protocol} binding for Site {storePath.SiteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
-                            };
+                            return new AnyJobCompleteInfo() { Status = 3, Message = $"{storePath.Protocol} binding for Site {storePath.SiteName} on server {config.Store.ClientMachine} not found." };
                         }
 
                         //in theory should only be one, but keeping for future update to chance inventory
@@ -90,56 +77,34 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                                 continue;
 
                             inventoryItems.Add(
-                                new CurrentInventoryItem
+                                new AgentCertStoreInventoryItem()
                                 {
-                                    Certificates = new[] {foundCert.CertificateData},
+                                    Certificates = new string[] { foundCert.CertificateData },
                                     Alias = thumbPrint,
                                     PrivateKeyEntry = foundCert.HasPrivateKey,
                                     UseChainLevel = false,
-                                    ItemStatus = OrchestratorInventoryItemStatus.Unknown
+                                    ItemStatus = AgentInventoryItemStatus.Unknown
                                 }
                             );
                         }
                     }
-
-                    runSpace.Close();
+                    runspace.Close();
                 }
 
                 submitInventory.Invoke(inventoryItems);
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = ""
-                };
+                return new AnyJobCompleteInfo() { Status = 2, Message = "Successful" };
             }
-            catch (PsCertStoreException psEx)
+            catch (PSCertStoreException psEx)
             {
-                _logger.LogTrace(psEx.Message);
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    FailureMessage =
-                        $"Unable to open remote certificate store: {psEx.Message}"
-                };
+                Logger.Trace(psEx);
+                return new AnyJobCompleteInfo() { Status = 4, Message = $"Unable to open remote certificate store: {psEx.Message}" };
             }
             catch (Exception ex)
             {
-                _logger.LogTrace(ex.Message);
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    FailureMessage =
-                        $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
-                };
+                Logger.Trace(ex);
+                return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ex.Message}" };
 
             }
-        }
-
-        public string ExtensionName => "IISBindings";
-        public JobResult ProcessJob(InventoryJobConfiguration jobConfiguration, SubmitInventoryUpdate submitInventoryUpdate)
-        {
-            return PerformInventory(jobConfiguration, submitInventoryUpdate);
         }
     }
 }

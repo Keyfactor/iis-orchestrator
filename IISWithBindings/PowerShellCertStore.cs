@@ -1,30 +1,33 @@
-﻿using System;
+﻿using Keyfactor.Extensions.Orchestrator.IISWithBinding;
+using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 
 namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
-    internal class PowerShellCertStore
+    class PowerShellCertStore
     {
-        public PowerShellCertStore(string serverName, string storePath, Runspace runSpace)
+        public string ServerName { get; set; }
+        public string StorePath { get; set; }
+        public Runspace Runspace { get; set; }
+        public List<PSCertificate> Certificates { get; set; }
+        public PowerShellCertStore(string serverName, string storePath, Runspace runspace)
         {
             ServerName = serverName;
             StorePath = storePath;
-            RunSpace = runSpace;
+            Runspace = runspace;
             Initalize();
         }
 
-        public string ServerName { get; set; }
-        public string StorePath { get; set; }
-        public Runspace RunSpace { get; set; }
-        public List<PsCertificate> Certificates { get; set; }
-
         public void RemoveCertificate(string thumbprint)
         {
-            using var ps = PowerShell.Create();
-            ps.Runspace = RunSpace;
-            var removeScript = $@"
+            try
+            {
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.Runspace = Runspace;
+                    string removeScript = $@"
                         $ErrorActionPreference = 'Stop'
                         $certStore = New-Object System.Security.Cryptography.X509Certificates.X509Store('{StorePath}','LocalMachine')
                         $certStore.Open('MaxAllowed')
@@ -36,22 +39,33 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
                         $certStore.Dispose()
                     ";
 
-            ps.AddScript(removeScript);
+                    ps.AddScript(removeScript);
 
-            var _ = ps.Invoke();
-            if (ps.HadErrors)
-                throw new PsCertStoreException($"Error removing certificate in {StorePath} store on {ServerName}.");
+                    var certs = ps.Invoke();
+                    if (ps.HadErrors)
+                    {
+                        throw new PSCertStoreException($"Error removing certificate in {StorePath} store on {ServerName}.");
+                    }
+                } 
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
         }
 
         private void Initalize()
         {
-            Certificates = new List<PsCertificate>();
+            Certificates = new List<PSCertificate>();
             try
             {
-                using var ps = PowerShell.Create();
-                ps.Runspace = RunSpace;
-                //todo: accept StoreType and Store Name enum for which to open
-                var certStoreScript = $@"
+                using (PowerShell ps = PowerShell.Create())
+                {
+                   
+                    ps.Runspace = Runspace;
+                    //todo: accept StoreType and Store Name enum for which to open
+                    string certStoreScript = $@"
                                 $certStore = New-Object System.Security.Cryptography.X509Certificates.X509Store('{StorePath}','LocalMachine')
                                 $certStore.Open('ReadOnly')
                                 $certs = $certStore.Certificates
@@ -61,22 +75,23 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
                                     $cert | Select-Object -Property Thumbprint, RawData, HasPrivateKey
                                 }}";
 
-                ps.AddScript(certStoreScript);
+                    ps.AddScript(certStoreScript);
 
-                var certs = ps.Invoke();
+                    var certs = ps.Invoke();
 
-                foreach (var c in certs)
-                    Certificates.Add(new PsCertificate
+                    foreach (var c in certs)
                     {
-                        Thumbprint = $"{c.Properties["Thumbprint"]?.Value}",
-                        HasPrivateKey = bool.Parse($"{c.Properties["HasPrivateKey"]?.Value}"),
-                        RawData = (byte[]) c.Properties["RawData"]?.Value
-                    });
+                        Certificates.Add(new PSCertificate() { 
+                            Thumbprint = $"{c.Properties["Thumbprint"]?.Value}",
+                            HasPrivateKey = bool.Parse($"{c.Properties["HasPrivateKey"]?.Value}"),
+                            RawData = (byte[])c.Properties["RawData"]?.Value 
+                        });
+                    }
+                }
             }
             catch (Exception ex)
             {
-                throw new PsCertStoreException(
-                    $"Error listing certificate in {StorePath} store on {ServerName}: {ex.Message}");
+                throw new PSCertStoreException($"Error listing certificate in {StorePath} store on {ServerName}: {ex.Message}");
             }
         }
     }
