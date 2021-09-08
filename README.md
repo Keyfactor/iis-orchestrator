@@ -10,7 +10,7 @@ This agent implements three job types – Inventory, Management Add, and Managem
 
 In Keyfactor Command create a new Certificate Store Type similar to the one below:
 
-![](images/screen1.png)
+![](images/screen1.gif)
 
 #### STORE TYPE CONFIGURATION
 CONFIG ELEMENT	| DESCRIPTION
@@ -47,31 +47,31 @@ Parameters	|This section must be configured with binding fields. The parameters 
 
 Open the Keyfactor Windows Agent Configuration Wizard and perform the tasks as illustrated below:
 
-![](images/screen2.png)
+![](images/screen2.gif)
 
 - Click **\<Next\>**
 
-![](images/screen3.png)
+![](images/screen3.gif)
 
 - If you have configured the agent service previously, you should be able to skip to just click **\<Next\>.** Otherwise, enter the service account Username and Password you wish to run the Keyfactor Windows Agent Service under, click **\<Update Windows Service Account\>** and click **\<Next\>.**
 
-![](images/screen4.png)
+![](images/screen4.gif)
 
 - If you have configured the agent service previously, you should be able to skip to just re-enter the password to the service account the agent service will run under, click **\<Validate Keyfactor Connection\>** and then **\<Next\>.**
 
-![](images/screen5.png)
+![](images/screen5.gif)
 
 - Select the agent you are adding capabilities for (in this case, IIS With Binding, and also select the specific capabilities (Inventory and Management in this example). Click **\<Next\>**.
 
-![](images/screen6.png)
+![](images/screen6.gif)
 
 - For agent configuration purposes, this screen can be skipped by clicking **\<Next\>**.
 
-![](images/screen7.png)
+![](images/screen7.gif)
 
 - For each AnyAgent implementation, check **Load assemblies containing extension modules from other location** , browse to the location of the compiled AnyAgent dll, and click **\<Validate Capabilities\>**. Once all AnyAgents have been validated, click **\<Apply Configuration\>**.
 
-![](images/screen8.png)
+![](images/screen8.gif)
 
 - If the Keyfactor Agent Configuration Wizard configured everything correctly, you should see the dialog above.
 
@@ -79,7 +79,7 @@ Open the Keyfactor Windows Agent Configuration Wizard and perform the tasks as i
 
 In Keyfactor Command create a new Certificate Store similar to the one below, selecting IIS With Binding as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS-With-Bindings AnyAgent&quot;.
 
-![](images/screen9.png)
+![](images/screen9.gif)
 
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
