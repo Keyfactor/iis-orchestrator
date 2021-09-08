@@ -47,31 +47,31 @@ Parameters	|This section must be configured with binding fields. The parameters 
 
 Open the Keyfactor Windows Agent Configuration Wizard and perform the tasks as illustrated below:
 
-![](Images/Image2.png)
+![](images/Image2.png)
 
 - Click **\<Next\>**
 
-![](Images/Image3.png)
+![](images/Image3.png)
 
 - If you have configured the agent service previously, you should be able to skip to just click **\<Next\>.** Otherwise, enter the service account Username and Password you wish to run the Keyfactor Windows Agent Service under, click **\<Update Windows Service Account\>** and click **\<Next\>.**
 
-![](Images/Image4.png)
+![](images/Image4.png)
 
 - If you have configured the agent service previously, you should be able to skip to just re-enter the password to the service account the agent service will run under, click **\<Validate Keyfactor Connection\>** and then **\<Next\>.**
 
-![](Images/Image5.png)
+![](images/Image5.png)
 
 - Select the agent you are adding capabilities for (in this case, IIS With Binding, and also select the specific capabilities (Inventory and Management in this example). Click **\<Next\>**.
 
-![](Images/Image6.png)
+![](images/Image6.png)
 
 - For agent configuration purposes, this screen can be skipped by clicking **\<Next\>**.
 
-![](Images/Image7.png)
+![](images/Image7.png)
 
 - For each AnyAgent implementation, check **Load assemblies containing extension modules from other location** , browse to the location of the compiled AnyAgent dll, and click **\<Validate Capabilities\>**. Once all AnyAgents have been validated, click **\<Apply Configuration\>**.
 
-![](Images/Image8.png)
+![](images/Image8.png)
 
 - If the Keyfactor Agent Configuration Wizard configured everything correctly, you should see the dialog above.
 
@@ -79,7 +79,7 @@ Open the Keyfactor Windows Agent Configuration Wizard and perform the tasks as i
 
 In Keyfactor Command create a new Certificate Store similar to the one below, selecting IIS With Binding as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS-With-Bindings AnyAgent&quot;.
 
-![](Images/Image9.png)
+![](images/Image9.png)
 
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
