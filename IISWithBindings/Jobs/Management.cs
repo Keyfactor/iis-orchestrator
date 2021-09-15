@@ -34,7 +34,14 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             switch (jobConfiguration.OperationType)
             {
                 case CertStoreOperationType.Add:
-                    complete = PerformAddition(jobConfiguration);
+                    if (jobConfiguration.JobProperties.ContainsKey("RenewalThumbprint"))
+                    {
+                        complete = PerformRenewal(jobConfiguration);
+                    }
+                    else
+                    {
+                        complete = PerformAddition(jobConfiguration);
+                    }
                     break;
                 case CertStoreOperationType.Remove:
                     complete = PerformRemoval(jobConfiguration);
@@ -213,13 +220,13 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                                                 Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
                                                     ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
                                             }}", storePath.SiteName, //{0} 
-                        storePath.Ip, //{1}
-                        storePath.Port, //{2}
+                        config.JobProperties["IP Address"], //{1}
+                        config.JobProperties["Port"], //{2}
                         storePath.Protocol, //{3}
-                        storePath.HostName, //{4}
+                        config.JobProperties["IP Address"], //{4}
                         x509Cert.Thumbprint, //{5} 
                         config.CertificateStoreDetails.StorePath, //{6}
-                        (int) storePath.SniFlag); //{7}
+                        Convert.ToInt16(config.JobProperties["Sni Flag"].ToString().Substring(0,1))); //{7}
 
                     ps.AddScript(funcScript);
                     ps.Invoke();
