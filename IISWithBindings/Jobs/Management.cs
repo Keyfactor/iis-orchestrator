@@ -56,11 +56,9 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             {
 
                 var siteName = config.JobProperties["Site Name"];
-                var ipAddress = config.JobProperties["IP Address"];
                 var port = config.JobProperties["Port"];
                 var hostName = config.JobProperties["Host Name"];
                 var protocol = config.JobProperties["Protocol"];
-                var sniFlag = Convert.ToInt16(config.JobProperties["Sni Flag"].ToString()?.Substring(0, 1));
 
                 var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
@@ -154,12 +152,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
         {
             try
             {
-                var siteName = config.JobProperties["Site Name"];
-                var ipAddress = config.JobProperties["IP Address"];
-                var port = config.JobProperties["Port"];
-                var hostName = config.JobProperties["Host Name"];
                 var protocol = config.JobProperties["Protocol"];
-                var sniFlag = Convert.ToInt16(config.JobProperties["Sni Flag"].ToString()?.Substring(0, 1));
 
                 var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
@@ -235,17 +228,17 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         foreach (var binding in bindings)
                         {
                             var bindingSiteName = binding.Properties["name"].Value.ToString();
-                            var bindingIPAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
+                            var bindingIpAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
                             var bindingPort = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
                             var bindingHostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
                             var bindingProtocol = binding.Properties["Protocol"].Value.ToString();
-                            var bindingThumprint = binding.Properties["thumbprint"].Value.ToString();
+                            var bindingThumbprint = binding.Properties["thumbprint"].Value.ToString();
                             var bindingSniFlg = binding.Properties["sniFlg"].Value.ToString();
-                            Console.WriteLine(bindingThumprint);
+                            Console.WriteLine(bindingThumbprint);
 
 
                             //if the thumprint of the renewal request matches the thumprint of the cert in IIS, then renew it
-                            if (_thumbprint == bindingThumprint)
+                            if (_thumbprint == bindingThumbprint)
                             {
                                 funcScript = string.Format(@"
                                             $ErrorActionPreference = ""Stop""
@@ -260,7 +253,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                                                 Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
                                                     ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
                                             }}", bindingSiteName, //{0} 
-                                                bindingIPAddress, //{1}
+                                                bindingIpAddress, //{1}
                                                 bindingPort, //{2}
                                                 bindingProtocol, //{3}
                                                 bindingHostName, //{4}
