@@ -15,6 +15,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
     {
         private readonly ILogger<Management> _logger;
 
+        private string Thumbprint = string.Empty;
+
         public Management(ILogger<Management> logger)
         {
             _logger = logger;
@@ -36,12 +38,9 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 case CertStoreOperationType.Add:
                     if (jobConfiguration.JobProperties.ContainsKey("RenewalThumbprint"))
                     {
-                        complete = PerformRenewal(jobConfiguration);
+                        Thumbprint = jobConfiguration.JobProperties["RenewalThumbprint"].ToString();
                     }
-                    else
-                    {
-                        complete = PerformAddition(jobConfiguration);
-                    }
+                    complete = PerformAddition(jobConfiguration, Thumbprint);
                     break;
                 case CertStoreOperationType.Remove:
                     complete = PerformRemoval(jobConfiguration);
@@ -144,7 +143,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             }
         }
 
-        private JobResult PerformAddition(ManagementJobConfiguration config)
+        private JobResult PerformAddition(ManagementJobConfiguration config,string thumpPrint)
         {
             try
             {
@@ -207,7 +206,30 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         };
 
                     ps.Commands.Clear();
-                    funcScript = string.Format(@"
+
+                    //if thumprint is there it is a renewal so we have to search all the sites for that tumprint and renew them all
+                    if (thumpPrint.Length > 0)
+                    {
+                        ps.AddCommand("Import-Module")
+                        .AddParameter("Name", "WebAdministration")
+                        .AddStatement();
+
+                        var searchScript = "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash;sniFlg=$Bind.sslFlags}}}";
+                        ps.AddScript(searchScript).AddStatement();
+                        var bindings = ps.Invoke();
+
+                        foreach (var binding in bindings)
+                        {
+                            var siteName = binding.Properties["name"].Value.ToString();
+                            var ipAddress = binding.Properties["Bindings"].Value.ToString().Split(':')[0];
+                            var port = binding.Properties["Bindings"].Value.ToString().Split(':')[1];
+                            var hostName = binding.Properties["Bindings"].Value.ToString().Split(':')[2];
+                            var protocal = binding.Properties["Protocol"].Value.ToString();
+                            var thumbPrint = binding.Properties["thumbprint"].Value.ToString();
+                            var sniFlag = binding.Properties["sniFlg"].Value.ToString();
+                            Console.WriteLine(thumbPrint);
+
+                            funcScript = string.Format(@"
                                             $ErrorActionPreference = ""Stop""
 
                                             $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
@@ -219,18 +241,46 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                                                 New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
                                                 Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
                                                     ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", storePath.SiteName, //{0} 
-                        config.JobProperties["IP Address"], //{1}
-                        config.JobProperties["Port"], //{2}
-                        storePath.Protocol, //{3}
-                        config.JobProperties["IP Address"], //{4}
-                        x509Cert.Thumbprint, //{5} 
-                        config.CertificateStoreDetails.StorePath, //{6}
-                        Convert.ToInt16(config.JobProperties["Sni Flag"].ToString().Substring(0,1))); //{7}
+                                            }}", siteName, //{0} 
+                                            ipAddress, //{1}
+                                            port, //{2}
+                                            protocal, //{3}
+                                            ipAddress, //{4}
+                                            thumpPrint, //{5} 
+                                            config.CertificateStoreDetails.StorePath, //{6}
+                                            Convert.ToInt16(sniFlag)); //{7}
 
-                    ps.AddScript(funcScript);
-                    ps.Invoke();
+                            ps.AddScript(funcScript);
+                            ps.Invoke();
+                            ps.Commands.Clear();
+                        }
+                    }
+                    else
+                    {
+                        funcScript = string.Format(@"
+                                            $ErrorActionPreference = ""Stop""
 
+                                            $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
+                                            if($IISInstalled) {{
+                                                Import-Module WebAdministration
+                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -Port ""{2}"" -Protocol ""{3}"" |
+                                                    ForEach-Object {{ Remove-WebBinding -BindingInformation  $_.bindingInformation }}
+
+                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
+                                                Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
+                                                    ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
+                                            }}", config.JobProperties["Site Name"], //{0} 
+                            config.JobProperties["IP Address"], //{1}
+                            config.JobProperties["Port"], //{2}
+                            storePath.Protocol, //{3}
+                            config.JobProperties["Host Name"], //{4}
+                            x509Cert.Thumbprint, //{5} 
+                            config.CertificateStoreDetails.StorePath, //{6}
+                            Convert.ToInt16(config.JobProperties["Sni Flag"].ToString().Substring(0, 1))); //{7}
+
+                        ps.AddScript(funcScript);
+                        ps.Invoke();
+                    }
                     if (ps.HadErrors)
                         return new JobResult
                         {

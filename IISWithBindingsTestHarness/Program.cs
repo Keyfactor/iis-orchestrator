@@ -12,27 +12,41 @@ namespace IISWithBindingsTestHarness
         static void Main(string[] args)
         {
 
-            try
+            var connInfo =
+                new WSManConnectionInfo(
+                    new Uri($"http://localhost:5985/wsman"));
+
+            connInfo.IncludePortInSPN = false;
+            var pw = new NetworkCredential("keyfactor\\administrator", "Password1")
+                .SecurePassword;
+            connInfo.Credential = new PSCredential("keyfactor\\administrator", pw);
+
+            using var runSpace = RunspaceFactory.CreateRunspace(connInfo);
+            runSpace.Open();
+            using var ps = PowerShell.Create();
+            ps.Runspace = runSpace;
+
+            ps.AddCommand("Import-Module")
+                .AddParameter("Name", "WebAdministration")
+                .AddStatement();
+
+            //ps.AddCommand("Get-Website");
+            var funcScript =
+                "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash}}}";
+            ps.AddScript(funcScript).AddStatement();
+            var bindings = ps.Invoke();
+
+            foreach (var binding in bindings)
             {
-                //http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman
-                Uri RemoteComputerUri = new Uri("http://localhost:5985/WSMAN");
-                WSManConnectionInfo connInfo = new WSManConnectionInfo(RemoteComputerUri);
-
-                connInfo.IncludePortInSPN = true;
-                SecureString pw = new NetworkCredential("keyfactor\\administrator", "Password1")
-                    .SecurePassword;
-                connInfo.Credential = new PSCredential("keyfactor\\administrator", pw);
-
-                using (Runspace remoteRunspace = RunspaceFactory.CreateRunspace(connInfo))
-                {
-                    remoteRunspace.Open();
-                }
-
+                var siteName = binding.Properties["name"].Value.ToString();
+                var ipAddress = binding.Properties["Bindings"].Value.ToString().Split(':')[0];
+                var port = binding.Properties["Bindings"].Value.ToString().Split(':')[1];
+                var hostName = binding.Properties["Bindings"].Value.ToString().Split(':')[2];
+                var protocal= binding.Properties["Protocol"].Value.ToString();
+                var thumbPrint = binding.Properties["thumbprint"].Value.ToString();
+                Console.WriteLine(thumbPrint);
             }
-            catch(Exception e)
-            {
-                Console.Write(e.Message);
-            }
+
         }
     }
 }
