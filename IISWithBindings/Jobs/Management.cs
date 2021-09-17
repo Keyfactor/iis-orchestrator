@@ -54,6 +54,14 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
         {
             try
             {
+
+                var siteName = config.JobProperties["Site Name"];
+                var ipAddress = config.JobProperties["IP Address"];
+                var port = config.JobProperties["Port"];
+                var hostName = config.JobProperties["Host Name"];
+                var protocol = config.JobProperties["Protocol"];
+                var sniFlag = Convert.ToInt16(config.JobProperties["Sni Flag"].ToString()?.Substring(0, 1));
+
                 var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
 
@@ -83,12 +91,11 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         .AddStatement();
 
                     ps.AddCommand("Get-WebBinding")
-                        .AddParameter("Protocol", storePath.Protocol)
-                        .AddParameter("Name", storePath.SiteName)
-                        .AddParameter("Port", storePath.Port)
-                        .AddParameter("HostHeader", storePath.HostName)
+                        .AddParameter("Protocol", protocol)
+                        .AddParameter("Name", siteName)
+                        .AddParameter("Port", port)
+                        .AddParameter("HostHeader", hostName)
                         .AddStatement();
-                    //ps.AddScript($"(Get-WebBinding -Protocol {storePath.Protocol} -Name {storePath.SiteName} -Port {storePath.Port} -HostHeader {storePath.HostName})").AddStatement();
 
                     var foundBindings = ps.Invoke();
                     if (foundBindings.Count == 0)
@@ -96,7 +103,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         {
                             Result = OrchestratorJobStatusJobResult.Failure,
                             FailureMessage =
-                                $"Site {storePath.Protocol} binding for Site {storePath.SiteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
+                                $"Site {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
                         };
 
                     ps.Commands.Clear();
@@ -106,7 +113,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                     foreach (var binding in foundBindings)
                     {
                         ps.AddCommand("Remove-WebBinding")
-                            .AddParameter("Name", storePath.SiteName)
+                            .AddParameter("Name", siteName)
                             .AddParameter("BindingInformation",
                                 $"{binding.Properties["bindingInformation"]?.Value}")
                             .AddStatement();
@@ -116,7 +123,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             {
                                 Result = OrchestratorJobStatusJobResult.Failure,
                                 FailureMessage =
-                                    $"Failed to remove {storePath.Protocol} binding for Site {storePath.SiteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
+                                    $"Failed to remove {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
                             };
                     }
 
@@ -147,6 +154,13 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
         {
             try
             {
+                var siteName = config.JobProperties["Site Name"];
+                var ipAddress = config.JobProperties["IP Address"];
+                var port = config.JobProperties["Port"];
+                var hostName = config.JobProperties["Host Name"];
+                var protocol = config.JobProperties["Protocol"];
+                var sniFlag = Convert.ToInt16(config.JobProperties["Sni Flag"].ToString()?.Substring(0, 1));
+
                 var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
 
@@ -155,7 +169,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
                 if (storePath != null)
                 {
-                    connInfo.IncludePortInSPN = storePath.SpnPortFlag;
+                    connInfo.IncludePortInSPN = storePath.SpnPortFlag; 
                     var pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
                         .SecurePassword;
                     connInfo.Credential = new PSCredential(config.ServerUsername, pw);
@@ -220,16 +234,20 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                         foreach (var binding in bindings)
                         {
-                            var siteName = binding.Properties["name"].Value.ToString();
-                            var ipAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
-                            var port = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
-                            var hostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
-                            var protocol = binding.Properties["Protocol"].Value.ToString();
-                            var thumbPrint = binding.Properties["thumbprint"].Value.ToString();
-                            var sniFlag = binding.Properties["sniFlg"].Value.ToString();
-                            Console.WriteLine(thumbPrint);
+                            var bindingSiteName = binding.Properties["name"].Value.ToString();
+                            var bindingIPAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
+                            var bindingPort = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
+                            var bindingHostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
+                            var bindingProtocol = binding.Properties["Protocol"].Value.ToString();
+                            var bindingThumprint = binding.Properties["thumbprint"].Value.ToString();
+                            var bindingSniFlg = binding.Properties["sniFlg"].Value.ToString();
+                            Console.WriteLine(bindingThumprint);
 
-                            funcScript = string.Format(@"
+
+                            //if the thumprint of the renewal request matches the thumprint of the cert in IIS, then renew it
+                            if (_thumbprint == bindingThumprint)
+                            {
+                                funcScript = string.Format(@"
                                             $ErrorActionPreference = ""Stop""
 
                                             $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
@@ -241,18 +259,19 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                                                 New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
                                                 Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
                                                     ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", siteName, //{0} 
-                                            ipAddress, //{1}
-                                            port, //{2}
-                                            protocol, //{3}
-                                            hostName, //{4}
-                                            thumpPrint, //{5} 
-                                            config.CertificateStoreDetails.StorePath, //{6}
-                                            Convert.ToInt16(sniFlag)); //{7}
+                                            }}", bindingSiteName, //{0} 
+                                                bindingIPAddress, //{1}
+                                                bindingPort, //{2}
+                                                bindingProtocol, //{3}
+                                                bindingHostName, //{4}
+                                                x509Cert.Thumbprint, //{5} 
+                                                config.CertificateStoreDetails.StorePath, //{6}
+                                                bindingSniFlg); //{7}
 
-                            ps.AddScript(funcScript);
-                            ps.Invoke();
-                            ps.Commands.Clear();
+                                ps.AddScript(funcScript);
+                                ps.Invoke();
+                                ps.Commands.Clear();
+                            }
                         }
                     }
                     else
@@ -272,7 +291,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                                             }}", config.JobProperties["Site Name"], //{0} 
                             config.JobProperties["IP Address"], //{1}
                             config.JobProperties["Port"], //{2}
-                            storePath.Protocol, //{3}
+                            protocol, //{3}
                             config.JobProperties["Host Name"], //{4}
                             x509Cert.Thumbprint, //{5} 
                             config.CertificateStoreDetails.StorePath, //{6}

@@ -67,14 +67,14 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             {
                                 Result = OrchestratorJobStatusJobResult.Warning,
                                 FailureMessage =
-                                    $"{storePath.Protocol} binding for Site {storePath.SiteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
+                                    $"Inventory on server {config.CertificateStoreDetails.ClientMachine} did not find any bindings."
                             };
                         }
 
                         //in theory should only be one, but keeping for future update to chance inventory
                         foreach (var binding in iisBindings)
                         {
-                            var thumbPrint = $"{(binding.Properties["certificateHash"]?.Value)}";
+                            var thumbPrint = $"{(binding.Properties["thumbprint"]?.Value)}";
                             if (string.IsNullOrEmpty(thumbPrint))
                                 continue;
 
