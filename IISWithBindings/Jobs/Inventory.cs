@@ -30,7 +30,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
                 if (storePath != null)
                 {
-                    connInfo.IncludePortInSPN = storePath.SpnPortFlag;
                     SecureString pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
                         .SecurePassword;
                     connInfo.Credential = new PSCredential(config.ServerUsername, pw);
@@ -43,17 +42,12 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                     using (PowerShell ps = PowerShell.Create())
                     {
                         ps.Runspace = runSpace;
-
                         ps.AddCommand("Import-Module")
                             .AddParameter("Name", "WebAdministration")
                             .AddStatement();
-                        ps.AddCommand("Get-WebBinding")
-                            .AddParameter("Name", storePath.SiteName)
-                            .AddParameter("Protocol", storePath.Protocol)
-                            .AddParameter("Port", storePath.Port)
-                            .AddParameter("HostHeader", storePath.HostName)
-                            .AddStatement();
 
+                        var searchScript = "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash;sniFlg=$Bind.sslFlags}}}";
+                        ps.AddScript(searchScript).AddStatement();
                         var iisBindings = ps.Invoke();
 
                         if (ps.HadErrors)

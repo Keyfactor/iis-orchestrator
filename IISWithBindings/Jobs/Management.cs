@@ -15,7 +15,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
     {
         private readonly ILogger<Management> _logger;
 
-        private string Thumbprint = string.Empty;
+        private string _thumbprint = string.Empty;
 
         public Management(ILogger<Management> logger)
         {
@@ -38,9 +38,9 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 case CertStoreOperationType.Add:
                     if (jobConfiguration.JobProperties.ContainsKey("RenewalThumbprint"))
                     {
-                        Thumbprint = jobConfiguration.JobProperties["RenewalThumbprint"].ToString();
+                        _thumbprint = jobConfiguration.JobProperties["RenewalThumbprint"].ToString();
                     }
-                    complete = PerformAddition(jobConfiguration, Thumbprint);
+                    complete = PerformAddition(jobConfiguration, _thumbprint);
                     break;
                 case CertStoreOperationType.Remove:
                     complete = PerformRemoval(jobConfiguration);
@@ -207,7 +207,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                     ps.Commands.Clear();
 
-                    //if thumprint is there it is a renewal so we have to search all the sites for that tumprint and renew them all
+                    //if thumbprint is there it is a renewal so we have to search all the sites for that thumbprint and renew them all
                     if (thumpPrint.Length > 0)
                     {
                         ps.AddCommand("Import-Module")
@@ -221,10 +221,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         foreach (var binding in bindings)
                         {
                             var siteName = binding.Properties["name"].Value.ToString();
-                            var ipAddress = binding.Properties["Bindings"].Value.ToString().Split(':')[0];
-                            var port = binding.Properties["Bindings"].Value.ToString().Split(':')[1];
-                            var hostName = binding.Properties["Bindings"].Value.ToString().Split(':')[2];
-                            var protocal = binding.Properties["Protocol"].Value.ToString();
+                            var ipAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
+                            var port = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
+                            var hostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
+                            var protocol = binding.Properties["Protocol"].Value.ToString();
                             var thumbPrint = binding.Properties["thumbprint"].Value.ToString();
                             var sniFlag = binding.Properties["sniFlg"].Value.ToString();
                             Console.WriteLine(thumbPrint);
@@ -244,8 +244,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                                             }}", siteName, //{0} 
                                             ipAddress, //{1}
                                             port, //{2}
-                                            protocal, //{3}
-                                            ipAddress, //{4}
+                                            protocol, //{3}
+                                            hostName, //{4}
                                             thumpPrint, //{5} 
                                             config.CertificateStoreDetails.StorePath, //{6}
                                             Convert.ToInt16(sniFlag)); //{7}
@@ -276,7 +276,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             config.JobProperties["Host Name"], //{4}
                             x509Cert.Thumbprint, //{5} 
                             config.CertificateStoreDetails.StorePath, //{6}
-                            Convert.ToInt16(config.JobProperties["Sni Flag"].ToString().Substring(0, 1))); //{7}
+                            Convert.ToInt16(config.JobProperties["Sni Flag"].ToString()?.Substring(0, 1))); //{7}
 
                         ps.AddScript(funcScript);
                         ps.Invoke();
