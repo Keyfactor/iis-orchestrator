@@ -42,7 +42,7 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 
 ![](images/screen1-a.gif)
 
-Custom Fields	|Store Level Settings<br/>
+Custom Fields|Store Level Settings<br/>
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
 <tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td></tr>
@@ -53,7 +53,7 @@ Custom Fields	|Store Level Settings<br/>
 
 ![](images/screen1-b.gif)
 
-Entry Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
+Entry Parameters|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
 <tr><td>port</td><td>String</td><td>443</td><td>Yes</td></tr>
