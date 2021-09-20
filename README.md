@@ -35,8 +35,12 @@ PFX Password Style	|This determines how the platform generate passwords to prote
 Job Types	|Inventory, Add, and Remove are the supported job types. 
 
 ![](images/screen1.gif)
+
+**Advanced Settings:**
+- **Custom Alias** – Can make Required, Optional or Forbidden based on the client preference
+- **Private Key Handling** – Required
+
 ![](images/screen1-a.gif)
-![](images/screen1-b.gif)
 
 Custom Fields	|Store Level Settings<br/>
 <table>
@@ -47,9 +51,7 @@ Custom Fields	|Store Level Settings<br/>
 - **SPN With Port** – Defaults to false but some customers need for remote Powershell Access
 </table>
 
-
-![](images/screen1-c.gif)
-
+![](images/screen1-b.gif)
 
 Entry Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
 <table>
@@ -71,6 +73,9 @@ Entry Parameters	|This section must be configured with binding fields. The param
    - 2  Non SNI binding which uses Central Certificate Store
    - 3  SNI binding which uses Central Certificate Store
 </table>
+
+![](images/screen1-c.gif)
+
 
 **2. Register the IIS-With-Bindings AnyAgent with Keyfactor**
 
