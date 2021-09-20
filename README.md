@@ -42,7 +42,7 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 
 ![](images/screen1-a.gif)
 
-**Custom Fields**
+**Custom Fields:**
 
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
@@ -76,44 +76,13 @@ This section must be configured with binding fields. The parameters will be popu
 
 ![](images/screen1-c.gif)
 
-
 **2. Register the IIS-With-Bindings AnyAgent with Keyfactor**
-
-Open the Keyfactor Windows Agent Configuration Wizard and perform the tasks as illustrated below:
-
-![](Images/Image2.png)
-
-- Click **\<Next\>**
-
-![](Images/Image3.png)
-
-- If you have configured the agent service previously, you should be able to skip to just click **\<Next\>.** Otherwise, enter the service account Username and Password you wish to run the Keyfactor Windows Agent Service under, click **\<Update Windows Service Account\>** and click **\<Next\>.**
-
-![](Images/Image4.png)
-
-- If you have configured the agent service previously, you should be able to skip to just re-enter the password to the service account the agent service will run under, click **\<Validate Keyfactor Connection\>** and then **\<Next\>.**
-
-![](Images/Image5.png)
-
-- Select the agent you are adding capabilities for (in this case, IIS With Binding, and also select the specific capabilities (Inventory and Management in this example). Click **\<Next\>**.
-
-![](Images/Image6.png)
-
-- For agent configuration purposes, this screen can be skipped by clicking **\<Next\>**.
-
-![](Images/Image7.png)
-
-- For each AnyAgent implementation, check **Load assemblies containing extension modules from other location** , browse to the location of the compiled AnyAgent dll, and click **\<Validate Capabilities\>**. Once all AnyAgents have been validated, click **\<Apply Configuration\>**.
-
-![](Images/Image8.png)
-
-- If the Keyfactor Agent Configuration Wizard configured everything correctly, you should see the dialog above.
 
 **3. Create an IIS With Binding Certificate Store within Keyfactor Command**
 
 In Keyfactor Command create a new Certificate Store similar to the one below, selecting IIS With Binding as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS-With-Bindings AnyAgent&quot;.
 
-![](Images/Image9.png)
+![](Images/screen2.gif)
 
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
@@ -122,9 +91,5 @@ Category	|The type of certificate store to be configured. Select category based 
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
 Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
 Store Path	|My or WebHosting
-port| Default (443) or other port for TLS bindings
-ipAddress| Default (*) or ipAddress to be used for TLS bindings
-hostName|Default(blank) or Host Header value to be used in for TLS binding
-siteName| Default (Default Web Site) or IIS Web Site name for TLS bindings
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
 Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
