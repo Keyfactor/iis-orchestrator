@@ -42,7 +42,8 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 
 ![](images/screen1-a.gif)
 
-Custom Fields|Store Level Settings<br/>
+**Custom Fields**
+Store Level Settings
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
 <tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td></tr>
@@ -53,7 +54,8 @@ Custom Fields|Store Level Settings<br/>
 
 ![](images/screen1-b.gif)
 
-Entry Parameters|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
+**Entry Parameters:**
+This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
 <tr><td>port</td><td>String</td><td>443</td><td>Yes</td></tr>
@@ -62,7 +64,6 @@ Entry Parameters|This section must be configured with binding fields. The parame
 <tr><td>siteName</td><td>String</td><td>Default Web Site</td><td>Yes</td></tr>
 <tr><td>sniflag</td><td>String</td><td>0</td><td>No</td></tr>
 
-**Entry Parameters:**
 - **Site Name** – Required. The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
 - **IP Address** – Required. The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
 - **Port** – Required. The port for the web site being bound to. Default is &quot;443&quot;.
