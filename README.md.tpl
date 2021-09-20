@@ -48,7 +48,6 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
 <tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td></tr>
 
-**Custom Fields:**
 - **SPN With Port** – Defaults to false but some customers need for remote Powershell Access
 </table>
 
