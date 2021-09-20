@@ -43,7 +43,7 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 ![](images/screen1-a.gif)
 
 **Custom Fields**
-Store Level Settings
+
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
 <tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td></tr>
