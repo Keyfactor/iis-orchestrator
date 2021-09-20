@@ -57,21 +57,25 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
-<tr><td>port</td><td>String</td><td>443</td><td>Yes</td></tr>
-<tr><td>ipAddress</td><td>String</td><td>*</td><td>Yes</td></tr>
-<tr><td>hostName</td><td>String</td><td></td><td>No</td></tr>
-<tr><td>siteName</td><td>String</td><td>Default Web Site</td><td>Yes</td></tr>
-<tr><td>sniflag</td><td>String</td><td>0</td><td>No</td></tr>
+<tr><td>Port</td><td>String</td><td>443</td><td>Yes</td></tr>
+<tr><td>IP Address</td><td>String</td><td>*</td><td>Yes</td></tr>
+<tr><td>Host Name</td><td>String</td><td></td><td>No</td></tr>
+<tr><td>Site Name</td><td>String</td><td>Default Web Site</td><td>Yes</td></tr>
+<tr><td>Sni Flag</td><td>String</td><td>0 - No SNI</td><td>No</td></tr>
+<tr><td>Protocol</td><td>Multiple Choice</td><td>https</td><td>Yes</td></tr>
 
-- **Site Name** – Required. The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
-- **IP Address** – Required. The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
-- **Port** – Required. The port for the web site being bound to. Default is &quot;443&quot;.
+- **Site Name** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
+- **IP Address** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
+- **Port** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The port for the web site being bound to. Default is &quot;443&quot;.
 - **Host Name** – Optional. The host name for the web site being bound to.
+- *Protocol* - Required (Adding an entry, Removing an entry, Reenrolling an entry) 
+   - https
+   - http
 - **Sni Flag** – Optional. Set the SNI flag assoicated with the binding being created.Default is &quot;0&quot;. Acceptable values are:
-   - 0  No SNI
-   - 1  SNI Enabled
-   - 2  Non SNI binding which uses Central Certificate Store
-   - 3  SNI binding which uses Central Certificate Store
+   - 0 - No SNI
+   - 1 - SNI Enabled
+   - 2 - Non SNI Binding
+   - 3 - SNI Binding
 </table>
 
 ![](images/screen1-c.gif)
