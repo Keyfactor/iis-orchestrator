@@ -17,7 +17,10 @@ This agent implements three job types – Inventory, Management Add, and Managem
 
 In Keyfactor Command create a new Certificate Store Type similar to the one below:
 
-![](Images/Image1.png)
+![](images/screen1.gif)
+![](images/screen1-a.gif)
+![](images/screen1-b.gif)
+![](images/screen1-c.gif)
 
 #### STORE TYPE CONFIGURATION
 CONFIG ELEMENT	| DESCRIPTION
