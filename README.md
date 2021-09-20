@@ -86,7 +86,7 @@ This section must be configured with binding fields. The parameters will be popu
 
 In Keyfactor Command create a new Certificate Store similar to the one below, selecting IIS With Binding as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS-With-Bindings AnyAgent&quot;.
 
-![](Images/screen2.gif)
+![](images/screen2.gif)
 
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
