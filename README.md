@@ -38,15 +38,22 @@ Store Path Value|A comma separated list of options to select from for the Store 
 Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is requried since IIS will need the private key material to establish TLS connections.
 PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
 Job Types	|Inventory, Add, and Remove are the supported job types. 
-Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/><table><tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr><tr><td>port</td><td>String</td><td>443</td><td>Yes</td><tr><tr><td>ipAddress</td><td>String</td><td>*</td><td>Yes</td><tr><tr><td>hostName</td><td>String</td><td></td><td>No</td><tr><tr><td>siteName</td><td>String</td><td>Default Web Site</td><td>Yes</td><tr><tr><td>sniflag</td><td>String</td><td>0</td><td>No</td><tr><tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td><tr>
+Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
+<table>
+<tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
+<tr><td>port</td><td>String</td><td>443</td><td>Yes</td></tr>
+<tr><td>ipAddress</td><td>String</td><td>*</td><td>Yes</td></tr>
+<tr><td>hostName</td><td>String</td><td></td><td>No</td></tr>
+<tr><td>siteName</td><td>String</td><td>Default Web Site</td><td>Yes</td></tr>
+<tr><td>sniflag</td><td>String</td><td>0</td><td>No</td></tr>
+<tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td></tr>
 
-**Parameters:**
+**Entry Parameters:**
 - **Site Name** – Required. The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
 - **IP Address** – Required. The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
 - **Port** – Required. The port for the web site being bound to. Default is &quot;443&quot;.
 - **Host Name** – Optional. The host name for the web site being bound to.
-- **SPN with Port** - Optional. Determine if the SPN assoicated with the remote connection contains the connection's port number (5985). Default is &quot;false&quot;.
-- **SNI Enabled** – Optional. Set the SNI flag assoicated with the binding being created.Default is &quot;0&quot;. Acceptable values are:
+- **Sni Flag** – Optional. Set the SNI flag assoicated with the binding being created.Default is &quot;0&quot;. Acceptable values are:
    - 0  No SNI
    - 1  SNI Enabled
    - 2  Non SNI binding which uses Central Certificate Store
