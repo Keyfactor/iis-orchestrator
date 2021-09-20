@@ -17,11 +17,6 @@ This agent implements three job types – Inventory, Management Add, and Managem
 
 In Keyfactor Command create a new Certificate Store Type similar to the one below:
 
-![](images/screen1.gif)
-![](images/screen1-a.gif)
-![](images/screen1-b.gif)
-![](images/screen1-c.gif)
-
 #### STORE TYPE CONFIGURATION
 CONFIG ELEMENT	| DESCRIPTION
 ---------------------|------------------
@@ -38,7 +33,25 @@ Store Path Value|A comma separated list of options to select from for the Store 
 Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is requried since IIS will need the private key material to establish TLS connections.
 PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
 Job Types	|Inventory, Add, and Remove are the supported job types. 
-Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
+
+![](images/screen1.gif)
+![](images/screen1-a.gif)
+![](images/screen1-b.gif)
+
+Custom Fields	|Store Level Settings<br/>
+<table>
+<tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
+<tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td></tr>
+
+**Custom Fields:**
+- **SPN With Port** – Defaults to false but some customers need for remote Powershell Access
+</table>
+
+
+![](images/screen1-c.gif)
+
+
+Entry Parameters	|This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
 <table>
 <tr><th>Parameter Name</th><th>Parameter Type</th><th>Default Value</th><th>Required</th></tr>
 <tr><td>port</td><td>String</td><td>443</td><td>Yes</td></tr>
@@ -46,7 +59,6 @@ Parameters	|This section must be configured with binding fields. The parameters 
 <tr><td>hostName</td><td>String</td><td></td><td>No</td></tr>
 <tr><td>siteName</td><td>String</td><td>Default Web Site</td><td>Yes</td></tr>
 <tr><td>sniflag</td><td>String</td><td>0</td><td>No</td></tr>
-<tr><td>spnwithport</td><td>Boolean</td><td>false</td><td>No</td></tr>
 
 **Entry Parameters:**
 - **Site Name** – Required. The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
