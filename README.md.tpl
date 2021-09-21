@@ -81,6 +81,7 @@ This section must be configured with binding fields. The parameters will be popu
 ![](images/screen1-c.gif)
 
 **2. Register the IIS-With-Bindings AnyAgent with Keyfactor**
+See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your Keyfactor contact/representitive.
 
 **3. Create an IIS With Binding Certificate Store within Keyfactor Command**
 
