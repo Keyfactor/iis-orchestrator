@@ -1,134 +1,190 @@
-﻿
-using Keyfactor.Platform.Extensions.Agents;
-using Keyfactor.Platform.Extensions.Agents.Delegates;
-using Keyfactor.Platform.Extensions.Agents.Enums;
-using Keyfactor.Platform.Extensions.Agents.Interfaces;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
-using System.Security;
 using System.Security.Cryptography.X509Certificates;
+using Keyfactor.Orchestrators.Common.Enums;
+using Keyfactor.Orchestrators.Extensions;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
+namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 {
-    [Job(JobTypes.MANAGEMENT)]
-    public class Management: AgentJob, IAgentJobExtension
+    public class Management : IManagementJobExtension
     {
-        public override AnyJobCompleteInfo processJob(AnyJobConfigInfo config, SubmitInventoryUpdate submitInventory, SubmitEnrollmentRequest submitEnrollmentRequest, SubmitDiscoveryResults sdr)
-        {
+        private readonly ILogger<Management> _logger;
 
-            AnyJobCompleteInfo complete = new AnyJobCompleteInfo()
+        private string _thumbprint = string.Empty;
+
+        public Management(ILogger<Management> logger)
+        {
+            _logger = logger;
+        }
+
+        public string ExtensionName => "IISBindings";
+
+        public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
+        {
+            var complete = new JobResult
             {
-                Status = 4,
-                Message = "Invalid Management Operation"
+                Result = OrchestratorJobStatusJobResult.Failure,
+                FailureMessage =
+                    "Invalid Management Operation"
             };
 
-            switch (config.Job.OperationType)
+            switch (jobConfiguration.OperationType)
             {
-                case AnyJobOperationType.Add:
-                    complete = PerformAddition(config);
+                case CertStoreOperationType.Add:
+                    if (jobConfiguration.JobProperties.ContainsKey("RenewalThumbprint"))
+                    {
+                        _thumbprint = jobConfiguration.JobProperties["RenewalThumbprint"].ToString();
+                    }
+                    complete = PerformAddition(jobConfiguration, _thumbprint);
                     break;
-                case AnyJobOperationType.Remove:
-                    complete = PerformRemoval(config);
+                case CertStoreOperationType.Remove:
+                    complete = PerformRemoval(jobConfiguration);
                     break;
             }
+
             return complete;
         }
 
-        private AnyJobCompleteInfo PerformRemoval(AnyJobConfigInfo config)
+        private JobResult PerformRemoval(ManagementJobConfiguration config)
         {
             try
             {
-                StorePath storePath = JsonConvert.DeserializeObject<StorePath>(config.Store.Properties.ToString(), new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
 
-                Logger.Trace($"Begin Removal for Cert Store {$@"\\{config.Store.ClientMachine}\{config.Store.StorePath}"}");
+                var siteName = config.JobProperties["Site Name"];
+                var port = config.JobProperties["Port"];
+                var hostName = config.JobProperties["Host Name"];
+                var protocol = config.JobProperties["Protocol"];
 
-                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"http://{config.Store.ClientMachine}:5985/wsman"));
-                connInfo.IncludePortInSPN = storePath.SPNPortFlag;
-                SecureString pw = new NetworkCredential(config.Server.Username, config.Server.Password).SecurePassword;
-                connInfo.Credential = new PSCredential(config.Server.Username, pw);
+                var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
 
-                using (Runspace runspace = RunspaceFactory.CreateRunspace(connInfo))
+                _logger.LogTrace(
+                    $"Begin Removal for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
+
+                var connInfo =
+                    new WSManConnectionInfo(
+                        new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
+                if (storePath != null)
                 {
-                    runspace.Open();
-                    PowerShellCertStore psCertStore = new PowerShellCertStore(config.Store.ClientMachine, config.Store.StorePath, runspace);
-                    using (PowerShell ps = PowerShell.Create())
-                    {
-                        ps.Runspace = runspace;
+                    connInfo.IncludePortInSPN = storePath.SpnPortFlag;
+                    var pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
+                        .SecurePassword;
+                    connInfo.Credential = new PSCredential(config.ServerUsername, pw);
 
-                        ps.AddCommand("Import-Module")
-                            .AddParameter("Name", "WebAdministration")
-                            .AddStatement();
+                    using var runSpace = RunspaceFactory.CreateRunspace(connInfo);
+                    runSpace.Open();
+                    var psCertStore = new PowerShellCertStore(
+                        config.CertificateStoreDetails.ClientMachine, config.CertificateStoreDetails.StorePath,
+                        runSpace);
+                    using var ps = PowerShell.Create();
+                    ps.Runspace = runSpace;
 
-                        ps.AddCommand("Get-WebBinding")
-                            .AddParameter("Protocol", storePath.Protocol)
-                            .AddParameter("Name", storePath.SiteName)
-                            .AddParameter("Port", storePath.Port)
-                            .AddParameter("HostHeader", storePath.HostName)
-                            .AddStatement();
-                        //ps.AddScript($"(Get-WebBinding -Protocol {storePath.Protocol} -Name {storePath.SiteName} -Port {storePath.Port} -HostHeader {storePath.HostName})").AddStatement();
+                    ps.AddCommand("Import-Module")
+                        .AddParameter("Name", "WebAdministration")
+                        .AddStatement();
 
-                        var foundBindings = ps.Invoke();
-                        if (foundBindings.Count == 0){
-                            return new AnyJobCompleteInfo() { Status = 4, Message = $"{storePath.Protocol} binding for Site {storePath.SiteName} on server {config.Store.ClientMachine} not found." };
-                        }
+                    ps.AddCommand("Get-WebBinding")
+                        .AddParameter("Protocol", protocol)
+                        .AddParameter("Name", siteName)
+                        .AddParameter("Port", port)
+                        .AddParameter("HostHeader", hostName)
+                        .AddStatement();
 
-                        ps.Commands.Clear();
-                        ps.AddCommand("Import-Module")
-                            .AddParameter("Name", "WebAdministration")
-                            .AddStatement();
-                        foreach (var binding in foundBindings)
+                    var foundBindings = ps.Invoke();
+                    if (foundBindings.Count == 0)
+                        return new JobResult
                         {
-                            ps.AddCommand($"Remove-WebBinding")
-                                .AddParameter("Name", storePath.SiteName)
-                                .AddParameter("BindingInformation",$"{binding.Properties["bindingInformation"]?.Value}")
-                                .AddStatement();
-                            var result = ps.Invoke();
-                            if (ps.HadErrors)
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            FailureMessage =
+                                $"Site {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
+                        };
+
+                    ps.Commands.Clear();
+                    ps.AddCommand("Import-Module")
+                        .AddParameter("Name", "WebAdministration")
+                        .AddStatement();
+                    foreach (var binding in foundBindings)
+                    {
+                        ps.AddCommand("Remove-WebBinding")
+                            .AddParameter("Name", siteName)
+                            .AddParameter("BindingInformation",
+                                $"{binding.Properties["bindingInformation"]?.Value}")
+                            .AddStatement();
+                        var _ = ps.Invoke();
+                        if (ps.HadErrors)
+                            return new JobResult
                             {
-                                return new AnyJobCompleteInfo() { Status = 4, Message = $"Failed to remove {storePath.Protocol} binding for Site {storePath.SiteName} on server {config.Store.ClientMachine}." };
-                            }
-                        }
-                        psCertStore.RemoveCertificate(config.Job.Alias);
-                        runspace.Close();
+                                Result = OrchestratorJobStatusJobResult.Failure,
+                                FailureMessage =
+                                    $"Failed to remove {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
+                            };
                     }
+
+                    psCertStore.RemoveCertificate(config.JobCertificate.Alias);
+                    runSpace.Close();
                 }
-                return new AnyJobCompleteInfo { Status = 2, Message = "" };
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage = ""
+                };
             }
             catch (Exception ex)
             {
-                Logger.Trace(ex);
-                return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ex.Message}" };
+                _logger.LogTrace(ex.Message);
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    FailureMessage =
+                        $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
+                };
             }
         }
 
-        private AnyJobCompleteInfo PerformAddition(AnyJobConfigInfo config)
+        private JobResult PerformAddition(ManagementJobConfiguration config,string thumpPrint)
         {
             try
             {
-                StorePath storePath = JsonConvert.DeserializeObject<StorePath>(config.Store.Properties.ToString(), new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                var protocol = config.JobProperties["Protocol"];
 
-                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"http://{config.Store.ClientMachine}:5985/wsman"));
-                connInfo.IncludePortInSPN = storePath.SPNPortFlag;
-                SecureString pw = new NetworkCredential(config.Server.Username, config.Server.Password).SecurePassword;
-                connInfo.Credential = new PSCredential(config.Server.Username, pw);
+                var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
 
-                X509Certificate2 x509Cert = new X509Certificate2(Convert.FromBase64String(config.Job.EntryContents), config.Job.PfxPassword, X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
+                var connInfo =
+                    new WSManConnectionInfo(
+                        new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
+                if (storePath != null)
+                {
+                    connInfo.IncludePortInSPN = storePath.SpnPortFlag; 
+                    var pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
+                        .SecurePassword;
+                    connInfo.Credential = new PSCredential(config.ServerUsername, pw);
 
-                Logger.Trace($"Begin Add for Cert Store {$@"\\{config.Store.ClientMachine}\{config.Store.StorePath}"}");
+                    var x509Cert = new X509Certificate2(
+                        Convert.FromBase64String(config.JobCertificate.Contents),
+                        config.JobCertificate.PrivateKeyPassword,
+                        X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet |
+                        X509KeyStorageFlags.Exportable);
 
-                using (Runspace runspace = RunspaceFactory.CreateRunspace(connInfo))
-                {   
-                    runspace.Open();
-                    PowerShellCertStore psCertStore = new PowerShellCertStore(config.Store.ClientMachine, config.Store.StorePath, runspace);
-                    using (PowerShell ps = PowerShell.Create())
-                    {
-                        ps.Runspace = runspace;
+                    _logger.LogTrace(
+                        $"Begin Add for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
 
-                        string funcScript = @"
+                    using var runSpace = RunspaceFactory.CreateRunspace(connInfo);
+                    runSpace.Open();
+                    var _ = new PowerShellCertStore(
+                        config.CertificateStoreDetails.ClientMachine, config.CertificateStoreDetails.StorePath,
+                        runSpace);
+                    using var ps = PowerShell.Create();
+                    ps.Runspace = runSpace;
+
+                    var funcScript = @"
                                                     $ErrorActionPreference = ""Stop""
 
                                                     function InstallPfxToMachineStore([byte[]]$bytes, [string]$password, [string]$storeName) {
@@ -139,20 +195,80 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
                                                         $certStore.Close();
                                                     }";
 
-                        ps.AddScript(funcScript).AddStatement();
-                        ps.AddCommand("InstallPfxToMachineStore")
-                            .AddParameter("bytes", Convert.FromBase64String(config.Job.EntryContents))
-                            .AddParameter("password", config.Job.PfxPassword)
-                            .AddParameter("storeName", $@"\\{config.Store.ClientMachine}\{config.Store.StorePath}");
+                    ps.AddScript(funcScript).AddStatement();
+                    ps.AddCommand("InstallPfxToMachineStore")
+                        .AddParameter("bytes", Convert.FromBase64String(config.JobCertificate.Contents))
+                        .AddParameter("password", config.JobCertificate.PrivateKeyPassword)
+                        .AddParameter("storeName",
+                            $@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}");
 
-                        ps.Invoke();
+                    ps.Invoke();
 
-                        if (ps.HadErrors)
+                    if (ps.HadErrors)
+                        return new JobResult
                         {
-                            return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ps.Streams.Error.ReadAll().First().ErrorDetails.Message}" };
-                        }
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            FailureMessage =
+                                $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ps.Streams.Error.ReadAll().First().ErrorDetails.Message}"
+                        };
 
-                        ps.Commands.Clear();
+                    ps.Commands.Clear();
+
+                    //if thumbprint is there it is a renewal so we have to search all the sites for that thumbprint and renew them all
+                    if (thumpPrint.Length > 0)
+                    {
+                        ps.AddCommand("Import-Module")
+                        .AddParameter("Name", "WebAdministration")
+                        .AddStatement();
+
+                        var searchScript = "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash;sniFlg=$Bind.sslFlags}}}";
+                        ps.AddScript(searchScript).AddStatement();
+                        var bindings = ps.Invoke();
+
+                        foreach (var binding in bindings)
+                        {
+                            var bindingSiteName = binding.Properties["name"].Value.ToString();
+                            var bindingIpAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
+                            var bindingPort = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
+                            var bindingHostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
+                            var bindingProtocol = binding.Properties["Protocol"].Value.ToString();
+                            var bindingThumbprint = binding.Properties["thumbprint"].Value.ToString();
+                            var bindingSniFlg = binding.Properties["sniFlg"].Value.ToString();
+                            Console.WriteLine(bindingThumbprint);
+
+
+                            //if the thumprint of the renewal request matches the thumprint of the cert in IIS, then renew it
+                            if (_thumbprint == bindingThumbprint)
+                            {
+                                funcScript = string.Format(@"
+                                            $ErrorActionPreference = ""Stop""
+
+                                            $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
+                                            if($IISInstalled) {{
+                                                Import-Module WebAdministration
+                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -Port ""{2}"" -Protocol ""{3}"" |
+                                                    ForEach-Object {{ Remove-WebBinding -BindingInformation  $_.bindingInformation }}
+
+                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
+                                                Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
+                                                    ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
+                                            }}", bindingSiteName, //{0} 
+                                                bindingIpAddress, //{1}
+                                                bindingPort, //{2}
+                                                bindingProtocol, //{3}
+                                                bindingHostName, //{4}
+                                                x509Cert.Thumbprint, //{5} 
+                                                config.CertificateStoreDetails.StorePath, //{6}
+                                                bindingSniFlg); //{7}
+
+                                ps.AddScript(funcScript);
+                                ps.Invoke();
+                                ps.Commands.Clear();
+                            }
+                        }
+                    }
+                    else
+                    {
                         funcScript = string.Format(@"
                                             $ErrorActionPreference = ""Stop""
 
@@ -165,33 +281,45 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
                                                 New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
                                                 Get-WebBinding -Name ""{0}"" -Port ""{2}"" -Protocol ""{3}"" | 
                                                     ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", storePath.SiteName,        //{0} 
-                                                 storePath.IP,              //{1}
-                                                 storePath.Port,            //{2}
-                                                 storePath.Protocol,        //{3}
-                                                 storePath.HostName,        //{4}
-                                                 x509Cert.Thumbprint,       //{5} 
-                                                 config.Store.StorePath,    //{6}
-                                                 (int)storePath.SniFlag);   //{7}
+                                            }}", config.JobProperties["Site Name"], //{0} 
+                            config.JobProperties["IP Address"], //{1}
+                            config.JobProperties["Port"], //{2}
+                            protocol, //{3}
+                            config.JobProperties["Host Name"], //{4}
+                            x509Cert.Thumbprint, //{5} 
+                            config.CertificateStoreDetails.StorePath, //{6}
+                            Convert.ToInt16(config.JobProperties["Sni Flag"].ToString()?.Substring(0, 1))); //{7}
 
                         ps.AddScript(funcScript);
                         ps.Invoke();
-
-                        if (ps.HadErrors)
-                        {
-                            return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ps.Streams.Error.ReadAll().First().ErrorDetails.Message}" };
-                        }
-                    
-                        runspace.Close();
                     }
+                    if (ps.HadErrors)
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            FailureMessage =
+                                $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ps.Streams.Error.ReadAll().First().ErrorDetails.Message}"
+                        };
+
+                    runSpace.Close();
                 }
-                    
-                return new AnyJobCompleteInfo() { Status = 2, Message = "Addition of certificate and binding complete" };
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage = ""
+                };
             }
             catch (Exception ex)
             {
-                Logger.Trace(ex);
-                return new AnyJobCompleteInfo() { Status = 4, Message = $"Site {config.Store.StorePath} on server {config.Store.ClientMachine}: {ex.Message}" };
+                _logger.LogTrace(ex.Message);
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    FailureMessage =
+                        $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
+                };
             }
         }
     }

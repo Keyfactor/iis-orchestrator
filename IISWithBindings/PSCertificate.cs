@@ -2,11 +2,11 @@
 
 namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
 {
-    public class PSCertificate
+    public class PsCertificate
     {
         public string Thumbprint { get; set; }
         public byte[] RawData { get; set; }
         public bool HasPrivateKey { get; set; }
-        public string CertificateData { get => Convert.ToBase64String(this.RawData); }
+        public string CertificateData => Convert.ToBase64String(RawData);
     }
 }
