@@ -2,14 +2,19 @@
 
 name: Keyfactor Extension - Release
 
+env:
+  SOLUTION_FOLDER: '.'
+  PROJECT_FOLDER: 'IISWithBindings'
+
 # Controls when the action will run. 
 on:
-  # Triggers the workflow on push
-  push:
-    #only run this workflow when pushing to a branch that contains a release number. ignore -pre
+  # Triggers the workflow on pull requests closing
+  pull_request:
+    # only run this workflow when closing a PR to a branch that contains a release number. ignore -pre
     branches: 
-        - 'release-[12].[0-9]+' 
-        - '!release-[12].[0-9]+.[0-9]+-pre*' 
+        - 'release-[0-9]+.[0-9]+' 
+        - '!release-[0-9]+.[0-9]+-pre'
+    types: [closed]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -18,6 +23,9 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
+      # run if pull request is completed and merged, or if manually dispatched
+    if:  github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+
     # The type of runner that the job will run on
     runs-on: windows-latest
 
@@ -34,12 +42,15 @@ jobs:
             $slnPath = (Get-ChildItem -Include *.sln -File -Recurse).fullname
             $relName = "${{ github.ref }}".Split("/")
             $repoName = "${{ github.repository }}".Split("/")
+            $relVersion = "${{ github.ref }}".Split("-")
             echo "Solution File Path: ${slnPath}"
             echo "SOLUTION_PATH=${slnPath}" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
             echo "Release Name: $($relName[-1])"
             echo "RELEASE_NAME=$($relName[-1])" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
             echo "Repo Name: $($repoName[-1])"
             echo "REPO_NAME=$($repoName[-1])" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+            echo "Release Version: $($relVersion[-1])"
+            echo "RELEASE_VERSION=$($relVersion[-1])" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
         
       - uses: actions/setup-dotnet@v1
         with:
@@ -66,9 +77,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          release_name: Release 1.0.3
+          release_name: ${{ env.REPO_NAME }} ${{ env.RELEASE_VERSION }}
           body: |
-            Add SNI support for new bindings when adding certificates to an IIS Store
             [Changelog](../CHANGELOG.MD)
           draft: false
           prerelease: false
@@ -76,25 +86,36 @@ jobs:
           tag_schema: semantic
           commitish: ${{ github.sha }}          
       
-      #update version number of AssemblyInfo.cs file
+      # update version number of AssemblyInfo.cs file
       - name: Increment Assembly Version
         run: |
             $VersionRegex = "\d+\.\d+\.\d+"
-            $assemlyFilePath = (Get-ChildItem -Include AssemblyInfo.cs -File -Recurse -Path .\IISWithBindings\).fullname
-            $filecontent = Get-Content($assemlyFilePath)
-            $newVer = "${{ steps.create_release.outputs.current_tag }}".TrimStart('v')
-            attrib $assemlyFilePath -r
-            $filecontent -replace $VersionRegex, $newVer | Out-File $assemlyFilePath
+            $assemblyInfoFiles = (Get-ChildItem -Include AssemblyInfo.cs -File -Recurse).fullname
+            if ($assemblyInfoFiles -ne $null)
+            {
+              $newVer = "${{ steps.create_release.outputs.current_tag }}".TrimStart('v').Split('-')[0]
+              echo "Prepared to overwrite Assembly version to: ${newVer}"
+              foreach ($assemblyInfoFile in $assemblyInfoFiles)
+              {
+                $filecontent = Get-Content($assemblyInfoFile)
+                attrib $assemblyInfoFile -r
+                $filecontent -replace $VersionRegex, $newVer | Out-File $assemblyInfoFile
+              }
+            }
       
       - name: Execute MSBuild Commands
         run: |
-          MSBuild.exe $Env:SOLUTION_PATH -p:RestorePackagesConfig=false -p:Configuration=Release       
+          $newVer = "${{ steps.create_release.outputs.current_tag }}".TrimStart('v').Split('-')[0]
+          MSBuild.exe $Env:SOLUTION_PATH -p:RestorePackagesConfig=false -p:Configuration=Release -p:Version=$newVer
       
       - name: Archive Files
         if: ${{ success() }}
         run: |
            md ${{ github.workspace }}\zip\Keyfactor
-           Compress-Archive -Path ${{ github.workspace }}\IISWithBindings\bin\Release\*.dll -DestinationPath ${{ github.workspace }}\zip\Keyfactor\$Env:REPO_NAME.zip -Force      
+           Compress-Archive -Path `
+           ${{ env.SOLUTION_FOLDER }}\${{ env.PROJECT_FOLDER }}\bin\Release\netcoreapp3.1\*, `
+           ${{ env.SOLUTION_FOLDER }}\integration-manifest.json `
+           -DestinationPath ${{ github.workspace }}\zip\Keyfactor\$Env:REPO_NAME.zip -Force      
       
       - name: Upload Release Asset (x64)
         if: ${{ success() }}
@@ -108,7 +129,7 @@ jobs:
           asset_name: ${{ env.REPO_NAME}}_${{ steps.create_release.outputs.current_tag }}.zip
           asset_content_type: application/zip                 
       
-      - name: On Failure Remove Tags and Release
+      - name: On Failure - Remove Tags and Release
         if: ${{ failure() }}
         uses: dev-drprasad/delete-tag-and-release@v0.2.0
         with:
