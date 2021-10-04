@@ -4,6 +4,7 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Security;
+using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
@@ -122,15 +123,17 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             }
             catch (Exception ex)
             {
-                _logger.LogTrace(ex.Message);
+                _logger.LogTrace(LogHandler.FlattenException(ex));
+
+                string failureMessage = $"Inventory job failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{ex.Message}'";
+                _logger.LogWarning(failureMessage);
+
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
                     JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
+                    FailureMessage = failureMessage
                 };
-
             }
         }
 
