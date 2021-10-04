@@ -55,6 +55,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             return new JobResult
                             {
                                 Result = OrchestratorJobStatusJobResult.Failure,
+                                JobHistoryId = config.JobHistoryId,
                                 FailureMessage =
                                     $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}:  failed."
                             };
@@ -66,6 +67,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             return new JobResult
                             {
                                 Result = OrchestratorJobStatusJobResult.Warning,
+                                JobHistoryId = config.JobHistoryId,
                                 FailureMessage =
                                     $"Inventory on server {config.CertificateStoreDetails.ClientMachine} did not find any bindings."
                             };
@@ -113,6 +115,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
                     FailureMessage =
                         $"Unable to open remote certificate store: {psEx.Message}"
                 };
@@ -123,6 +126,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
                     FailureMessage =
                         $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
                 };

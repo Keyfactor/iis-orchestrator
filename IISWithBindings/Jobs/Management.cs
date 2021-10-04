@@ -100,6 +100,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         return new JobResult
                         {
                             Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = config.JobHistoryId,
                             FailureMessage =
                                 $"Site {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
                         };
@@ -120,6 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             return new JobResult
                             {
                                 Result = OrchestratorJobStatusJobResult.Failure,
+                                JobHistoryId = config.JobHistoryId,
                                 FailureMessage =
                                     $"Failed to remove {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
                             };
@@ -142,6 +144,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
                     FailureMessage =
                         $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
                 };
@@ -208,6 +211,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         return new JobResult
                         {
                             Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = config.JobHistoryId,
                             FailureMessage =
                                 $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ps.Streams.Error.ReadAll().First().ErrorDetails.Message}"
                         };
@@ -297,6 +301,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                         return new JobResult
                         {
                             Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = config.JobHistoryId,
                             FailureMessage =
                                 $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ps.Streams.Error.ReadAll().First().ErrorDetails.Message}"
                         };
@@ -317,6 +322,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
                     FailureMessage =
                         $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
                 };
