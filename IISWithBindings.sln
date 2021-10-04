@@ -8,8 +8,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1A6C93E7-24FD-47FD-883D-EDABF5CEE4C6}"
 	ProjectSection(SolutionItems) = preProject
 		CHANGELOG.md = CHANGELOG.md
+		integration-manifest.json = integration-manifest.json
 		.github\workflows\keyfactor-extension-release.yml = .github\workflows\keyfactor-extension-release.yml
 		README.md = README.md
+		README.md.tpl = README.md.tpl
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{6302034E-DF8C-4B65-AC36-CED24C068999}"
