@@ -1,7 +1,7 @@
 {
-    "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
-    "integration_type": "orchestrator",
-    "name": "Windows IIS Orchestrator",
-    "status": "Development",
-    "description": "The IIS-With-Bindings AnyAgent allows a user to create, configure, and manage a Keyfactor certificate store defined as an Internet Information Systems (IIS) binding definition. The certificate itself will still be stored in the defined server's personal certificate store, but the management within Keyfactor will be abstracted to appear as if the binding itself houses the certificate."
+  "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
+  "integration_type": "orchestrator",
+  "name": "Windows IIS Binding Orchestrator",
+  "status": "Development",
+  "description": "The IIS Bindings orchestrator treats the certificates bound (actively in use) on a Microsoft Internet Information Server (IIS) as a Keyfactor certificate store. Inventory and Management functions are supported. The orchestrator replaces the IIS orchestrator (which did not support binding.)"
 }
