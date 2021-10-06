@@ -81,7 +81,7 @@ Port|String|443|Yes
 IP Address|String|*|Yes
 Host Name |String||No
 Site Name |String|Default Web Site|Yes
-Sni Flag  |Multiple Choice|0 - No SNI|No
+Sni Flag  |String|0 - No SNI|No
 Protocol  |Multiple Choice|https|Yes
 
 ![](images/screen1-c.gif)
