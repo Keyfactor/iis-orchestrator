@@ -1,10 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Security;
-using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
@@ -56,7 +55,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             return new JobResult
                             {
                                 Result = OrchestratorJobStatusJobResult.Failure,
-                                JobHistoryId = config.JobHistoryId,
                                 FailureMessage =
                                     $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}:  failed."
                             };
@@ -68,7 +66,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             return new JobResult
                             {
                                 Result = OrchestratorJobStatusJobResult.Warning,
-                                JobHistoryId = config.JobHistoryId,
                                 FailureMessage =
                                     $"Inventory on server {config.CertificateStoreDetails.ClientMachine} did not find any bindings."
                             };
@@ -86,15 +83,33 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             if (foundCert == null)
                                 continue;
 
-                            var siteSettingsDict = new Dictionary<string, object>
+                            var sniValue = "";
+                            switch (Convert.ToInt16(binding.Properties["sniFlg"]?.Value))
                             {
-                                { "Site Name", binding.Properties["Name"]?.Value },
-                                { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
-                                { "IP Address", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
-                                { "Host Name", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
-                                { "Sni Flag", binding.Properties["sniFlg"]?.Value },
-                                { "Protocol", binding.Properties["Protocol"]?.Value }
-                            };
+                                case 0:
+                                    sniValue = "0 - No SNI";
+                                    break;
+                                case 1:
+                                    sniValue = "1 - SNI Enabled";
+                                    break;
+                                case 2:
+                                    sniValue = "2 - Non SNI Binding";
+                                    break;
+                                case 3:
+                                    sniValue = "3 - SNI Binding";
+                                    break;
+
+                            }
+
+                            var siteSettingsDict = new Dictionary<string, object>
+                             {
+                                 { "Site Name", binding.Properties["Name"]?.Value },
+                                 { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
+                                 { "IP Address", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
+                                 { "Host Name", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
+                                 { "Sni Flag", sniValue },
+                                 { "Protocol", binding.Properties["Protocol"]?.Value }
+                             };
 
                             inventoryItems.Add(
                                 new CurrentInventoryItem
@@ -127,24 +142,20 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
                     FailureMessage =
                         $"Unable to open remote certificate store: {psEx.Message}"
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogTrace(LogHandler.FlattenException(ex));
-
-                string failureMessage = $"Inventory job failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{ex.Message}'";
-                _logger.LogWarning(failureMessage);
-
+                _logger.LogTrace(ex.Message);
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = failureMessage
+                    FailureMessage =
+                        $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}: {ex.Message}"
                 };
+
             }
         }
 
