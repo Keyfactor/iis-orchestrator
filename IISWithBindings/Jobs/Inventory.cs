@@ -86,14 +86,25 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                             if (foundCert == null)
                                 continue;
 
+                            var siteSettingsDict = new Dictionary<string, object>
+                            {
+                                { "Site Name", binding.Properties["Name"]?.Value },
+                                { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
+                                { "IP Address", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
+                                { "Host Name", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
+                                { "Sni Flag", binding.Properties["sniFlg"]?.Value },
+                                { "Protocol", binding.Properties["Protocol"]?.Value }
+                            };
+
                             inventoryItems.Add(
                                 new CurrentInventoryItem
                                 {
-                                    Certificates = new[] {foundCert.CertificateData},
+                                    Certificates = new[] { foundCert.CertificateData },
                                     Alias = thumbPrint,
                                     PrivateKeyEntry = foundCert.HasPrivateKey,
                                     UseChainLevel = false,
-                                    ItemStatus = OrchestratorInventoryItemStatus.Unknown
+                                    ItemStatus = OrchestratorInventoryItemStatus.Unknown,
+                                    Parameters = siteSettingsDict
                                 }
                             );
                         }
