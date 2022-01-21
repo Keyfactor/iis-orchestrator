@@ -27,7 +27,7 @@ In Keyfactor Command create a new Certificate Store Type similar to the one belo
 CONFIG ELEMENT	| DESCRIPTION
 ------------------|------------------
 Name	|Descriptive name for the Store Type
-Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be IISBinding
+Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be IISWBin
 Custom Capability|Store type name orchestrator will register with. Must be "IISBindings".
 Needs Server	|Must be checked
 Blueprint Allowed	|Unchecked
@@ -44,7 +44,7 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 ![](images/screen1.gif)
 
 **Advanced Settings:**
-- **Custom Alias** – Can make Required, Optional or Forbidden based on the client preference
+- **Custom Alias** – Forbidden
 - **Private Key Handling** – Required
 
 ![](images/screen1-a.gif)
@@ -66,7 +66,7 @@ This section must be configured with binding fields. The parameters will be popu
 - **IP Address** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
 - **Port** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The port for the web site being bound to. Default is &quot;443&quot;.
 - **Host Name** – Optional. The host name for the web site being bound to.
-- *Protocol* - Required (Adding an entry, Removing an entry, Reenrolling an entry) 
+- **Protocol** - Required (Adding an entry, Removing an entry, Reenrolling an entry) 
    - https
    - http
 - **Sni Flag** – Optional. Set the SNI flag associated with the binding being created. Default is "0". Acceptable values are:
