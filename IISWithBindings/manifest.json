@@ -1,0 +1,14 @@
+﻿{
+  "extensions": {
+    "Keyfactor.Orchestrators.Extensions.IOrchestratorJobExtension": {
+      "CertStores.IISBindings.Inventory": {
+        "assemblypath": "IISWithBindings.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs.Inventory"
+      },
+      "CertStores.IISBindings.Management": {
+        "assemblypath": "IISWithBindings.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs.Management"
+      }
+    }
+  }
+}
