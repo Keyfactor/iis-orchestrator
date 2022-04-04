@@ -25,12 +25,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             {
                 StorePath storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 var inventoryItems = new List<CurrentInventoryItem>();
-                var winRmProtocol = config.JobProperties["WinRm Protocol"];
-                var winRmPort = config.JobProperties["WinRm Port"];
 
                 _logger.LogTrace($"Begin Inventory for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
 
-                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{winRmPort}/wsman"));
+                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"{storePath.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath.WinRmPort}/wsman"));
                 if (storePath != null)
                 {
                     SecureString pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
