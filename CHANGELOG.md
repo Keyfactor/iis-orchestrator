@@ -1,4 +1,4 @@
-1.1.0
+1.1.3
 * Made WinRM port a store parameter
 * Made WinRM protocol a store parameter
 
