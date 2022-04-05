@@ -63,7 +63,7 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 - **SPN With Port** – Defaults to false but some customers need for remote PowerShell Access
 
 Parameter Name|Display Name|Parameter Type|Default Value|Required|Description
----|---|---|---
+---|---|---|---|---|---
 spnwithport|SPN With Port?|Boolean|false|No|An SPN is the name by which a client uniquely identifies an instance of a service
 WinRm Protocol|WinRm Protocol|Multiple Choice|http|Yes|Protocol that WinRM Runs on
 WinRm Port|WinRm Port|String|5985|Yes|Port that WinRM Runs on
