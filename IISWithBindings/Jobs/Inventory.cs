@@ -28,7 +28,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                 _logger.LogTrace($"Begin Inventory for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
 
-                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
+                WSManConnectionInfo connInfo = new WSManConnectionInfo(new Uri($"{storePath.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath.WinRmPort}/wsman"));
                 if (storePath != null)
                 {
                     SecureString pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)

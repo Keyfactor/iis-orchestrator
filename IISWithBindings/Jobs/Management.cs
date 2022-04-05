@@ -69,7 +69,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                 var connInfo =
                     new WSManConnectionInfo(
-                        new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
+                        new Uri($"{storePath.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath.WinRmPort}/wsman"));
                 if (storePath != null)
                 {
                     connInfo.IncludePortInSPN = storePath.SpnPortFlag;
@@ -166,7 +166,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                 var connInfo =
                     new WSManConnectionInfo(
-                        new Uri($"http://{config.CertificateStoreDetails.ClientMachine}:5985/wsman"));
+                        new Uri($"{storePath.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath.WinRmPort}/wsman"));
                 if (storePath != null)
                 {
                     connInfo.IncludePortInSPN = storePath.SpnPortFlag; 
