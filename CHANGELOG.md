@@ -1,4 +1,8 @@
 1.1.0
+* Made WinRM port a store parameter
+* Made WinRM protocol a store parameter
+
+1.1.0
 * Migrate to Universal Orchestrator (KF9 / .NET Core)
 * Perform Renewals using RenewalThumbprint
 
