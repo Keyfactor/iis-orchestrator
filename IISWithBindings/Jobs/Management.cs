@@ -60,8 +60,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 var port = config.JobProperties["Port"];
                 var hostName = config.JobProperties["Host Name"];
                 var protocol = config.JobProperties["Protocol"];
-                var winRmProtocol = config.JobProperties["WinRm Protocol"];
-                var winRmPort = config.JobProperties["WinRm Port"];
 
                 var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
@@ -71,7 +69,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                 var connInfo =
                     new WSManConnectionInfo(
-                        new Uri($"{winRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{winRmPort}/wsman"));
+                        new Uri($"{storePath.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath.WinRmPort}/wsman"));
                 if (storePath != null)
                 {
                     connInfo.IncludePortInSPN = storePath.SpnPortFlag;
@@ -166,12 +164,9 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
                 var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
 
-                var winRmProtocol = config.JobProperties["WinRm Protocol"];
-                var winRmPort = config.JobProperties["WinRm Port"];
-
                 var connInfo =
                     new WSManConnectionInfo(
-                        new Uri($"{winRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{winRmPort}/wsman"));
+                        new Uri($"{storePath.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath.WinRmPort}/wsman"));
                 if (storePath != null)
                 {
                     connInfo.IncludePortInSPN = storePath.SpnPortFlag; 
