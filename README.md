@@ -62,9 +62,11 @@ Job Types	|Inventory, Add, and Remove are the supported job types.
 
 - **SPN With Port** – Defaults to false but some customers need for remote PowerShell Access
 
-Parameter Name|Parameter Type|Default Value|Required
+Parameter Name|Display Name|Parameter Type|Default Value|Required|Description
 ---|---|---|---
-spnwithport|Boolean|false|No
+spnwithport|SPN With Port?|Boolean|false|No|An SPN is the name by which a client uniquely identifies an instance of a service
+WinRm Protocol|WinRm Protocol|Multiple Choice|http|Yes|Protocol that WinRM Runs on
+WinRm Port|WinRm Port|String|5985|Yes|Port that WinRM Runs on
 
 ![](images/screen1-b.gif)
 
@@ -103,6 +105,7 @@ See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your
 In Keyfactor Command create a new Certificate Store similar to the one below, selecting IIS With Binding as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS-With-Bindings AnyAgent&quot;.
 
 ![](images/screen2.gif)
+![](images/screen2-a.gif)
 
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
@@ -110,6 +113,9 @@ CONFIG ELEMENT	|DESCRIPTION
 Category	|The type of certificate store to be configured. Select category based on the display name configured above.
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
 Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
+Credentials |Local or domain admin account that has permissions to manage iis (Has to be admin)
 Store Path	|My or WebHosting
+WinRm Protocol|http or https
+WinRm Port |Port to run WinRm on Default for http is 5985
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
 Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
