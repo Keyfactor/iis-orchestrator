@@ -28,6 +28,8 @@ This agent implements three job types – Inventory, Management Add, and Managem
 WinRM is used to remotely manage the certificate stores and IIS bindings. WinRM must be properly configured to allow
 the server running the orchestrator to manage the server running IIS.
 
+**Note if you are upgrading from version 1.1.2 you must run the IISWBin 1.1.3 upgrade script.sql SQL Script**
+
 **1. Create the New Certificate Store Type for the IIS Orchestrator**
 
 In Keyfactor Command create a new Certificate Store Type similar to the one below:
