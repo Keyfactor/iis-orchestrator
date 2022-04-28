@@ -121,3 +121,4 @@ WinRm Protocol|http or https
 WinRm Port |Port to run WinRm on Default for http is 5985
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
 Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
+
