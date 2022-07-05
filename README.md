@@ -1,7 +1,7 @@
-# Windows IIS Binding Orchestrator
+# IIS Orchestrator
 ## Orchestrator
 
-The IIS Bindings orchestrator treats the certificates bound (actively in use) on a Microsoft Internet Information Server (IIS) as a Keyfactor certificate store. Inventory and Management functions are supported. The orchestrator replaces the IIS orchestrator (which did not support binding.)
+The IIS Orchestrator treats the certificates bound (actively in use) on a Microsoft Internet Information Server (IIS) as a Keyfactor certificate store. Inventory and Management functions are supported. The orchestrator replaces the IIS orchestrator that ships with Keyfactor Command (which did not support binding.)
 
 <!-- add integration specific information below -->
 *** 
