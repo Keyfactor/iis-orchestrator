@@ -16,6 +16,19 @@ The Universal Orchestrator is the successor to the Windows Orchestrator. This Ca
 
 
 
+## Platform Specific Notes
+
+The Keyfactor Universal Orchestrator may be installed on either Windows or Linux based platforms. The certificate operations supported by a capability may vary based what platform the capability is installed on. The table below indicates what capabilities are supported based on which platform the encompassing Universal Orchestrator is running.
+| Operation | Win | Linux |
+|-----|-----|------|
+|Supports Management Add|&check; |  |
+|Supports Management Remove|&check; |  |
+|Supports Create Store|  |  |
+|Supports Discovery|  |  |
+|Supports Renrollment|  |  |
+|Supports Inventory|&check; |  |
+
+
 
 ---
 
