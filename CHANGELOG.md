@@ -1,3 +1,8 @@
+1.1.3
+* Made WinRM port a store parameter
+* Made WinRM protocol a store parameter
+* IISWBin 1.1.3 upgrade script.sql added to upgrade from 1.1.2
+
 1.1.0
 * Migrate to Universal Orchestrator (KF9 / .NET Core)
 * Perform Renewals using RenewalThumbprint
