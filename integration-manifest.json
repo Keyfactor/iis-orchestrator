@@ -4,5 +4,27 @@
   "name": "IIS Orchestrator",
   "status": "production",
   "link_github": true,
-  "description": "The IIS Orchestrator treats the certificates bound (actively in use) on a Microsoft Internet Information Server (IIS) as a Keyfactor certificate store. Inventory and Management functions are supported. The orchestrator replaces the IIS orchestrator that ships with Keyfactor Command (which did not support binding.)"
+  "description": "The IIS Orchestrator treats the certificates bound (actively in use) on a Microsoft Internet Information Server (IIS) as a Keyfactor certificate store. Inventory and Management functions are supported. The orchestrator replaces the IIS orchestrator that ships with Keyfactor Command (which did not support binding.)",
+  "about": {
+    "orchestrator": {
+      "win": {
+        "supportsCreateStore": false,
+        "supportsDiscovery": false,
+        "supportsManagementAdd": true,
+        "supportsManagementRemove": true,
+        "supportsReenrollment": false,
+        "supportsInventory": true,
+        "platformSupport": "Unused"
+      },
+      "linux": {
+        "supportsCreateStore": false,
+        "supportsDiscovery": false,
+        "supportsManagementAdd": false,
+        "supportsManagementRemove": false,
+        "supportsReenrollment": false,
+        "supportsInventory": false,
+        "platformSupport": "Unused"
+      }
+    }
+  }
 }
