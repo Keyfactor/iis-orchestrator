@@ -3,10 +3,10 @@ using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.IISU
 {
-    internal class StorePath
+    internal class JobProperties
     {
 
-        public StorePath()
+        public JobProperties()
         {
         }
 

@@ -25,7 +25,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
             {
                 _logger.MethodEntry();
                 _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
-                var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 var inventoryItems = new List<CurrentInventoryItem>();
 
                 _logger.LogTrace($"Begin Inventory for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
