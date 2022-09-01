@@ -10,7 +10,7 @@ using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
+namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 {
     public class Inventory : IInventoryJobExtension
     {
@@ -195,7 +195,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             }
         }
 
-        public string ExtensionName => "IISBindings";
+        public string ExtensionName => "IISU";
         public JobResult ProcessJob(InventoryJobConfiguration jobConfiguration, SubmitInventoryUpdate submitInventoryUpdate)
         {
             return PerformInventory(jobConfiguration, submitInventoryUpdate);

@@ -10,7 +10,7 @@ using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
+namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 {
     public class Management : IManagementJobExtension
     {
@@ -23,7 +23,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             _logger = logger;
         }
 
-        public string ExtensionName => "IISBindings";
+        public string ExtensionName => "IISU";
 
         public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
         {

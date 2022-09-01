@@ -8,6 +8,10 @@
       "CertStores.IISBindings.Management": {
         "assemblypath": "IISWithBindings.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs.Management"
+      },
+      "CertStores.IISBindings.ReEnrollment": {
+        "assemblypath": "IISWithBindings.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs.ReEnrollment"
       }
     }
   }
