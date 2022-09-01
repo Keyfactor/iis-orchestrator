@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
+namespace Keyfactor.Extensions.Orchestrator.IISU
 {
     public class PsCertificate
     {

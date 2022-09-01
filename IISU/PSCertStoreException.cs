@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
+namespace Keyfactor.Extensions.Orchestrator.IISU
 {
     [Serializable]
     internal class PsCertStoreException : Exception
