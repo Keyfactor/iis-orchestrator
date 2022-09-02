@@ -3,7 +3,6 @@ using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -46,7 +45,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                         _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {_thumbprint}");
                     }
                     _logger.LogTrace("Before PerformAddition...");
-                    complete = PerformAddition(jobConfiguration, _thumbprint);
+                    complete = PerformAddition(jobConfiguration);
                     _logger.LogTrace("After PerformAddition...");
                     break;
                 case CertStoreOperationType.Remove:
