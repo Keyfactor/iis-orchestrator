@@ -65,7 +65,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                     new WSManConnectionInfo(
                         new Uri($"{Properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{Properties?.WinRmPort}/wsman"));
 
-                return InstallCertificate();
+                return InstallCertificate(true);
             }
             catch (Exception e)
             {
@@ -90,10 +90,9 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
                 IpAddress = config.JobProperties["IPAddress"].ToString();
 
-                PrivateKeyPassword =  config.JobCertificate.PrivateKeyPassword; //Todo set the private Key Password
+                PrivateKeyPassword =  config.JobCertificate.PrivateKeyPassword;
                 ServerUserName = config.ServerUsername;
                 ServerPassword = config.ServerPassword;
-                Thumbprint = ""; //todo Set the Thumbprint
                 ClientMachine = config.CertificateStoreDetails.ClientMachine;
                 Path = config.CertificateStoreDetails.StorePath;
                 CertContents = config.JobCertificate.Contents;
@@ -112,7 +111,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                     Logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {Thumbprint}");
                 }
 
-                return InstallCertificate();
+                return InstallCertificate(false);
 
             }
             catch (Exception e)
@@ -127,7 +126,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
         }
 
 
-        private JobResult InstallCertificate()
+        private JobResult InstallCertificate(bool reEnrollment)
         {
             try
             {
@@ -139,15 +138,40 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 ConnectionInfo.Credential = new PSCredential(ServerUserName, pw);
                 Logger.LogTrace($"PSCredential Created {pw}");
 
-                Logger.LogTrace($"Creating X509 Cert from: {CertContents}");
-                var x509Cert = new X509Certificate2(
-                    Convert.FromBase64String(CertContents),
-                    PrivateKeyPassword,
-                    X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet |
-                    X509KeyStorageFlags.Exportable);
-                Logger.LogTrace($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
-                Logger.LogTrace(
-                    $"Begin Add for Cert Store {$@"\\{ClientMachine}\{Path}"}");
+                X509Certificate2 x509Cert;
+
+                //If ReEnrollment
+                if (reEnrollment)
+                {
+                    //***************** Cert content not coming from Keyfactor Enrollment UI You Must Create on the Machine Instead **************************************
+
+                    //1. Get whatever new Properties are needed from the Cert Store Params for Alogo and such to generate the CSR and Keypair
+
+                    //2. responseContent=SomeWindowsCryptoFunction.GenerateCSR(subject from ReEnroll UI) //ToDo Generate a CSR
+
+                    //3. sign CSR in Keyfactor
+                    //string body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{storeProperties.template}\"}}";
+                    //enrollResponse resp = MakeWebRequest<enrollResponse>(storeProperties.keyfactorHost + "/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
+                    //string cert = resp.CertificateInformation.Certificates[0];
+                    //cert = cert.Substring(cert.IndexOf("-----"));
+                    //_logger.LogDebug(cert);
+
+                    //4. Try Loading cert contents from step 2. into an X509Certificate2 object
+                    x509Cert = new X509Certificate2(); //ToDo Replace this 
+                }
+                else
+                {
+                    Logger.LogTrace($"Creating X509 Cert from: {CertContents}");
+                    x509Cert = new X509Certificate2(
+                        Convert.FromBase64String(CertContents),
+                        PrivateKeyPassword,
+                        X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet |
+                        X509KeyStorageFlags.Exportable);
+                    Logger.LogTrace($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
+                    Logger.LogTrace(
+                        $"Begin Add for Cert Store {$@"\\{ClientMachine}\{Path}"}");
+                }
+                
 
                 using var runSpace = RunspaceFactory.CreateRunspace(ConnectionInfo);
                 Logger.LogTrace("RunSpace Created");
