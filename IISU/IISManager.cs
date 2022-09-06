@@ -64,6 +64,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 ConnectionInfo =
                     new WSManConnectionInfo(
                         new Uri($"{Properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{Properties?.WinRmPort}/wsman"));
+
+                return InstallCertificate();
             }
             catch (Exception e)
             {
@@ -75,12 +77,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 };
             }
 
-            return new JobResult
-            {
-                Result = OrchestratorJobStatusJobResult.Failure,
-                JobHistoryId = config.JobHistoryId,
-                FailureMessage = "UnExpected Error Occured"
-            };
         }
 
         public JobResult AddCertificate(ManagementJobConfiguration config)
