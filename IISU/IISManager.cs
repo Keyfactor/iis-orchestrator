@@ -47,8 +47,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"].ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag= config.JobProperties["SniFlag"].ToString();
-                IpAddress = config.JobProperties["IpAddress"].ToString();
+                SniFlag= config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                IpAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; //Todo set the private Key Password
                 ServerUserName = config.ServerUsername;
@@ -92,10 +92,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"].ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString();
-                IpAddress = config.JobProperties["IpAddress"].ToString();
+                SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                IpAddress = config.JobProperties["IPAddress"].ToString();
 
-                PrivateKeyPassword = ""; //Todo set the private Key Password
+                PrivateKeyPassword =  config.JobCertificate.PrivateKeyPassword; //Todo set the private Key Password
                 ServerUserName = config.ServerUsername;
                 ServerPassword = config.ServerPassword;
                 Thumbprint = ""; //todo Set the Thumbprint
@@ -307,7 +307,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                     x509Cert.Thumbprint, //{5} 
                     Path, //{6}
                     Convert.ToInt16(SniFlag)); //{7}
-                //Convert.ToInt16(config.JobProperties["Sni Flag"].ToString()?.Substring(0, 1))); //{7}
                 foreach (var cmd in ps.Commands.Commands)
                 {
                     Logger.LogTrace("Logging PowerShell Command");
@@ -343,10 +342,9 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
 
             return new JobResult
             {
-                Result = OrchestratorJobStatusJobResult.Failure,
+                Result = OrchestratorJobStatusJobResult.Success,
                 JobHistoryId = JobHistoryId,
-                FailureMessage =
-                    "Unexpected Error Occured"
+                FailureMessage = ""
             };
         }
     }
