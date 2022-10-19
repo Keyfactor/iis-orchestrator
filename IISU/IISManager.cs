@@ -143,6 +143,21 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 //If ReEnrollment
                 if (reEnrollment)
                 {
+                    //////
+                    // Create the private, public key value (from the local machine)
+                    // .INF File
+                    //      Subject         = "CN=Keyfactor SSL Certificate
+                    //      ProviderName    = "Fortanix KMS CNG Provider"
+                    //      MachineKeySet   = true
+                    //      CertificateTemplate = DDKeyfactorDatabaseEncrypt2yr
+                    //      SAN             = "dns=fortanix.thedemodrive.com&dns=keyfactor.thedemodrive.com"
+
+                    // Generate the CSR and send it to get signed
+                    //      Phase I:    Sign in Keyfactor
+                    //      Phase II:   Get it signed by Fortanix
+                    // Bind the new cert to IIS
+                    //////
+
                     //***************** Cert content not coming from Keyfactor Enrollment UI You Must Create on the Machine Instead **************************************
 
                     //1. Get whatever new Properties are needed from the Cert Store Params for Alogo and such to generate the CSR and Keypair
@@ -238,7 +253,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 Logger.LogTrace("Commands Cleared..");
 
                 //if thumbprint is there it is a renewal so we have to search all the sites for that thumbprint and renew them all
-                if (Thumbprint.Length > 0)
+                if (Thumbprint?.Length > 0)
                 {
                     Logger.LogTrace($"Thumbprint Length > 0 {Thumbprint}");
                     ps.AddCommand("Import-Module")

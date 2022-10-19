@@ -132,11 +132,11 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 
                             var siteSettingsDict = new Dictionary<string, object>
                              {
-                                 { "Site Name", binding.Properties["Name"]?.Value },
+                                 { "SiteName", binding.Properties["Name"]?.Value },
                                  { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
-                                 { "IP Address", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
-                                 { "Host Name", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
-                                 { "Sni Flag", sniValue },
+                                 { "IPAddress", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
+                                 { "HostName", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
+                                 { "SniFlag", sniValue },
                                  { "Protocol", binding.Properties["Protocol"]?.Value }
                              };
 

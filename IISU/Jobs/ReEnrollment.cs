@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Management.Automation.Runspaces;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -27,18 +30,54 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 
             _logger.LogTrace("Entering ReEnrollment...");
             _logger.LogTrace("Before ReEnrollment...");
-            return PerformReEnrollment(config);
+            return PerformReEnrollment(config, submitReEnrollmentUpdate);
 
         }
 
-        private JobResult PerformReEnrollment(ReenrollmentJobConfiguration config)
+        private JobResult PerformReEnrollment(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReenrollment)
         {
             try
             {
                 _logger.MethodEntry();
 
+                // Extract values necessary to create remote PS connection
+                JobProperties properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+
+                WSManConnectionInfo connectionInfo = new WSManConnectionInfo(new Uri($"{properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{properties?.WinRmPort}/wsman"));
+                connectionInfo.IncludePortInSPN = properties.SpnPortFlag;
+                var pw = new NetworkCredential(config.ServerUsername, config.ServerPassword).SecurePassword;
+                _logger.LogTrace($"Credentials: UserName:{config.ServerUsername} Password:{config.ServerPassword}");
+
+                connectionInfo.Credential = new System.Management.Automation.PSCredential(config.ServerUsername, pw);
+                _logger.LogTrace($"PSCredential Created {pw}");
+
+                // Establish new remote ps session
+                _logger.LogTrace("Creating remote PS Workspace");
+                using var runSpace = RunspaceFactory.CreateRunspace(connectionInfo);
+                _logger.LogTrace("Workspace created");
+                runSpace.Open();
+                _logger.LogTrace("Workspace opened");
+
+                using var _ = new PowerShellCertRequest(config.CertificateStoreDetails.ClientMachine, config.CertificateStoreDetails.StorePath, runSpace);
+
+                // Build INF file and create CSR
+                string CSRFilename = _.AddNewCertificate(config);
+
+                // Sign CSR in Keyfactor
+                X509Certificate2 myCert = submitReenrollment.Invoke(CSRFilename);
+
+                // Accept the signed cert
+                //x509object as encoded string to send back to powershell
+                //X509Certificate2 myCert = X509Certificate2.CreateFromCertFile("Myfile");
+                _.AcceptCertificate(myCert.GetRawCertDataString());
+                
+                runSpace.Close();
+
+                // Bind the certificate to IIS
                 var iisManager = new IISManager();
                 return iisManager.ReEnrollCertificate(config);
+                
             }
             catch (Exception ex)
             {
