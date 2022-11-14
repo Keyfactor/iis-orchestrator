@@ -1,4 +1,5 @@
 ﻿using Keyfactor.Orchestrators.Extensions;
+using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,14 +19,15 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
 
         private PowerShell ps { get; set; }
 
-        public PowerShellCertRequest(string serverName, string storePath, Runspace runspace)
+        public PowerShellCertRequest(WSManConnectionInfo connectionInfo, string serverName, string storePath) //, Runspace runspace)
         {
             ServerName = serverName;
             StorePath = storePath;
-            RunSpace = runspace;
+            //RunSpace = runspace;
 
             ps = PowerShell.Create();
-            ps.Runspace = runspace;
+            ps.Runspace = RunspaceFactory.CreateRunspace(connectionInfo); // = runspace;
+            ps.Runspace.Open();
         }
 
         /// <summary>
@@ -34,50 +36,68 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
         /// <returns>Unsigned CSR Filename</returns>
         public string AddNewCertificate(ReenrollmentJobConfiguration config)
         {
-            // Define the variables sent from config argument
-            // Todo: Set the values that come from the Reenrollment object
-            string subject = "CN=Bobs Test Win Cert";
-            string providerName = "Microsoft Enhanced RSA and AES Cryptographic Provider";
-            string machineKeySet = "true";
-            string certificateTemplate = "ExportableWebServer";
-            string SAN = "SAN=\"dns=www.bobs.com\"&dns=bobs.com";
-
-            // Create the script file
-            ps.AddScript("$infFilename = New-TemporaryFile");
-            ps.AddScript("$csrFilename = New-TemporaryFile");
-
-            ps.AddScript("if (Test-Path $csrFilename) { Remove-Item $csrFilename }");
-
-            ps.AddScript($"Set-Content $infFilename [NewRequest]");
-            ps.AddScript($"Add-Content $infFilename 'Subject = \"{subject}\"'");
-            ps.AddScript($"Add-Content $infFilename 'ProviderName = \"{providerName}\"'");
-            ps.AddScript($"Add-Content $infFilename 'MachineKeySet = {machineKeySet}'");
-
-            ps.AddScript($"Add-Content $infFilename [RequestAttributes]");
-            ps.AddScript($"Add-Content $infFilename 'CertificateTemplate = {certificateTemplate}'");
-            ps.AddScript($"Add-Content $infFilename 'SAN = \"{SAN}\"'");
-
-            // Execute the -new command
-            ps.AddScript($"certreq -new -q $infFilename $csrFilename");
-            ps.AddScript($"$CSR = Get-Content $csrFilename");
-
-            // Get the returned results back from Powershell
-            Collection<PSObject> results = ps.Invoke();
-
-            if (ps.HadErrors)
-            {
-                var psError = ps.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
-                throw new PowerShellCertException($"Error creating CSR File. {psError}");
-            }
-
-            // Get the byte array
-            var CSRArray = ps.Runspace.SessionStateProxy.PSVariable.GetValue("CSR");
             string CSR = string.Empty;
-            foreach(object o in (IEnumerable)(CSRArray))
+
+            var subjectText = config.JobProperties["subjectText"];
+            var providerName = config.JobProperties["ProviderName"];
+            //var keyType = config.JobProperties["keyType"];
+            //var keySize = config.JobProperties["keySize"];
+            var SAN = config.JobProperties["SAN"];
+
+            try
             {
-                CSR += o.ToString() + "\n";
-            }
+                // Create the script file
+                ps.AddScript("$infFilename = New-TemporaryFile");
+                ps.AddScript("$csrFilename = New-TemporaryFile");
+
+                ps.AddScript("if (Test-Path $csrFilename) { Remove-Item $csrFilename }");
+
+                //Collection<PSObject> results = ps.Invoke();
+
+                ps.AddScript($"Set-Content $infFilename [NewRequest]");
+                ps.AddScript($"Add-Content $infFilename 'Subject = \"{subjectText}\"'");
+                ps.AddScript($"Add-Content $infFilename 'ProviderName = \"{providerName}\"'");
+                ps.AddScript($"Add-Content $infFilename 'MachineKeySet = True");
+                ps.AddScript($"Add-Content $infFilename 'KeySpec = 0");
+
+                //results = ps.Invoke();
+
+                ps.AddScript($"Add-Content $infFilename [RequestAttributes]");
+                ps.AddScript($"Add-Content $infFilename 'SAN = \"{SAN}\"'");
+
+                //results = ps.Invoke();
+
+                // Execute the -new command
+                ps.AddScript($"certreq -new -q $infFilename $csrFilename");
+                Collection<PSObject> results = ps.Invoke();
+
+                ps.AddScript($"$CSR = Get-Content $csrFilename");
+
+                // Get the returned results back from Powershell
+                // Collection<PSObject> results = ps.Invoke();
+                results = ps.Invoke();
+
+                if (ps.HadErrors)
+                {
+                    var psError = ps.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
+                    throw new PowerShellCertException($"Error creating CSR File. {psError}");
+                }
+
+                // Get the byte array
+                var CSRArray = ps.Runspace.SessionStateProxy.PSVariable.GetValue("CSR");
+                
+                foreach (object o in (IEnumerable)(CSRArray))
+                {
+                    CSR += o.ToString() + "\n";
+                }
+
             return CSR;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
 
         public void SubmitCertificate()

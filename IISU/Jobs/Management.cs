@@ -212,8 +212,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
             {
                 _logger.MethodEntry();
                 
-                    var iisManager=new IISManager();
-                    return iisManager.AddCertificate(config);
+                    var iisManager=new IISManager(config);
+                    return iisManager.AddCertificate();
             }
             catch (Exception ex)
             {

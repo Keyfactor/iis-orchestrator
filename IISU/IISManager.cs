@@ -12,13 +12,8 @@ using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.IISU
 {
-    public class IISManager
+    public class IISManager 
     {
-        public IISManager()
-        {
-            Logger = LogHandler.GetClassLogger<IISManager>();
-        }
-
         private ILogger Logger { get; }
         private string SiteName { get; set; }
         private string IpAddress { get; set; }
@@ -34,53 +29,23 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
         private string ServerUserName { get; set; }
         private string ServerPassword { get; set; }
         private JobProperties Properties { get; set; }
-        private string Thumbprint { get; set; }
+        private string RenewalThumbprint { get; set; }
         private WSManConnectionInfo ConnectionInfo { get; set; }
 
 
-        public JobResult ReEnrollCertificate(ReenrollmentJobConfiguration config)
+        private X509Certificate2 x509Cert;
+        private Runspace runSpace;
+        private PowerShell ps;
+
+        #region Constructors
+        /// <summary>
+        /// Performs a Reenrollment of a certificate in IIS
+        /// </summary>
+        /// <param name="config"></param>
+        public IISManager(ReenrollmentJobConfiguration config)
         {
-            try
-            {
-                SiteName = config.JobProperties["SiteName"].ToString();
-                Port = config.JobProperties["Port"].ToString();
-                HostName = config.JobProperties["HostName"].ToString();
-                Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag= config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
-                IpAddress = config.JobProperties["IPAddress"].ToString();
+            Logger = LogHandler.GetClassLogger<IISManager>();
 
-                PrivateKeyPassword = ""; //Todo set the private Key Password
-                ServerUserName = config.ServerUsername;
-                ServerPassword = config.ServerPassword;
-                Thumbprint = ""; //todo Set the Thumbprint
-                ClientMachine = config.CertificateStoreDetails.ClientMachine;
-                Path = config.CertificateStoreDetails.StorePath;
-                CertContents = ""; //Todo Generate CSR and Get Cert Contents
-                JobHistoryId = config.JobHistoryId;
-
-                Properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
-                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-
-                ConnectionInfo =
-                    new WSManConnectionInfo(
-                        new Uri($"{Properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{Properties?.WinRmPort}/wsman"));
-
-                return InstallCertificate(true);
-            }
-            catch (Exception e)
-            {
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = $"Error Occurred in InstallCertificate {LogHandler.FlattenException(e)}"
-                };
-            }
-
-        }
-
-        public JobResult AddCertificate(ManagementJobConfiguration config)
-        {
             try
             {
                 SiteName = config.JobProperties["SiteName"].ToString();
@@ -90,7 +55,46 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
                 IpAddress = config.JobProperties["IPAddress"].ToString();
 
-                PrivateKeyPassword =  config.JobCertificate.PrivateKeyPassword;
+                PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
+                ServerUserName = config.ServerUsername;
+                ServerPassword = config.ServerPassword;
+                RenewalThumbprint = ""; // A reenrollment will always be empty
+                ClientMachine = config.CertificateStoreDetails.ClientMachine;
+                Path = config.CertificateStoreDetails.StorePath;
+                CertContents = ""; // Not needed for a reenrollment
+                JobHistoryId = config.JobHistoryId;
+
+                Properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+
+                ConnectionInfo =
+                    new WSManConnectionInfo(
+                        new Uri($"{Properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{Properties?.WinRmPort}/wsman"));
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Error when initiating an IIS ReEnrollment Job: {e.Message}", e.InnerException);
+            }
+        }
+
+        /// <summary>
+        /// Performs Management functions of Adding or updating certificates in IIS
+        /// </summary>
+        /// <param name="config"></param>
+        public IISManager(ManagementJobConfiguration config)
+        {
+            Logger = LogHandler.GetClassLogger<IISManager>(); 
+
+            try
+            {
+                SiteName = config.JobProperties["SiteName"].ToString();
+                Port = config.JobProperties["Port"].ToString();
+                HostName = config.JobProperties["HostName"].ToString();
+                Protocol = config.JobProperties["Protocol"].ToString();
+                SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                IpAddress = config.JobProperties["IPAddress"].ToString();
+
+                PrivateKeyPassword = config.JobCertificate.PrivateKeyPassword;
                 ServerUserName = config.ServerUsername;
                 ServerPassword = config.ServerPassword;
                 ClientMachine = config.CertificateStoreDetails.ClientMachine;
@@ -107,11 +111,29 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
 
                 if (config.JobProperties.ContainsKey("RenewalThumbprint"))
                 {
-                    Thumbprint = config.JobProperties["RenewalThumbprint"].ToString();
-                    Logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {Thumbprint}");
+                    RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
+                    Logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
                 }
 
-                return InstallCertificate(false);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Error when initiating an IIS Management Job: {e.Message}", e.InnerException);
+            }
+        }
+
+        #endregion
+
+        public JobResult ReEnrollCertificate(X509Certificate2 certificate)
+        {
+            x509Cert = certificate;
+
+            try
+            {
+                // Instanciate a new Powershell instance
+                CreatePowerShellInstance();
+
+                return BindCertificate();
 
             }
             catch (Exception e)
@@ -119,90 +141,30 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = $"Error Occurred in InstallCertificate {LogHandler.FlattenException(e)}"
+                    JobHistoryId = JobHistoryId,
+                    FailureMessage = $"Error Occurred in ReEnrollCertification {LogHandler.FlattenException(e)}"
                 };
             }
         }
 
-
-        private JobResult InstallCertificate(bool reEnrollment)
+       public JobResult AddCertificate()
         {
             try
             {
-                Logger.LogTrace($"IncludePortInSPN: {Properties.SpnPortFlag}");
-                ConnectionInfo.IncludePortInSPN = Properties.SpnPortFlag;
-                Logger.LogTrace($"Credentials: UserName:{ServerUserName} Password:{ServerPassword}");
-                var pw = new NetworkCredential(ServerUserName, ServerPassword)
-                    .SecurePassword;
-                ConnectionInfo.Credential = new PSCredential(ServerUserName, pw);
-                Logger.LogTrace($"PSCredential Created {pw}");
-
-                X509Certificate2 x509Cert;
-
-                //If ReEnrollment
-                if (reEnrollment)
-                {
-                    //////
-                    // Create the private, public key value (from the local machine)
-                    // .INF File
-                    //      Subject         = "CN=Keyfactor SSL Certificate
-                    //      ProviderName    = "Fortanix KMS CNG Provider"
-                    //      MachineKeySet   = true
-                    //      CertificateTemplate = DDKeyfactorDatabaseEncrypt2yr
-                    //      SAN             = "dns=fortanix.thedemodrive.com&dns=keyfactor.thedemodrive.com"
-
-                    // Generate the CSR and send it to get signed
-                    //      Phase I:    Sign in Keyfactor
-                    //      Phase II:   Get it signed by Fortanix
-                    // Bind the new cert to IIS
-                    //////
-
-                    //***************** Cert content not coming from Keyfactor Enrollment UI You Must Create on the Machine Instead **************************************
-
-                    //1. Get whatever new Properties are needed from the Cert Store Params for Alogo and such to generate the CSR and Keypair
-
-                    //2. responseContent=SomeWindowsCryptoFunction.GenerateCSR(subject from ReEnroll UI) //ToDo Generate a CSR
-
-                    //3. sign CSR in Keyfactor
-                    //string body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{storeProperties.template}\"}}";
-                    //enrollResponse resp = MakeWebRequest<enrollResponse>(storeProperties.keyfactorHost + "/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
-                    //string cert = resp.CertificateInformation.Certificates[0];
-                    //cert = cert.Substring(cert.IndexOf("-----"));
-                    //_logger.LogDebug(cert);
-
-                    //4. Try Loading cert contents from step 2. into an X509Certificate2 object
-                    x509Cert = new X509Certificate2(); //ToDo Replace this 
-                }
-                else
-                {
-                    Logger.LogTrace($"Creating X509 Cert from: {CertContents}");
-                    x509Cert = new X509Certificate2(
-                        Convert.FromBase64String(CertContents),
-                        PrivateKeyPassword,
-                        X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet |
-                        X509KeyStorageFlags.Exportable);
-                    Logger.LogTrace($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
-                    Logger.LogTrace(
-                        $"Begin Add for Cert Store {$@"\\{ClientMachine}\{Path}"}");
-                }
-                
-
-                using var runSpace = RunspaceFactory.CreateRunspace(ConnectionInfo);
-                Logger.LogTrace("RunSpace Created");
-                runSpace.Open();
-                Logger.LogTrace("RunSpace Opened");
+                Logger.LogTrace($"Creating X509 Cert from: {CertContents}");
+                x509Cert = new X509Certificate2(
+                    Convert.FromBase64String(CertContents),
+                    PrivateKeyPassword,
+                    X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet |
+                    X509KeyStorageFlags.Exportable);
+                Logger.LogTrace($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
                 Logger.LogTrace(
-                    $"Creating Cert Store with ClientMachine: {ClientMachine}, JobProperties: {Path}");
-                var _ = new PowerShellCertStore(
-                    ClientMachine, Path,
-                    runSpace);
-                Logger.LogTrace("Cert Store Created");
-                using var ps = PowerShell.Create();
-                Logger.LogTrace("ps created");
-                ps.Runspace = runSpace;
-                Logger.LogTrace("RunSpace Assigned");
+                    $"Begin Add for Cert Store {$@"\\{ClientMachine}\{Path}"}");
 
+                // Instanciate a new Powershell instance
+                CreatePowerShellInstance();
+
+                // Add Certificate 
                 var funcScript = @"
                                                     $ErrorActionPreference = ""Stop""
 
@@ -252,10 +214,54 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 ps.Commands.Clear();
                 Logger.LogTrace("Commands Cleared..");
 
-                //if thumbprint is there it is a renewal so we have to search all the sites for that thumbprint and renew them all
-                if (Thumbprint?.Length > 0)
+                // Install the certifiacte
+                return BindCertificate();
+            }
+            catch (Exception e)
+            {
+                return new JobResult
                 {
-                    Logger.LogTrace($"Thumbprint Length > 0 {Thumbprint}");
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = JobHistoryId,
+                    FailureMessage = $"Error Occurred in InstallCertificate {LogHandler.FlattenException(e)}"
+                };
+            }
+        }
+
+        private void CreatePowerShellInstance()
+        {
+            Logger.LogTrace($"IncludePortInSPN: {Properties.SpnPortFlag}");
+            ConnectionInfo.IncludePortInSPN = Properties.SpnPortFlag;
+            Logger.LogTrace($"Credentials: UserName:{ServerUserName} Password:{ServerPassword}");
+            var pw = new NetworkCredential(ServerUserName, ServerPassword)
+                .SecurePassword;
+            ConnectionInfo.Credential = new PSCredential(ServerUserName, pw);
+            Logger.LogTrace($"PSCredential Created {pw}");
+
+            runSpace = RunspaceFactory.CreateRunspace(ConnectionInfo);
+            Logger.LogTrace("RunSpace Created");
+            runSpace.Open();
+            Logger.LogTrace("RunSpace Opened");
+            Logger.LogTrace(
+                $"Creating Cert Store with ClientMachine: {ClientMachine}, JobProperties: {Path}");
+            var _ = new PowerShellCertStore(
+                ClientMachine, Path,
+                runSpace);
+            Logger.LogTrace("Cert Store Created");
+            ps = PowerShell.Create();
+            Logger.LogTrace("ps created");
+            ps.Runspace = runSpace;
+            Logger.LogTrace("RunSpace Assigned");
+        }
+
+        private JobResult BindCertificate()
+        {
+            try
+            {
+                //if thumbprint is there it is a renewal so we have to search all the sites for that thumbprint and renew them all
+                if (RenewalThumbprint?.Length > 0)
+                {
+                    Logger.LogTrace($"Thumbprint Length > 0 {RenewalThumbprint}");
                     ps.AddCommand("Import-Module")
                         .AddParameter("Name", "WebAdministration")
                         .AddStatement();
@@ -281,10 +287,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                             $"bindingSiteName: {bindingSiteName}, bindingIpAddress: {bindingIpAddress}, bindingPort: {bindingPort}, bindingHostName: {bindingHostName}, bindingProtocol: {bindingProtocol}, bindingThumbprint: {bindingThumbprint}, bindingSniFlg: {bindingSniFlg}");
 
                         //if the thumbprint of the renewal request matches the thumbprint of the cert in IIS, then renew it
-                        if (Thumbprint == bindingThumbprint)
+                        if (RenewalThumbprint == bindingThumbprint)
                         {
-                            Logger.LogTrace($"Thumbprint Match {Thumbprint}={bindingThumbprint}");
-                            funcScript = string.Format(@"
+                            Logger.LogTrace($"Thumbprint Match {RenewalThumbprint}={bindingThumbprint}");
+                            var funcScript = string.Format(@"
                                             $ErrorActionPreference = ""Stop""
 
                                             $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
@@ -323,7 +329,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 }
                 else
                 {
-                    funcScript = string.Format(@"
+                    var funcScript = string.Format(@"
                                             $ErrorActionPreference = ""Stop""
 
                                             $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
@@ -374,7 +380,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 Logger.LogTrace("closing RunSpace...");
                 runSpace.Close();
                 Logger.LogTrace("RunSpace Closed...");
-
 
                 return new JobResult
                 {
