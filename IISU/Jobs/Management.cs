@@ -6,6 +6,7 @@ using System.Net;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -13,19 +14,33 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 {
     public class Management : IManagementJobExtension
     {
-        private readonly ILogger<Management> _logger;
+        private ILogger _logger;
+
+        private IPAMSecretResolver _resolver;
 
         private string _thumbprint = string.Empty;
 
-        public Management(ILogger<Management> logger)
+        private string ServerUserName { get; set; }
+        private string ServerPassword { get; set; }
+
+        public Management(IPAMSecretResolver resolver)
         {
-            _logger = logger;
+            _resolver = resolver;
         }
 
         public string ExtensionName => "IISU";
 
+        private string ResolvePamField(string name,string value)
+        {
+            _logger.LogTrace($"Attempting to resolved PAM eligible field {name}");
+            return _resolver.Resolve(value);
+        }
+
         public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
         {
+            _logger = LogHandler.GetClassLogger<Management>();
+            ServerUserName = ResolvePamField("Server UserName", jobConfiguration.ServerUsername);
+            ServerPassword = ResolvePamField("Server Password", jobConfiguration.ServerPassword);
             _logger.MethodEntry();
             _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(jobConfiguration)}");
             var complete = new JobResult
@@ -83,10 +98,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                 {
                     _logger.LogTrace($"IncludePortInSPN: {storePath.SpnPortFlag}");
                     connInfo.IncludePortInSPN = storePath.SpnPortFlag;
-                    var pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
+                    var pw = new NetworkCredential(ServerUserName, ServerPassword)
                         .SecurePassword;
-                    _logger.LogTrace($"Credentials: UserName:{config.ServerUsername} Password:{config.ServerPassword}");
-                    connInfo.Credential = new PSCredential(config.ServerUsername, pw);
+                    _logger.LogTrace($"Credentials: UserName:{ServerUserName} Password:{ServerPassword}");
+                    connInfo.Credential = new PSCredential(ServerUserName, pw);
                     _logger.LogTrace($"PSCredential Created {pw}");
                     using var runSpace = RunspaceFactory.CreateRunspace(connInfo);
                     _logger.LogTrace("runSpace Created");
@@ -212,7 +227,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
             {
                 _logger.MethodEntry();
                 
-                    var iisManager=new IISManager(config);
+                    var iisManager=new IISManager(config,ServerUserName,ServerPassword);
                     return iisManager.AddCertificate();
             }
             catch (Exception ex)
