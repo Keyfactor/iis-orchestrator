@@ -1,0 +1,18 @@
+﻿{
+  "extensions": {
+    "Keyfactor.Orchestrators.Extensions.IOrchestratorJobExtension": {
+      "CertStores.IISU.Inventory": {
+        "assemblypath": "IISU.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISU.Jobs.Inventory"
+      },
+      "CertStores.IISU.Management": {
+        "assemblypath": "IISU.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISU.Jobs.Management"
+      },
+      "CertStores.IISU.ReEnrollment": {
+        "assemblypath": "IISU.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISU.Jobs.ReEnrollment"
+      }
+    }
+  }
+}

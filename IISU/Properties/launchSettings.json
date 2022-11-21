@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "IISU": {
+      "commandName": "Project",
+      "remoteDebugEnabled": true,
+      "authenticationMode": "None",
+      "remoteDebugMachine": "WIN-KFO100:4026",
+      "nativeDebugging": true
+    }
+  }
+}

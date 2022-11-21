@@ -10,7 +10,7 @@ using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
+namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 {
     public class Inventory : IInventoryJobExtension
     {
@@ -25,7 +25,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             {
                 _logger.MethodEntry();
                 _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
-                var storePath = JsonConvert.DeserializeObject<StorePath>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 var inventoryItems = new List<CurrentInventoryItem>();
 
                 _logger.LogTrace($"Begin Inventory for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
@@ -132,11 +132,11 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
 
                             var siteSettingsDict = new Dictionary<string, object>
                              {
-                                 { "Site Name", binding.Properties["Name"]?.Value },
+                                 { "SiteName", binding.Properties["Name"]?.Value },
                                  { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
-                                 { "IP Address", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
-                                 { "Host Name", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
-                                 { "Sni Flag", sniValue },
+                                 { "IPAddress", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
+                                 { "HostName", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
+                                 { "SniFlag", sniValue },
                                  { "Protocol", binding.Properties["Protocol"]?.Value }
                              };
 
@@ -195,7 +195,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISWithBinding.Jobs
             }
         }
 
-        public string ExtensionName => "IISBindings";
+        public string ExtensionName => "IISU";
         public JobResult ProcessJob(InventoryJobConfiguration jobConfiguration, SubmitInventoryUpdate submitInventoryUpdate)
         {
             return PerformInventory(jobConfiguration, submitInventoryUpdate);

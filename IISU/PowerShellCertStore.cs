@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 
-namespace Keyfactor.Extensions.Orchestrator.IISWithBinding
+namespace Keyfactor.Extensions.Orchestrator.IISU
 {
     internal class PowerShellCertStore
     {
