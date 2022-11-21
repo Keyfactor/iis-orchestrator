@@ -12,7 +12,7 @@
         "supportsDiscovery": false,
         "supportsManagementAdd": true,
         "supportsManagementRemove": true,
-        "supportsReenrollment": false,
+        "supportsReenrollment": true,
         "supportsInventory": true,
         "platformSupport": "Unused"
       },

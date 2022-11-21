@@ -64,7 +64,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                 runSpace.Open();
                 _logger.LogTrace("Workspace opened");
 
-                // NEW
                 var ps = PowerShell.Create();
                 ps.Runspace = runSpace;
 
@@ -75,7 +74,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                 var keyType = config.JobProperties["keyType"];
                 var keySize = config.JobProperties["keySize"];
                 var SAN = config.JobProperties["SAN"];
-                
+
+                // If the provider name is null, default it to the Microsoft CA
+                if (providerName == null) providerName = "Microsoft Strong Cryptographic Provider";
+
                 // Create the script file
                 ps.AddScript("$infFilename = New-TemporaryFile");
                 ps.AddScript("$csrFilename = New-TemporaryFile");
@@ -99,17 +101,20 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                 {
                     ps.AddScript($"Add-Content $infFilename '_continue_ = \"{s + "&"}\"'");
                 }
-                
+
                 // Execute the -new command
                 ps.AddScript($"certreq -new -q $infFilename $csrFilename");
-                
+                _logger.LogTrace("Attempting to create the CSR by Invoking the script.");
                 Collection<PSObject> results = ps.Invoke();
+                _logger.LogTrace("Completed the attempt in creating the CSR.");
                 ps.Commands.Clear();
 
                 try
                 {
                     ps.AddScript($"$CSR = Get-Content $csrFilename");
+                    _logger.LogTrace("Attempting to get the contents of the CSR file.");
                     results = ps.Invoke();
+                    _logger.LogTrace("Completet getting the CSR Contents.");
                 }
                 catch (Exception e)
                 {
@@ -123,20 +128,24 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     // Delete the temp files
                     ps.AddScript("if (Test-Path $infFilename) { Remove-Item -Path $infFilename }");
                     ps.AddScript("if (Test-Path $csrFilename) { Remove-Item -Path $csrFilename }");
+                    _logger.LogTrace("Attempt to delete the temporary files.");
                     results = ps.Invoke();
                 }
 
                 // Get the byte array
                 var CSRContent = ps.Runspace.SessionStateProxy.GetVariable("CSR").ToString();
-                
+
                 // Sign CSR in Keyfactor
+                _logger.LogTrace("Get the signed CSR from KF.");
                 X509Certificate2 myCert = submitReenrollment.Invoke(CSRContent);
 
                 if (myCert != null)
                 {
                     // Get the cert data into string format
                     string csrData = Convert.ToBase64String(myCert.RawData, Base64FormattingOptions.InsertLineBreaks);
-                    
+
+                    _logger.LogTrace("Creating the text version of the certificate.");
+
                     // Write out the cert file
                     StringBuilder sb = new StringBuilder();
                     sb.AppendLine("-----BEGIN CERTIFICATE-----");
@@ -150,20 +159,24 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     ps.Commands.Clear();
 
                     // Accept the signed cert
+                    _logger.LogTrace("Attempting to accept or bind the certificate to the HSM.");
                     ps.AddScript("certreq -accept $cerFilename");
                     ps.Invoke();
+                    _logger.LogTrace("Successfully bind the certificate to the HSM.");
                     ps.Commands.Clear();
 
                     // Delete the temp files
                     ps.AddScript("if (Test-Path $infFilename) { Remove-Item -Path $infFilename }");
                     ps.AddScript("if (Test-Path $csrFilename) { Remove-Item -Path $csrFilename }");
                     ps.AddScript("if (Test-Path $cerFilename) { Remove-Item -Path $cerFilename }");
+                    _logger.LogTrace("Removing temporary files.");
                     results = ps.Invoke();
 
                     ps.Commands.Clear();
                     runSpace.Close();
 
                     // Bind the certificate to IIS
+                    _logger.LogTrace("Binding the certificate to IIS.");
                     var iisManager = new IISManager(config);
                     return iisManager.ReEnrollCertificate(myCert);
                 }
@@ -173,7 +186,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     {
                         Result = OrchestratorJobStatusJobResult.Failure,
                         JobHistoryId = config.JobHistoryId,
-                        FailureMessage = "The ReEnrollment job was unable to sign te CSR.  Please check the formatting of the SAN and other ReEnrollment properties."
+                        FailureMessage = "The ReEnrollment job was unable to sign the CSR.  Please check the formatting of the SAN and other ReEnrollment properties."
                     };
                 }
 
