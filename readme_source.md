@@ -7,7 +7,7 @@ The "Personal" (My) and "Web Hosting" Stores are supported.
 Only certificates that are bound to an IIS web site are managed.
 Unbound certificates are ignored.
 
-This agent implements three job types – Inventory, Management Add, and Management Remove. Below are the steps necessary to configure this AnyAgent.
+This agent implements four job types – Inventory, Management Add, Remove and ReEnrollment. Below are the steps necessary to configure this AnyAgent.
 
 WinRM is used to remotely manage the certificate stores and IIS bindings. WinRM must be properly configured to allow
 the server running the orchestrator to manage the server running IIS.
@@ -71,6 +71,8 @@ This section must be configured with binding fields. The parameters will be popu
    - 1 - SNI Enabled
    - 2 - Non SNI Binding
    - 3 - SNI Binding
+- **Prover Name** - Optional. To get a list of Crypto Providers, open PowerShell and issue the 'certutil -csplist' command.  If no Provider Name is provided, the 'Microsoft Strong Cryptographic Provider' will be used.
+- **SAN** - Required.  The SAN must have one entry that matches the Subject Name when using ReEnrollment.  Multiple SANs maybe chained together using '&'.  Example: dns=www.mysite.com&dns=www.mysite2.com.
 
 Parameter Name|Parameter Type|Default Value|Required
 ---|---|---|---
@@ -80,6 +82,8 @@ Host Name |String||No
 Site Name |String|Default Web Site|Yes
 Sni Flag  |String|0 - No SNI|No
 Protocol  |Multiple Choice|https|Yes
+Provider Name	|String||No
+SAN	|String||Yes
 
 ![](images/screen1-c.gif)
 
@@ -122,6 +126,7 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 10  |Renew Single Cert on Same Site Same Binding Settings Different Hostname Different Certs|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding2.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on only one binding because the other binding does not match thrumbprint|True|![](images/TestCase10Binding1.gif)![](images/TestCase10Binding2.gif)
 11  |Renew Same Cert on Same Site Same Binding Settings Different IPs|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.160`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thrumbprint|True|![](images/TestCase11Binding1.gif)![](images/TestCase11Binding2.gif)
 12  |Renew Same Cert on Same Site Same Binding Settings Different Ports|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 543<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thrumbprint|True|![](images/TestCase12Binding1.gif)![](images/TestCase12Binding2.gif)
+13	|ReEnrollment to Fortanix HSM|**Subject Name:** cn=www.mysite.com<br/>**Port:** 433<br/>**IP Address:**`*`<br/>**Host Name:** mysite.command.local<br/>**Site Name:**Default Web Site<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https<br/>**Provider Name:** Fortanix KMS CNG Provider<br/>**SAN:** dns=www.mysite.com&dns=mynewsite.com|Cert will be generated with keys stored in Fortanix HSM and the cert will be bound to the supplied site.|true|![](images/ReEnrollment1a.png)![](images/ReEnrollment1b.png)
 
 
 
