@@ -6,6 +6,7 @@
   "link_github": true,
   "description": "The IIS Orchestrator treats the certificates bound (actively in use) on a Microsoft Internet Information Server (IIS) as a Keyfactor certificate store. Inventory and Management functions are supported. The orchestrator replaces the IIS orchestrator that ships with Keyfactor Command (which did not support binding.)",
   "about": {
+    "UOFramework": "10.1",
     "orchestrator": {
       "win": {
         "supportsCreateStore": false,
