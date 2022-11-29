@@ -42,7 +42,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
         /// Performs a Reenrollment of a certificate in IIS
         /// </summary>
         /// <param name="config"></param>
-        public IISManager(ReenrollmentJobConfiguration config)
+        public IISManager(ReenrollmentJobConfiguration config,string serverUserName,string serverPassword)
         {
             Logger = LogHandler.GetClassLogger<IISManager>();
 
@@ -56,8 +56,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 IpAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
-                ServerUserName = config.ServerUsername;
-                ServerPassword = config.ServerPassword;
+                ServerUserName = serverUserName;
+                ServerPassword = serverPassword;
                 RenewalThumbprint = ""; // A reenrollment will always be empty
                 ClientMachine = config.CertificateStoreDetails.ClientMachine;
                 Path = config.CertificateStoreDetails.StorePath;
@@ -81,7 +81,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
         /// Performs Management functions of Adding or updating certificates in IIS
         /// </summary>
         /// <param name="config"></param>
-        public IISManager(ManagementJobConfiguration config)
+        public IISManager(ManagementJobConfiguration config, string serverUserName, string serverPassword)
         {
             Logger = LogHandler.GetClassLogger<IISManager>(); 
 
@@ -95,8 +95,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 IpAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = config.JobCertificate.PrivateKeyPassword;
-                ServerUserName = config.ServerUsername;
-                ServerPassword = config.ServerPassword;
+                ServerUserName = serverUserName;
+                ServerPassword = serverPassword;
                 ClientMachine = config.CertificateStoreDetails.ClientMachine;
                 Path = config.CertificateStoreDetails.StorePath;
                 CertContents = config.JobCertificate.Contents;

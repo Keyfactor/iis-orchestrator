@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Management.Automation;
@@ -10,6 +9,7 @@ using System.Text;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -17,18 +17,27 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 {
     public class ReEnrollment:IReenrollmentJobExtension
     {
-        private readonly ILogger<ReEnrollment> _logger;
+        private ILogger _logger;
 
-        public ReEnrollment(ILogger<ReEnrollment> logger)
+        private IPAMSecretResolver _resolver;
+
+        public ReEnrollment(IPAMSecretResolver resolver)
         {
-            _logger = logger;
+            _resolver = resolver;
         }
 
         public string ExtensionName => "IISU";
         
+        private string ResolvePamField(string name, string value)
+        {
+            _logger.LogTrace($"Attempting to resolved PAM eligible field {name}");
+            return _resolver.Resolve(value);
+        }
+
         public JobResult ProcessJob(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReEnrollmentUpdate)
         {
             _logger.MethodEntry();
+            _logger = LogHandler.GetClassLogger<ReEnrollment>();
             _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
             var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
             _logger.LogTrace($"WinRm Url: {storePath?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath?.WinRmPort}/wsman");
@@ -44,6 +53,8 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
             try
             {
                 _logger.MethodEntry();
+                var serverUserName = ResolvePamField("Server UserName", config.ServerUsername);
+                var serverPassword = ResolvePamField("Server Password", config.ServerPassword);
 
                 // Extract values necessary to create remote PS connection
                 JobProperties properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
@@ -51,10 +62,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 
                 WSManConnectionInfo connectionInfo = new WSManConnectionInfo(new Uri($"{properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{properties?.WinRmPort}/wsman"));
                 connectionInfo.IncludePortInSPN = properties.SpnPortFlag;
-                var pw = new NetworkCredential(config.ServerUsername, config.ServerPassword).SecurePassword;
-                _logger.LogTrace($"Credentials: UserName:{config.ServerUsername} Password:{config.ServerPassword}");
+                var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                _logger.LogTrace($"Credentials: UserName:{serverUserName} Password:{serverPassword}");
 
-                connectionInfo.Credential = new PSCredential(config.ServerUsername, pw);
+                connectionInfo.Credential = new PSCredential(serverUserName, pw);
                 _logger.LogTrace($"PSCredential Created {pw}");
 
                 // Establish new remote ps session
@@ -64,6 +75,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                 runSpace.Open();
                 _logger.LogTrace("Workspace opened");
 
+                // NEW
                 var ps = PowerShell.Create();
                 ps.Runspace = runSpace;
 
@@ -176,8 +188,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     runSpace.Close();
 
                     // Bind the certificate to IIS
-                    _logger.LogTrace("Binding the certificate to IIS.");
-                    var iisManager = new IISManager(config);
+                    var iisManager = new IISManager(config,serverUserName,serverPassword);
                     return iisManager.ReEnrollCertificate(myCert);
                 }
                 else

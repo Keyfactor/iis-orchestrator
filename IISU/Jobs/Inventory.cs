@@ -7,6 +7,7 @@ using System.Net;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -14,16 +15,33 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 {
     public class Inventory : IInventoryJobExtension
     {
-        private readonly ILogger<Inventory> _logger;
+        private ILogger _logger;
 
-        public Inventory(ILogger<Inventory> logger) =>
-            _logger = logger;
+        private IPAMSecretResolver _resolver;
+
+        private string ServerUserName { get; set; }
+        private string ServerPassword { get; set; }
+
+        public Inventory(IPAMSecretResolver resolver)
+        {
+            _resolver = resolver;
+        }
+
+        private string ResolvePamField(string name, string value)
+        {
+            _logger.LogTrace($"Attempting to resolved PAM eligible field {name}");
+            return _resolver.Resolve(value);
+        }
 
         private JobResult PerformInventory(InventoryJobConfiguration config, SubmitInventoryUpdate submitInventory)
         {
             try
             {
+                _logger = LogHandler.GetClassLogger<Inventory>();
                 _logger.MethodEntry();
+                ServerUserName = ResolvePamField("Server UserName", config.ServerUsername);
+                ServerPassword = ResolvePamField("Server Password", config.ServerPassword);
+
                 _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
                 var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 var inventoryItems = new List<CurrentInventoryItem>();
@@ -35,10 +53,10 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 
                 if (storePath != null)
                 {
-                    var pw = new NetworkCredential(config.ServerUsername, config.ServerPassword)
+                    var pw = new NetworkCredential(ServerUserName, ServerPassword)
                         .SecurePassword;
-                    _logger.LogTrace($"Credentials: UserName:{config.ServerUsername} Password:{config.ServerPassword}");
-                    connInfo.Credential = new PSCredential(config.ServerUsername, pw);
+                    _logger.LogTrace($"Credentials: UserName:{ServerUserName} Password:{ServerPassword}");
+                    connInfo.Credential = new PSCredential(ServerUserName, pw);
                     _logger.LogTrace($"PSCredential Created {pw}");
 
                     using var runSpace = RunspaceFactory.CreateRunspace(connInfo);
