@@ -12,7 +12,13 @@ This agent implements four job types – Inventory, Management Add, Remove and R
 WinRM is used to remotely manage the certificate stores and IIS bindings. WinRM must be properly configured to allow
 the server running the orchestrator to manage the server running IIS.
 
-**Note:  Version 2.0 requires the iis-Conversion.sql script be executed if you have existing IISwBin Cert Stores and you want to migrate to the new IISU Extension.**
+**Note:**
+In version 2.0 of the IIS Orchestrator, the certificate store type has been renamed and additional parameters have been added. Prior to 2.0 the certificate store type was called “IISBin” and as of 2.0 it is called “IISU”. If you have existing certificate stores of type “IISBin”, you have three options:
+1. Leave them as is and continue to manage them with a pre 2.0 IIS Orchestrator Extension. Create the new IISU certificate store type and create any new IIS stores using the new type.
+1. Delete existing IIS stores. Delete the IISBin store type. Create the new IISU store type. Recreate the IIS stores using the new IISU store type.
+1. Convert existing IISBin certificate stores to IISU certificate stores. There is not currently a way to do this via the Keyfactor API, so direct updates to the underlying Keyfactor SQL database is required. A SQL script (IIS-Conversion.sql) is available in the repository to do this. Hosted customers, which do not have access to the underlying database, will need to work Keyfactor support to run the conversion. On-premises customers can run the script themselves, but are strongly encouraged to ensure that a SQL backup is taken prior running the script (and also be confident that they have a tested database restoration process.)
+
+**Note: There is an additional certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
 
 **1. Create the New Certificate Store Type for the IIS Orchestrator**
 
