@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.2.32616.157
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32929.386
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IISU", "IISU\IISU.csproj", "{33FBC5A1-3466-4F10-B9A6-7186F804A65A}"
 EndProject
@@ -15,6 +15,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{6302034E-DF8C-4B65-AC36-CED24C068999}"
 	ProjectSection(SolutionItems) = preProject
+		images\AddCertStore.png = images\AddCertStore.png
+		images\CertStoreType-c.png = images\CertStoreType-c.png
+		images\CertStoreType.png = images\CertStoreType.png
 		images\ReEnrollment1.png = images\ReEnrollment1.png
 		images\ReEnrollment1a.png = images\ReEnrollment1a.png
 		images\ReEnrollment1b.png = images\ReEnrollment1b.png

@@ -116,7 +116,13 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 
                 // Execute the -new command
                 ps.AddScript($"certreq -new -q $infFilename $csrFilename");
+                _logger.LogDebug($"Subject Text: {subjectText}");
+                _logger.LogDebug($"SAN: {SAN}");
+                _logger.LogDebug($"Provider Name: {providerName}");
+                _logger.LogDebug($"Key Type: {keyType}");
+                _logger.LogDebug($"Key Size: {keySize}");
                 _logger.LogTrace("Attempting to create the CSR by Invoking the script.");
+
                 Collection<PSObject> results = ps.Invoke();
                 _logger.LogTrace("Completed the attempt in creating the CSR.");
                 ps.Commands.Clear();
@@ -126,9 +132,9 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     ps.AddScript($"$CSR = Get-Content $csrFilename");
                     _logger.LogTrace("Attempting to get the contents of the CSR file.");
                     results = ps.Invoke();
-                    _logger.LogTrace("Completet getting the CSR Contents.");
+                    _logger.LogTrace("Finished getting the CSR Contents.");
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     var psError = ps.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
                     throw new PowerShellCertException($"Error creating CSR File. {psError}");
@@ -174,7 +180,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     _logger.LogTrace("Attempting to accept or bind the certificate to the HSM.");
                     ps.AddScript("certreq -accept $cerFilename");
                     ps.Invoke();
-                    _logger.LogTrace("Successfully bind the certificate to the HSM.");
+                    _logger.LogTrace("Successfully bound the certificate to the HSM.");
                     ps.Commands.Clear();
 
                     // Delete the temp files
