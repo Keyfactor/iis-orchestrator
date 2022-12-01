@@ -81,7 +81,7 @@ This section must be configured with binding fields. The parameters will be popu
    - 1 - SNI Enabled
    - 2 - Non SNI Binding
    - 3 - SNI Binding
-- **Prover Name** - Optional. To get a list of Crypto Providers, open PowerShell and issue the 'certutil -csplist' command.  If no Provider Name is provided, the 'Microsoft Strong Cryptographic Provider' will be used.
+- **Provider Name** - Optional. To get a list of Crypto Providers, open PowerShell and issue the 'certutil -csplist' command.  If no Provider Name is provided, the 'Microsoft Strong Cryptographic Provider' will be used.
 - **SAN** - Required.  The SAN must have one entry that matches the Subject Name when using ReEnrollment.  Multiple SANs maybe chained together using '&'.  Example: dns=www.mysite.com&dns=www.mysite2.com.
 
 Parameter Name|Parameter Type|Default Value|Required
