@@ -1,6 +1,7 @@
 2.0.0
-* PAM Support added (requires Univesal Orchestrator Framework version 10.1)
-* Added HSM Support (Use Powershell certutil -csplist to obtain a list of supported Crypto Providers)
+* Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
+* Local PAM Support added (requires Univesal Orchestrator Framework version 10.1)
+* Certificate store type changed from IISBin to IISU. See readme for migration notes.
 
 1.1.3
 * Made WinRM port a store parameter
