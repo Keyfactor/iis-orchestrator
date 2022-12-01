@@ -1,3 +1,6 @@
+2.0.0
+*PAM Support added (requires Univesal Orchestrator Framework version 10.1)
+
 1.1.3
 * Made WinRM port a store parameter
 * Made WinRM protocol a store parameter
