@@ -11,7 +11,7 @@ jobs:
     with:
       release_version: ${{ needs.call-create-github-release-workflow.outputs.release_version }}
       release_url: ${{ needs.call-create-github-release-workflow.outputs.release_url }}
-      release_dir: IISWithBindings/bin/Release/netcoreapp3.1 # output directory to upload as a release, relative to checkout workspace
+      release_dir: IISU/bin/Release/netcoreapp3.1 
     secrets: 
       token: ${{ secrets.PRIVATE_PACKAGE_ACCESS }}
 
