@@ -5,14 +5,6 @@
 -- 1) The certificate store types you are attempting to convert TO need to already be properly set up in Keyfactor Command
 -- 2) Make sure to back up the targeted Keyfactor Command database before running this
 
-
--- !!! SPECIAL NOTE - PLEASE READ !!!
--- If you are converting from JKS-SSH to the appropriate RemoteFile type, be aware that java keystores of type JKS need to be converted to RFJKS while java keystores
---  of type PKCS12 need to be converted to RFPkcs12.  The conversion process below will do one or the other.  If the client in question has a mix, you either need to:
---  1) Choose the type that covers the most stores, run this script, and then manually convert the the stores with the incorrect RemoteFile type to the correct one, or
---  2) Do not use the script below to convert java keystores and set up each store manually.
-
-
 -- *** BEGIN SET UP ***
 
 -- *** STEP 1 OF 4: set store type short name of the stores you wish to convert. ***
