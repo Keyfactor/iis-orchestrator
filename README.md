@@ -125,19 +125,20 @@ This section must be configured with binding fields. The parameters will be popu
    - 1 - SNI Enabled
    - 2 - Non SNI Binding
    - 3 - SNI Binding
-- **Provider Name** - Optional. To get a list of Crypto Providers, open PowerShell and issue the 'certutil -csplist' command.  If no Provider Name is provided, the 'Microsoft Strong Cryptographic Provider' will be used.
-- **SAN** - Required.  The SAN must have one entry that matches the Subject Name when using ReEnrollment.  Multiple SANs maybe chained together using '&'.  Example: dns=www.mysite.com&dns=www.mysite2.com.
+- **Provider Name** - Optional. Name of the Windows cryptographic provider to use when generating and storing the private key for the certificate being enrolled by a reenrollment job. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be changed when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target IIS server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' in a command shell on the target IIS Server.
 
-Parameter Name|Parameter Type|Default Value|Required
+- **SAN** - Optional. Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs.
+
+Parameter Name|Parameter Type|Default Value|Required When
 ---|---|---|---
-Port|String|443|Yes
-IP Address|String|*|Yes
-Host Name |String||No
-Site Name |String|Default Web Site|Yes
-Sni Flag  |String|0 - No SNI|No
-Protocol  |Multiple Choice|https|Yes
-Provider Name	|String||No
-SAN	|String||Yes
+Port|String|443|Adding Entry, Removing Entry, Reenrolling and Entry
+IP Address|String|*|Adding Entry, Reenrolling an Entry
+Host Name |String||
+Site Name |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
+Sni Flag  |String|0 - No SNI|
+Protocol  |Multiple Choice|https|Adding Entry, Removing Entry, Reenrolling an Entry
+Provider Name	|String||
+SAN	|String||Reenrolling an Entry and the CA follows RFC 2818 specifications
 
 ![](images/screen2.png)
 
