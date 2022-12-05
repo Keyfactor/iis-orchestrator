@@ -84,16 +84,16 @@ This section must be configured with binding fields. The parameters will be popu
 - **Provider Name** - Optional. To get a list of Crypto Providers, open PowerShell and issue the 'certutil -csplist' command.  If no Provider Name is provided, the 'Microsoft Strong Cryptographic Provider' will be used.
 - **SAN** - Required.  The SAN must have one entry that matches the Subject Name when using ReEnrollment.  Multiple SANs maybe chained together using '&'.  Example: dns=www.mysite.com&dns=www.mysite2.com.
 
-Parameter Name|Parameter Type|Default Value|Required
+Parameter Name|Parameter Type|Default Value|Required When
 ---|---|---|---
-Port|String|443|Yes
-IP Address|String|*|Yes
+Port|String|443|Adding Entry, Removing Entry, Reenrolling an Entry
+IP Address|String|*|Adding Entry, Removing Entry, Reenrolling an Entry
 Host Name |String||No
-Site Name |String|Default Web Site|Yes
+Site Name |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
 Sni Flag  |String|0 - No SNI|No
-Protocol  |Multiple Choice|https|Yes
+Protocol  |Multiple Choice|https|Adding Entry, Removing Entry, Reenrolling an Entry
 Provider Name	|String||No
-SAN	|String||Yes
+SAN	|String||Reenrolling an Entry
 
 ![](images/screen2.png)
 
@@ -128,7 +128,7 @@ Inventory Schedule	|The interval that the system will use to report on what cert
 #### TEST CASES
 Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 ----|------------------------|------------------------------------|--------------|----------------|-------------------------
-1	|New Cert Enrollment To New Binding|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Created with Enrollment Params specified|True|![](images/TestCase1Results.gif)
+1	|New Cert Enrollment To New Binding With KFSecret Creds|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Created with Enrollment Params specified creds pulled from KFSecret|True|![](images/TestCase1Results.gif)
 2   |New Cert Enrollment To Existing Binding|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|Existing Binding From Case 1 Updated with New Cert|True|![](images/TestCase2Results.gif)
 3   |New Cert Enrollment To Existing Binding Enable SNI |**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Will Update Site In Case 2 to Have Sni Enabled|True|![](images/TestCase3Results.gif)
 4   |New Cert Enrollment New IP Address|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|New Binding Created With New IP and New SNI on Same Port|True|![](images/TestCase4Results.gif)
@@ -141,6 +141,7 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 11  |Renew Same Cert on Same Site Same Binding Settings Different IPs|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.160`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thrumbprint|True|![](images/TestCase11Binding1.gif)![](images/TestCase11Binding2.gif)
 12  |Renew Same Cert on Same Site Same Binding Settings Different Ports|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 543<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thrumbprint|True|![](images/TestCase12Binding1.gif)![](images/TestCase12Binding2.gif)
 13	|ReEnrollment to Fortanix HSM|**Subject Name:** cn=www.mysite.com<br/>**Port:** 433<br/>**IP Address:**`*`<br/>**Host Name:** mysite.command.local<br/>**Site Name:**Default Web Site<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https<br/>**Provider Name:** Fortanix KMS CNG Provider<br/>**SAN:** dns=www.mysite.com&dns=mynewsite.com|Cert will be generated with keys stored in Fortanix HSM and the cert will be bound to the supplied site.|true|![](images/ReEnrollment1a.png)![](images/ReEnrollment1b.png)
+14	|New Cert Enrollment To New Binding With Pam Creds|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Created with Enrollment Params specified creds pulled from Pam Provider|True|![](images/TestCase1Results.gif)
 
 
 
