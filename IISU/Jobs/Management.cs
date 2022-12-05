@@ -92,10 +92,11 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
             try
             {
                 _logger.MethodEntry();
-                var siteName = config.JobProperties["Site Name"];
+                var siteName = config.JobProperties["SiteName"];
                 var port = config.JobProperties["Port"];
-                var hostName = config.JobProperties["Host Name"];
+                var hostName = config.JobProperties["HostName"];
                 var protocol = config.JobProperties["Protocol"];
+                var ipAddress = config.JobProperties["IPAddress"].ToString();
                 _logger.LogTrace($"Removing Site: {siteName}, Port:{port}, hostName:{hostName}, protocol:{protocol}");
 
                 var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
@@ -141,6 +142,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                         .AddParameter("Name", siteName)
                         .AddParameter("Port", port)
                         .AddParameter("HostHeader", hostName)
+                        .AddParameter("IPAddress",ipAddress)
                         .AddStatement();
 
                     
