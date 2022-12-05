@@ -146,6 +146,16 @@ begin transaction
 		from cms_agents.CertStoreTypes a
 		inner join @StoreTypesToConvert b on a.StoreType = b.FromCertStoreTypeId
 	end
+	
+	--Update Cert Store Param Name to not have space (will not show on reenrolmment screen with space, KF Bug)
+	update [cms_agents].[CertStoreTypeEntryParameters]
+  	set [Name]='SiteName' where Name='Site Name'
+        and [StoreTypeId] in (select StoreType from [cms_agents].[CertStoreTypes] where Name='IISU')
+
+	--Update Cert Store Param Name to not have space (will not show on reenrolmment screen with space, KF Bug)
+        update [cms_agents].[CertStoreTypeEntryParameters]
+        set [Name]='HostName' where Name='Host Name'
+        and [StoreTypeId] in (select StoreType from [cms_agents].[CertStoreTypes] where Name='IISU')
 
 	select *
 	from cms_agents.CertStoreTypes
