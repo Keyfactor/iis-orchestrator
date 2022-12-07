@@ -47,6 +47,7 @@ The secrets that this orchestrator extension supports for use with a PAM Provide
 |----|-----------|
 |Server UserName|The user id that will be used to authenticate into the server hosting the store|
 |Server Password|The password that will be used to authenticate into the server hosting the store|
+
 It is not necessary to implement all of the secrets available to be managed by a PAM provider.  For each value that you want managed by a PAM provider, simply enter the key value inside your specific PAM provider that will hold this value into the corresponding field when setting up the certificate store, discovery job, or API call.
 
 Setting up a PAM provider for use involves adding an additional section to the manifest.json file for this extension as well as setting up the PAM provider you will be using.  Each of these steps is specific to the PAM provider you will use and are documented in the specific GitHub repo for that provider.  For a list of Keyfactor supported PAM providers, please reference the [Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam).
