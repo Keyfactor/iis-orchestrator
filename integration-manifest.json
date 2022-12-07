@@ -8,7 +8,7 @@
   "about": {
     "orchestrator": {
       "UOFramework": "10.1",
-	    "pam_support": true,
+      "pam_support": true,
       "win": {
         "supportsCreateStore": false,
         "supportsDiscovery": false,
