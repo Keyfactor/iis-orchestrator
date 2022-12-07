@@ -1,4 +1,18 @@
-﻿using System;
+﻿// Copyright 2022 Keyfactor
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using System;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
@@ -78,10 +92,11 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
             try
             {
                 _logger.MethodEntry();
-                var siteName = config.JobProperties["Site Name"];
+                var siteName = config.JobProperties["SiteName"];
                 var port = config.JobProperties["Port"];
-                var hostName = config.JobProperties["Host Name"];
+                var hostName = config.JobProperties["HostName"];
                 var protocol = config.JobProperties["Protocol"];
+                var ipAddress = config.JobProperties["IPAddress"].ToString();
                 _logger.LogTrace($"Removing Site: {siteName}, Port:{port}, hostName:{hostName}, protocol:{protocol}");
 
                 var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
@@ -127,6 +142,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                         .AddParameter("Name", siteName)
                         .AddParameter("Port", port)
                         .AddParameter("HostHeader", hostName)
+                        .AddParameter("IPAddress",ipAddress)
                         .AddStatement();
 
                     
