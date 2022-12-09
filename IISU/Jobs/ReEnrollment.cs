@@ -50,7 +50,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 
         public JobResult ProcessJob(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReEnrollmentUpdate)
         {
-            _logger.MethodEntry();
             _logger = LogHandler.GetClassLogger<ReEnrollment>();
             _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
             var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
