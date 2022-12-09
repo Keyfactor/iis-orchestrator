@@ -1,4 +1,18 @@
-﻿using System;
+﻿// Copyright 2022 Keyfactor
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Management.Automation;
@@ -36,7 +50,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
 
         public JobResult ProcessJob(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReEnrollmentUpdate)
         {
-            _logger.MethodEntry();
             _logger = LogHandler.GetClassLogger<ReEnrollment>();
             _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
             var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
@@ -108,7 +121,6 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                 ps.AddScript($"Add-Content $infFilename '[Extensions]'");
                 ps.AddScript(@"Add-Content $infFilename '2.5.29.17 = ""{text}""'");
 
-                // Todo:  Parse SAN by '&' and add the below entry for each DSN
                 foreach (string s in SAN.ToString().Split("&"))
                 {
                     ps.AddScript($"Add-Content $infFilename '_continue_ = \"{s + "&"}\"'");
