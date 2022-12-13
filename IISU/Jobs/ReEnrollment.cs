@@ -118,12 +118,15 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                 ps.AddScript($"Add-Content $infFilename 'KeyLength={keySize}'");
                 ps.AddScript($"Add-Content $infFilename 'KeySpec = 0'");
 
-                ps.AddScript($"Add-Content $infFilename '[Extensions]'");
-                ps.AddScript(@"Add-Content $infFilename '2.5.29.17 = ""{text}""'");
-
-                foreach (string s in SAN.ToString().Split("&"))
+                if(SAN != null)
                 {
-                    ps.AddScript($"Add-Content $infFilename '_continue_ = \"{s + "&"}\"'");
+                    ps.AddScript($"Add-Content $infFilename '[Extensions]'");
+                    ps.AddScript(@"Add-Content $infFilename '2.5.29.17 = ""{text}""'");
+
+                    foreach (string s in SAN.ToString().Split("&"))
+                    {
+                        ps.AddScript($"Add-Content $infFilename '_continue_ = \"{s + "&"}\"'");
+                    }
                 }
 
                 // Execute the -new command
