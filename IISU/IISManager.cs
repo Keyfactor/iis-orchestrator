@@ -64,7 +64,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
             {
                 SiteName = config.JobProperties["SiteName"].ToString();
                 Port = config.JobProperties["Port"].ToString();
-                HostName = config.JobProperties["HostName"].ToString();
+                HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
                 SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
                 IpAddress = config.JobProperties["IPAddress"].ToString();
