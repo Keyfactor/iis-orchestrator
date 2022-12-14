@@ -40,7 +40,7 @@ Store Path Type	|Determines what restrictions are applied to the store path fiel
 Store Path Value|A comma separated list of options to select from for the Store Path. This, combined with the hostname, will determine the location used for the certificate store management and inventory.  Must be My, WebHosting
 Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is required since IIS will need the private key material to establish TLS connections.
 PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
-Job Types	|Inventory, Add, and Remove are the supported job types. 
+Job Types	|Inventory, Add, Remove, and Reenrollment are the supported job types. 
 
 ![](images/certstoretype.png)
 
@@ -87,13 +87,13 @@ This section must be configured with binding fields. The parameters will be popu
 Parameter Name|Parameter Type|Default Value|Required When
 ---|---|---|---
 Port|String|443|Adding Entry, Removing Entry, Reenrolling and Entry
-IP Address|String|*|Adding Entry, Reenrolling an Entry
-Host Name |String||
-Site Name |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
-Sni Flag  |String|0 - No SNI|
+IPAddress|String|*|Adding Entry, Reenrolling an Entry
+HostName |String||
+SiteName |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
+SniFlag  |String|0 - No SNI|
 Protocol  |Multiple Choice|https|Adding Entry, Removing Entry, Reenrolling an Entry
-Provider Name	|String||
-SAN	|String||Reenrolling an Entry and the CA follows RFC 2818 specifications
+ProviderName	|String||
+SAN	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
 
 ![](images/screen2.png)
 
@@ -143,7 +143,6 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 13	|ReEnrollment to Fortanix HSM|**Subject Name:** cn=www.mysite.com<br/>**Port:** 433<br/>**IP Address:**`*`<br/>**Host Name:** mysite.command.local<br/>**Site Name:**Default Web Site<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https<br/>**Provider Name:** Fortanix KMS CNG Provider<br/>**SAN:** dns=www.mysite.com&dns=mynewsite.com|Cert will be generated with keys stored in Fortanix HSM and the cert will be bound to the supplied site.|true|![](images/ReEnrollment1a.png)![](images/ReEnrollment1b.png)
 14	|New Cert Enrollment To New Binding With Pam Creds|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Created with Enrollment Params specified creds pulled from Pam Provider|True|![](images/TestCase1Results.gif)
 15	|New Cert Enrollment Default Site No HostName|**Site Name:** Default Web Site<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:**<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Installed with no HostName|True|![](images/TestCase15Results.gif)
-
 
 
 
