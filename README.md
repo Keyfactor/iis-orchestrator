@@ -100,7 +100,7 @@ Store Path Type	|Determines what restrictions are applied to the store path fiel
 Store Path Value|A comma separated list of options to select from for the Store Path. This, combined with the hostname, will determine the location used for the certificate store management and inventory.  Must be My, WebHosting
 Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is required since IIS will need the private key material to establish TLS connections.
 PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
-Job Types	|Inventory, Add, and Remove are the supported job types. 
+Job Types	|Inventory, Add, Remove, and Reenrollment are the supported job types. 
 
 ![](images/certstoretype.png)
 
@@ -147,13 +147,13 @@ This section must be configured with binding fields. The parameters will be popu
 Parameter Name|Parameter Type|Default Value|Required When
 ---|---|---|---
 Port|String|443|Adding Entry, Removing Entry, Reenrolling and Entry
-IP Address|String|*|Adding Entry, Reenrolling an Entry
-Host Name |String||
-Site Name |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
-Sni Flag  |String|0 - No SNI|
+IPAddress|String|*|Adding Entry, Reenrolling an Entry
+HostName |String||
+SiteName |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
+SniFlag  |String|0 - No SNI|
 Protocol  |Multiple Choice|https|Adding Entry, Removing Entry, Reenrolling an Entry
-Provider Name	|String||
-SAN	|String||Reenrolling an Entry and the CA follows RFC 2818 specifications
+ProviderName	|String||
+SAN	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
 
 ![](images/screen2.png)
 
