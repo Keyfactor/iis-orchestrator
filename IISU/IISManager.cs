@@ -288,23 +288,25 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                     var bindings = ps.Invoke();
                     foreach (var binding in bindings)
                     {
-                        Logger.LogTrace("Looping Bindings....");
-                        var bindingSiteName = binding.Properties["name"].Value.ToString();
-                        var bindingIpAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
-                        var bindingPort = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
-                        var bindingHostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
-                        var bindingProtocol = binding.Properties["Protocol"].Value.ToString();
-                        var bindingThumbprint = binding.Properties["thumbprint"].Value.ToString();
-                        var bindingSniFlg = binding.Properties["sniFlg"].Value.ToString();
-
-                        Logger.LogTrace(
-                            $"bindingSiteName: {bindingSiteName}, bindingIpAddress: {bindingIpAddress}, bindingPort: {bindingPort}, bindingHostName: {bindingHostName}, bindingProtocol: {bindingProtocol}, bindingThumbprint: {bindingThumbprint}, bindingSniFlg: {bindingSniFlg}");
-
-                        //if the thumbprint of the renewal request matches the thumbprint of the cert in IIS, then renew it
-                        if (RenewalThumbprint == bindingThumbprint)
+                        if (binding.Properties["Protocol"].Value.ToString().Contains("http"))
                         {
-                            Logger.LogTrace($"Thumbprint Match {RenewalThumbprint}={bindingThumbprint}");
-                            var funcScript = string.Format(@"
+                            Logger.LogTrace("Looping Bindings....");
+                            var bindingSiteName = binding.Properties["name"].Value.ToString();
+                            var bindingIpAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
+                            var bindingPort = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
+                            var bindingHostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
+                            var bindingProtocol = binding.Properties["Protocol"].Value.ToString();
+                            var bindingThumbprint = binding.Properties["thumbprint"].Value.ToString();
+                            var bindingSniFlg = binding.Properties["sniFlg"].Value.ToString();
+
+                            Logger.LogTrace(
+                                $"bindingSiteName: {bindingSiteName}, bindingIpAddress: {bindingIpAddress}, bindingPort: {bindingPort}, bindingHostName: {bindingHostName}, bindingProtocol: {bindingProtocol}, bindingThumbprint: {bindingThumbprint}, bindingSniFlg: {bindingSniFlg}");
+
+                            //if the thumbprint of the renewal request matches the thumbprint of the cert in IIS, then renew it
+                            if (RenewalThumbprint == bindingThumbprint)
+                            {
+                                Logger.LogTrace($"Thumbprint Match {RenewalThumbprint}={bindingThumbprint}");
+                                var funcScript = string.Format(@"
                                             $ErrorActionPreference = ""Stop""
 
                                             $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
@@ -317,27 +319,28 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                                                 Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" | 
                                                     ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
                                             }}", bindingSiteName, //{0} 
-                                bindingIpAddress, //{1}
-                                bindingPort, //{2}
-                                bindingProtocol, //{3}
-                                bindingHostName, //{4}
-                                x509Cert.Thumbprint, //{5} 
-                                Path, //{6}
-                                bindingSniFlg); //{7}
+                                    bindingIpAddress, //{1}
+                                    bindingPort, //{2}
+                                    bindingProtocol, //{3}
+                                    bindingHostName, //{4}
+                                    x509Cert.Thumbprint, //{5} 
+                                    Path, //{6}
+                                    bindingSniFlg); //{7}
 
-                            Logger.LogTrace($"funcScript {funcScript}");
-                            ps.AddScript(funcScript);
-                            Logger.LogTrace("funcScript added...");
-                            ps.Invoke();
-                            Logger.LogTrace("funcScript Invoked...");
-                            foreach (var cmd in ps.Commands.Commands)
-                            {
-                                Logger.LogTrace("Logging PowerShell Command");
-                                Logger.LogTrace(cmd.CommandText);
+                                Logger.LogTrace($"funcScript {funcScript}");
+                                ps.AddScript(funcScript);
+                                Logger.LogTrace("funcScript added...");
+                                ps.Invoke();
+                                Logger.LogTrace("funcScript Invoked...");
+                                foreach (var cmd in ps.Commands.Commands)
+                                {
+                                    Logger.LogTrace("Logging PowerShell Command");
+                                    Logger.LogTrace(cmd.CommandText);
+                                }
+
+                                ps.Commands.Clear();
+                                Logger.LogTrace("Commands Cleared..");
                             }
-
-                            ps.Commands.Clear();
-                            Logger.LogTrace("Commands Cleared..");
                         }
                     }
                 }
