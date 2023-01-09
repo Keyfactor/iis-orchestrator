@@ -15,7 +15,7 @@
 using System.ComponentModel;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
     internal class JobProperties
     {

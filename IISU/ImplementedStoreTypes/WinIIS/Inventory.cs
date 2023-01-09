@@ -24,8 +24,9 @@ using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
 {
     public class Inventory : IInventoryJobExtension
     {
@@ -78,7 +79,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     runSpace.Open();
                     _logger.LogTrace("runSpace Opened");
 
-                    var psCertStore = new PowerShellCertStore(
+                    var psCertStore = new PowerShellUtilities.CertificateStore(
                         config.CertificateStoreDetails.ClientMachine, config.CertificateStoreDetails.StorePath,
                         runSpace);
                     _logger.LogTrace("psCertStore Created");
@@ -200,7 +201,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     FailureMessage = ""
                 };
             }
-            catch (PsCertStoreException psEx)
+            catch (CertificateStoreException psEx)
             {
                 _logger.LogTrace(psEx.Message);
                 return new JobResult
@@ -227,7 +228,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
             }
         }
 
-        public string ExtensionName => "IISU";
+        public string ExtensionName => "WinIIS";
         public JobResult ProcessJob(InventoryJobConfiguration jobConfiguration, SubmitInventoryUpdate submitInventoryUpdate)
         {
             return PerformInventory(jobConfiguration, submitInventoryUpdate);

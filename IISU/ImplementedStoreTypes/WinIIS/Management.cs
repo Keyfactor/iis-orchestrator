@@ -24,7 +24,7 @@ using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
 {
     public class Management : IManagementJobExtension
     {
@@ -122,7 +122,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU.Jobs
                     _logger.LogTrace("runSpace Created");
                     runSpace.Open();
                     _logger.LogTrace("runSpace Opened");
-                    var psCertStore = new PowerShellCertStore(
+                    var psCertStore = new PowerShellUtilities.CertificateStore(
                         config.CertificateStoreDetails.ClientMachine, config.CertificateStoreDetails.StorePath,
                         runSpace);
                     _logger.LogTrace("psCertStore Created");

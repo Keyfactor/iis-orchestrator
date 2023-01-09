@@ -14,9 +14,9 @@
 
 using System;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities
 {
-    public class PsCertificate
+    public class Certificate
     {
         public string Thumbprint { get; set; }
         public byte[] RawData { get; set; }

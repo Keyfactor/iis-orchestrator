@@ -17,24 +17,24 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities
 {
     [Serializable]
-    internal class PowerShellCertException : Exception
+    internal class CertificateException : Exception
     {
-        public PowerShellCertException()
+        public CertificateException()
         {
         }
 
-        public PowerShellCertException(string message) : base(message)
+        public CertificateException(string message) : base(message)
         {
         }
 
-        public PowerShellCertException(string message, Exception innerException) : base(message, innerException)
+        public CertificateException(string message, Exception innerException) : base(message, innerException)
         {
         }
 
-        protected PowerShellCertException(SerializationInfo info, StreamingContext context) : base(info, context)
+        protected CertificateException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }
     }

@@ -17,11 +17,11 @@ using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities
 {
-    internal class PowerShellCertStore
+    internal class CertificateStore
     {
-        public PowerShellCertStore(string serverName, string storePath, Runspace runSpace)
+        public CertificateStore(string serverName, string storePath, Runspace runSpace)
         {
             ServerName = serverName;
             StorePath = storePath;
@@ -32,7 +32,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
         public string ServerName { get; set; }
         public string StorePath { get; set; }
         public Runspace RunSpace { get; set; }
-        public List<PsCertificate> Certificates { get; set; }
+        public List<Certificate> Certificates { get; set; }
 
         public void RemoveCertificate(string thumbprint)
         {
@@ -54,12 +54,12 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
 
             var _ = ps.Invoke();
             if (ps.HadErrors)
-                throw new PsCertStoreException($"Error removing certificate in {StorePath} store on {ServerName}.");
+                throw new CertificateStoreException($"Error removing certificate in {StorePath} store on {ServerName}.");
         }
 
         private void Initalize()
         {
-            Certificates = new List<PsCertificate>();
+            Certificates = new List<Certificate>();
             try
             {
                 using var ps = PowerShell.Create();
@@ -80,7 +80,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
                 var certs = ps.Invoke();
 
                 foreach (var c in certs)
-                    Certificates.Add(new PsCertificate
+                    Certificates.Add(new Certificate
                     {
                         Thumbprint = $"{c.Properties["Thumbprint"]?.Value}",
                         HasPrivateKey = bool.Parse($"{c.Properties["HasPrivateKey"]?.Value}"),
@@ -89,7 +89,7 @@ namespace Keyfactor.Extensions.Orchestrator.IISU
             }
             catch (Exception ex)
             {
-                throw new PsCertStoreException(
+                throw new CertificateStoreException(
                     $"Error listing certificate in {StorePath} store on {ServerName}: {ex.Message}");
             }
         }
