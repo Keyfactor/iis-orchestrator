@@ -14,7 +14,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
@@ -66,9 +69,81 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
                 var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 var inventoryItems = new List<CurrentInventoryItem>();
 
-                _logger.LogTrace("Invoking Inventory...");
-                submitInventory.Invoke(inventoryItems);
-                _logger.LogTrace($"Inventory Invoked ... {inventoryItems.Count} Items");
+                // Setup a new connection to the client machine
+                var connectionInfo = new WSManConnectionInfo(new Uri($"{storePath?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath?.WinRmPort}/wsman"));
+                _logger.LogTrace($"WinRm URL: {storePath?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath?.WinRmPort}/wsman");
+
+                if (storePath != null)
+                {
+                    // Set credentials object
+                    var pw = new NetworkCredential(ServerUserName, ServerPassword).SecurePassword;
+
+                    connectionInfo.Credential = new PSCredential(ServerUserName, pw);
+
+                    // Create the PowerShell Runspace
+                    using var runSpace = RunspaceFactory.CreateRunspace(connectionInfo);
+                    _logger.LogTrace("runSpace Created");
+                    runSpace.Open();
+                    _logger.LogTrace("runSpace Opened");
+
+                    using (var ps = PowerShell.Create())
+                    {
+                        ps.Runspace = runSpace;
+                        _logger.LogTrace("RunSpace Created");
+
+                        try
+                        {
+                            // Call PowerShell Command to get child items (certs)
+                            _logger.LogTrace($"Attempting to get licenses from cert path: {config.CertificateStoreDetails.StorePath})");
+                            List<X509Certificate2> myCerts =
+                            PSCommandHelper.GetChildItem(ps, config.CertificateStoreDetails.StorePath);
+
+                            if(myCerts.Count > 0)
+                            {
+                                _logger.LogTrace($"Found {myCerts.Count} certificates in path: {config.CertificateStoreDetails.StorePath}");
+                                foreach (X509Certificate2 thisCert in myCerts)
+                                {
+                                    CurrentInventoryItem inventoryItem = new CurrentInventoryItem()
+                                    {
+                                        Certificates = new[] { thisCert.GetRawCertDataString().ToString() },
+                                        Alias = thisCert.Thumbprint,
+                                        PrivateKeyEntry = thisCert.HasPrivateKey,
+                                        UseChainLevel = false,
+                                        ItemStatus = OrchestratorInventoryItemStatus.Unknown,
+                                        Parameters = null
+                                    };
+
+                                    inventoryItems.Add(inventoryItem);
+                                }
+
+                                // Get Certificate info and add to list of inventory items to pass back to KF
+                                _logger.LogTrace("Invoking Inventory...");
+                                submitInventory.Invoke(inventoryItems);
+                                _logger.LogTrace($"Inventory Invoked ... {inventoryItems.Count} Items");
+                            }
+                            else
+                            {
+                                return new JobResult
+                                {
+                                    Result = OrchestratorJobStatusJobResult.Warning,
+                                    JobHistoryId = config.JobHistoryId,
+                                    FailureMessage =
+                                        $"No certificates were found in the Certificate Store Path: {config.CertificateStoreDetails.StorePath} on server: {config.CertificateStoreDetails.ClientMachine}"
+                                };
+                            }
+                        }
+                        catch (CertificateStoreException certEx)
+                        {
+                            return new JobResult
+                            {
+                                Result = OrchestratorJobStatusJobResult.Failure,
+                                JobHistoryId = config.JobHistoryId,
+                                FailureMessage =
+                                    $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}:  failed with Error: {certEx.Message}"
+                            };
+                        }
+                    }
+                }
 
                 return new JobResult
                 {
