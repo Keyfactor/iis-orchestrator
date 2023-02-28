@@ -207,7 +207,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     // Accept the signed cert
                     _logger.LogTrace("Attempting to accept or bind the certificate to the HSM.");
 
-                    ps.AddScript($"Set-Location -Path Cert:\\localmachine\\{config.CertificateStoreDetails.StorePath}");
+                    ps.AddScript($"Set-Location -Path Cert:\\localmachine\\'{config.CertificateStoreDetails.StorePath}'");
                     ps.AddScript($"Import-Certificate -Filepath $cerFilename");
                     ps.Invoke();
                     _logger.LogTrace("Successfully bound the certificate.");
