@@ -20,6 +20,10 @@
       "CertStores.Win.Management": {
         "assemblypath": "WindowsCertStore.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.Management"
+      },
+      "CertStores.Win.ReEnrollment": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.ReEnrollment"
       }
     }
   }

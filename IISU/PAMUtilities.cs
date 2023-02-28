@@ -12,15 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Keyfactor.Orchestrators.Extensions.Interfaces;
+using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
+using System.Text;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    public class Certificate
+    internal class PAMUtilities
     {
-        public string Thumbprint { get; set; }
-        public byte[] RawData { get; set; }
-        public bool HasPrivateKey { get; set; }
-        public string CertificateData => Convert.ToBase64String(RawData);
+        internal static string ResolvePAMField(IPAMSecretResolver resolver, ILogger logger, string name, string key)
+        {
+            if (resolver == null) return key;
+            else
+            {
+                logger.LogDebug($"Attempting to resolve PAM eligible field {name} with key {key}");
+                return resolver.Resolve(key);
+            }
+
+        }
     }
 }

@@ -18,7 +18,6 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -28,128 +27,82 @@ using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
 {
-    public class Inventory : IInventoryJobExtension
+    public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {
-        public string ExtensionName => "Win";
-
         private ILogger _logger;
-        private IPAMSecretResolver _resolver;
+        public string ExtensionName => string.Empty;
 
-        private string ServerUserName { get; set; }
-        private string ServerPassword { get; set; }
+        public Inventory()
+        {
+        }
 
         public Inventory(IPAMSecretResolver resolver)
         {
             _resolver = resolver;
-            
-            _logger = LogHandler.GetClassLogger<Inventory>();
-            _logger.MethodEntry();
         }
 
         public JobResult ProcessJob(InventoryJobConfiguration jobConfiguration, SubmitInventoryUpdate submitInventoryUpdate)
         {
-            return PerformInventory(jobConfiguration, submitInventoryUpdate);
-        }
+            _logger = LogHandler.GetClassLogger<Inventory>();
+            _logger.MethodEntry();
 
-        public string ResolvePamField(string name, string value)
-        {
-            _logger.LogTrace($"Attempting to resolve PAM eligible field {name}");
-            return _resolver.Resolve(value);
+            return PerformInventory(jobConfiguration, submitInventoryUpdate);
         }
 
         private JobResult PerformInventory(InventoryJobConfiguration config, SubmitInventoryUpdate submitInventory)
         {
             try
             {
-                ServerUserName = ResolvePamField("Server UserName", config.ServerUsername);
-                ServerPassword = ResolvePamField("Server Password", config.ServerPassword);
+                var inventoryItems = new List<CurrentInventoryItem>();
 
                 _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
 
-                var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-                var inventoryItems = new List<CurrentInventoryItem>();
+                string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
+                string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
-                // Setup a new connection to the client machine
-                var connectionInfo = new WSManConnectionInfo(new Uri($"{storePath?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath?.WinRmPort}/wsman"));
-                _logger.LogTrace($"WinRm URL: {storePath?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath?.WinRmPort}/wsman");
+                // Deserialize specific job properties
+                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                string protocol = jobProperties.WinRmProtocol;
+                string port = jobProperties.WinRmPort;
+                bool IncludePortInSPN = jobProperties.SpnPortFlag;
+                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
+                string storePath = config.CertificateStoreDetails.StorePath;
 
                 if (storePath != null)
                 {
-                    // Set credentials object
-                    var pw = new NetworkCredential(ServerUserName, ServerPassword).SecurePassword;
+                    _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
+                    using var myRunspace = PSHelper.GetClientPSRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                    myRunspace.Open();
 
-                    connectionInfo.Credential = new PSCredential(ServerUserName, pw);
+                    _logger.LogTrace("Runspace is now open");
+                    _logger.LogTrace($"Attempting to read certificates from cert store: {storePath}");
 
-                    // Create the PowerShell Runspace
-                    using var runSpace = RunspaceFactory.CreateRunspace(connectionInfo);
-                    _logger.LogTrace("runSpace Created");
-                    runSpace.Open();
-                    _logger.LogTrace("runSpace Opened");
+                    //foreach (Certificate cert in PowerShellUtilities.CertificateStore.GetCertificatesFromStore(myRunspace, storePath))
+                    WinInventory winInv = new WinInventory(_logger);
+                    inventoryItems = winInv.GetInventoryItems(myRunspace, storePath);
 
-                    using (var ps = PowerShell.Create())
+                    _logger.LogTrace($"A total of {inventoryItems.Count} were found");
+                    _logger.LogTrace("Closing runspace");
+                    myRunspace.Close();
+
+                    _logger.LogTrace("Invoking Inventory...");
+                    submitInventory.Invoke(inventoryItems);
+                    _logger.LogTrace($"Inventory Invoked ... {inventoryItems.Count} Items");
+
+                    return new JobResult
                     {
-                        ps.Runspace = runSpace;
-                        _logger.LogTrace("RunSpace Created");
-
-                        try
-                        {
-                            // Call PowerShell Command to get child items (certs)
-                            _logger.LogTrace($"Attempting to get licenses from cert path: {config.CertificateStoreDetails.StorePath})");
-                            List<X509Certificate2> myCerts =
-                            PSCommandHelper.GetChildItem(ps, config.CertificateStoreDetails.StorePath);
-
-                            if(myCerts.Count > 0)
-                            {
-                                _logger.LogTrace($"Found {myCerts.Count} certificates in path: {config.CertificateStoreDetails.StorePath}");
-                                foreach (X509Certificate2 thisCert in myCerts)
-                                {
-                                    CurrentInventoryItem inventoryItem = new CurrentInventoryItem()
-                                    {
-                                        Certificates = new[] { thisCert.GetRawCertDataString().ToString() },
-                                        Alias = thisCert.Thumbprint,
-                                        PrivateKeyEntry = thisCert.HasPrivateKey,
-                                        UseChainLevel = false,
-                                        ItemStatus = OrchestratorInventoryItemStatus.Unknown,
-                                        Parameters = null
-                                    };
-
-                                    inventoryItems.Add(inventoryItem);
-                                }
-
-                                // Get Certificate info and add to list of inventory items to pass back to KF
-                                _logger.LogTrace("Invoking Inventory...");
-                                submitInventory.Invoke(inventoryItems);
-                                _logger.LogTrace($"Inventory Invoked ... {inventoryItems.Count} Items");
-                            }
-                            else
-                            {
-                                return new JobResult
-                                {
-                                    Result = OrchestratorJobStatusJobResult.Warning,
-                                    JobHistoryId = config.JobHistoryId,
-                                    FailureMessage =
-                                        $"No certificates were found in the Certificate Store Path: {config.CertificateStoreDetails.StorePath} on server: {config.CertificateStoreDetails.ClientMachine}"
-                                };
-                            }
-                        }
-                        catch (CertificateStoreException certEx)
-                        {
-                            return new JobResult
-                            {
-                                Result = OrchestratorJobStatusJobResult.Failure,
-                                JobHistoryId = config.JobHistoryId,
-                                FailureMessage =
-                                    $"Site {config.CertificateStoreDetails.StorePath} on server {config.CertificateStoreDetails.ClientMachine}:  failed with Error: {certEx.Message}"
-                            };
-                        }
-                    }
+                        Result = OrchestratorJobStatusJobResult.Success,
+                        JobHistoryId = config.JobHistoryId,
+                        FailureMessage = ""
+                    };
                 }
 
                 return new JobResult
                 {
-                    Result = OrchestratorJobStatusJobResult.Success,
+                    Result = OrchestratorJobStatusJobResult.Warning,
                     JobHistoryId = config.JobHistoryId,
-                    FailureMessage = ""
+                    FailureMessage =
+                        $"No certificates were found in the Certificate Store Path: {storePath} on server: {clientMachineName}"
                 };
             }
             catch (CertificateStoreException psEx)

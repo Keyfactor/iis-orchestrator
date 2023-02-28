@@ -22,199 +22,136 @@ using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
 {
-    public class Management : IManagementJobExtension
+    public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
         private ILogger _logger;
 
-        private IPAMSecretResolver _resolver;
+        public string ExtensionName => string.Empty;
 
         private string _thumbprint = string.Empty;
 
-        private string ServerUserName { get; set; }
-        private string ServerPassword { get; set; }
+        private Runspace myRunspace;
 
         public Management(IPAMSecretResolver resolver)
         {
             _resolver = resolver;
         }
 
-        public string ExtensionName => "IISU";
-
-        private string ResolvePamField(string name,string value)
-        {
-            _logger.LogTrace($"Attempting to resolved PAM eligible field {name}");
-            return _resolver.Resolve(value);
-        }
-
-        public JobResult ProcessJob(ManagementJobConfiguration jobConfiguration)
-        {
-            _logger = LogHandler.GetClassLogger<Management>();
-            ServerUserName = ResolvePamField("Server UserName", jobConfiguration.ServerUsername);
-            ServerPassword = ResolvePamField("Server Password", jobConfiguration.ServerPassword);
-            _logger.MethodEntry();
-            _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(jobConfiguration)}");
-            var complete = new JobResult
-            {
-                Result = OrchestratorJobStatusJobResult.Failure,
-                FailureMessage =
-                    "Invalid Management Operation"
-            };
-
-            switch (jobConfiguration.OperationType)
-            {
-                case CertStoreOperationType.Add:
-                    _logger.LogTrace("Entering Add...");
-                    if (jobConfiguration.JobProperties.ContainsKey("RenewalThumbprint"))
-                    {
-                        _thumbprint = jobConfiguration.JobProperties["RenewalThumbprint"].ToString();
-                        _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {_thumbprint}");
-                    }
-                    _logger.LogTrace("Before PerformAddition...");
-                    complete = PerformAddition(jobConfiguration);
-                    _logger.LogTrace("After PerformAddition...");
-                    break;
-                case CertStoreOperationType.Remove:
-                    _logger.LogTrace("After PerformRemoval...");
-                    complete = PerformRemoval(jobConfiguration);
-                    _logger.LogTrace("After PerformRemoval...");
-                    break;
-            }
-            _logger.MethodExit();
-            return complete;
-        }
-
-        private JobResult PerformRemoval(ManagementJobConfiguration config)
+        public JobResult ProcessJob(ManagementJobConfiguration config)
         {
             try
             {
+                _logger = LogHandler.GetClassLogger<Management>();
                 _logger.MethodEntry();
-                var siteName = config.JobProperties["SiteName"];
-                var port = config.JobProperties["Port"];
-                var hostName = config.JobProperties["HostName"];
-                var protocol = config.JobProperties["Protocol"];
-                var ipAddress = config.JobProperties["IPAddress"].ToString();
-                _logger.LogTrace($"Removing Site: {siteName}, Port:{port}, hostName:{hostName}, protocol:{protocol}");
 
-                var storePath = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
-                    new JsonSerializerSettings {DefaultValueHandling = DefaultValueHandling.Populate});
+                _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
 
-                _logger.LogTrace(
-                    $"Begin Removal for Cert Store {$@"\\{config.CertificateStoreDetails.ClientMachine}\{config.CertificateStoreDetails.StorePath}"}");
-                _logger.LogTrace($"WinRm Url: {storePath?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath?.WinRmPort}/wsman");
+                string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
+                string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
-                var connInfo =
-                    new WSManConnectionInfo(
-                        new Uri($"{storePath?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{storePath?.WinRmPort}/wsman"));
-                if (storePath != null)
+                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                string protocol = jobProperties.WinRmProtocol;
+                string port = jobProperties.WinRmPort;
+                bool IncludePortInSPN = jobProperties.SpnPortFlag;
+                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
+                string storePath = config.CertificateStoreDetails.StorePath;
+                long JobHistoryID = config.JobHistoryId;
+
+                _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
+                myRunspace = PSHelper.GetClientPSRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+
+                var complete = new JobResult
                 {
-                    _logger.LogTrace($"IncludePortInSPN: {storePath.SpnPortFlag}");
-                    connInfo.IncludePortInSPN = storePath.SpnPortFlag;
-                    var pw = new NetworkCredential(ServerUserName, ServerPassword)
-                        .SecurePassword;
-                    _logger.LogTrace($"Credentials: UserName:{ServerUserName} Password:{ServerPassword}");
-                    connInfo.Credential = new PSCredential(ServerUserName, pw);
-                    _logger.LogTrace($"PSCredential Created {pw}");
-                    using var runSpace = RunspaceFactory.CreateRunspace(connInfo);
-                    _logger.LogTrace("runSpace Created");
-                    runSpace.Open();
-                    _logger.LogTrace("runSpace Opened");
-                    var psCertStore = new PowerShellUtilities.CertificateStore(
-                        config.CertificateStoreDetails.ClientMachine, config.CertificateStoreDetails.StorePath,
-                        runSpace);
-                    _logger.LogTrace("psCertStore Created");
-                    using var ps = PowerShell.Create();
-                    _logger.LogTrace("ps Created");
-                    ps.Runspace = runSpace;
-                    _logger.LogTrace("RunSpace Set");
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    FailureMessage =
+                        "Invalid Management Operation"
+                };
 
-                    ps.AddCommand("Import-Module")
-                        .AddParameter("Name", "WebAdministration")
-                        .AddStatement();
+                switch (config.OperationType)
+                {
+                    case CertStoreOperationType.Add:
+                        _logger.LogTrace("Entering Add...");
 
-                    _logger.LogTrace("WebAdministration Imported");
+                        myRunspace.Open();
+                        complete = PerformAddCertificate(config, serverUserName, serverPassword);
+                        myRunspace.Close();
 
-                    ps.AddCommand("Get-WebBinding")
-                        .AddParameter("Protocol", protocol)
-                        .AddParameter("Name", siteName)
-                        .AddParameter("Port", port)
-                        .AddParameter("HostHeader", hostName)
-                        .AddParameter("IPAddress",ipAddress)
-                        .AddStatement();
+                        _logger.LogTrace("After Perform Addition...");
+                        break;
+                    case CertStoreOperationType.Remove:
+                        _logger.LogTrace("Entering Remove...");
 
-                    
-                    _logger.LogTrace("Get-WebBinding Set");
-                    var foundBindings = ps.Invoke();
-                    _logger.LogTrace("foundBindings Invoked");
+                        _logger.LogTrace("After PerformRemoval...");
+                        myRunspace.Open();
+                        complete = PerformRemoveCertificate(config, serverUserName, serverPassword);
+                        myRunspace.Close();
 
-                    if (foundBindings.Count == 0)
-                    {
-                        _logger.LogTrace($"{foundBindings.Count} Bindings Found...");
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage =
-                                $"Site {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found."
-                        };
-                    }
-
-                    //Log Commands out for debugging purposes
-                    foreach (var cmd in ps.Commands.Commands)
-                    {
-                        _logger.LogTrace("Logging PowerShell Command");
-                        _logger.LogTrace(cmd.CommandText);
-                    }
-
-                    ps.Commands.Clear();
-                    _logger.LogTrace("Cleared Commands");
-
-                    ps.AddCommand("Import-Module")
-                        .AddParameter("Name", "WebAdministration")
-                        .AddStatement();
-
-                    _logger.LogTrace("Imported WebAdministration Module");
-
-                    foreach (var binding in foundBindings)
-                    {
-                        ps.AddCommand("Remove-WebBinding")
-                            .AddParameter("Name", siteName)
-                            .AddParameter("BindingInformation",
-                                $"{binding.Properties["bindingInformation"]?.Value}")
-                            .AddStatement();
-                        
-                        //Log Commands out for debugging purposes
-                        foreach (var cmd in ps.Commands.Commands)
-                        {
-                            _logger.LogTrace("Logging PowerShell Command");
-                            _logger.LogTrace(cmd.CommandText);
-                        }
-
-                        var _ = ps.Invoke();
-                        _logger.LogTrace("Invoked Remove-WebBinding");
-
-                        if (ps.HadErrors)
-                        {
-                            _logger.LogTrace("PowerShell Had Errors");
-                            var psError = ps.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
-                            return new JobResult
-                            {
-                                Result = OrchestratorJobStatusJobResult.Failure,
-                                JobHistoryId = config.JobHistoryId,
-                                FailureMessage =
-                                    $"Failed to remove {protocol} binding for Site {siteName} on server {config.CertificateStoreDetails.ClientMachine} not found, error {psError}"
-                            };
-                        }
-                    }
-                    _logger.LogTrace($"Removing Certificate with Alias: {config.JobCertificate.Alias}");
-                    psCertStore.RemoveCertificate(config.JobCertificate.Alias);
-                    _logger.LogTrace($"Removed Certificate with Alias: {config.JobCertificate.Alias}");
-                    runSpace.Close();
-                    _logger.LogTrace($"RunSpace was closed...");
+                        _logger.LogTrace("After Perform Removal...");
+                        break;
                 }
+
+                _logger.MethodExit();
+                return complete;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogTrace(LogHandler.FlattenException(ex));
+
+                var failureMessage = $"Managemenmt job {config.OperationType} failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogWarning(failureMessage);
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage = failureMessage
+                };
+            }
+        }
+
+        private JobResult PerformAddCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
+        {
+            _logger.LogTrace("Before PerformAddition...");
+
+            string certificateContents = config.JobCertificate.Contents;
+            string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+            string storePath = config.CertificateStoreDetails.StorePath;
+            long jobNumber = config.JobHistoryId;
+
+            ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
+            JobResult result = manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
+
+            if (result.Result == OrchestratorJobStatusJobResult.Success)
+            {
+                // Bind to IIS
+                ClientPSIIManager iisManager = new ClientPSIIManager(config, serverUsername, serverPassword);
+                result = iisManager.BindCertificate(manager.X509Cert);
+                return result;
+            } else return result;
+        }
+
+        private JobResult PerformRemoveCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
+        {
+            _logger.LogTrace("Before Remove Certificate...");
+
+            string certificateContents = config.JobCertificate.Contents;
+            string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+            string storePath = config.CertificateStoreDetails.StorePath;
+            long jobNumber = config.JobHistoryId;
+
+            // First we need to unbind the certificate from IIS before we remove it from the store
+            ClientPSIIManager iisManager = new ClientPSIIManager(config, serverUsername, serverPassword);
+            JobResult result = iisManager.UnBindCertificate();
+
+            if (result.Result == OrchestratorJobStatusJobResult.Success)
+            {
+                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
+                manager.RemoveCertificate(config.JobCertificate.Alias, storePath);
 
                 return new JobResult
                 {
@@ -223,42 +160,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
                     FailureMessage = ""
                 };
             }
-            catch (Exception ex)
-            {
-                var failureMessage = $"Remove job failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
-                _logger.LogWarning(failureMessage);
-
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = failureMessage
-                };
-            }
+            else return result;
         }
-
-        private JobResult PerformAddition(ManagementJobConfiguration config)
-        {
-            try
-            {
-                _logger.MethodEntry();
-                
-                    var iisManager=new IISManager(config,ServerUserName,ServerPassword);
-                    return iisManager.AddCertificate();
-            }
-            catch (Exception ex)
-            {
-                var failureMessage = $"Add job failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
-                _logger.LogWarning(failureMessage);
-
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = failureMessage
-                };
-            }
-        }
-
     }
 }

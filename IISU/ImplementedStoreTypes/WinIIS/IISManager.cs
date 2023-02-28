@@ -145,10 +145,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
             try
             {
                 // Instanciate a new Powershell instance
-                CreatePowerShellInstance();
+                //CreatePowerShellInstance();
 
-                return BindCertificate();
-
+                //return BindCertificate();
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = JobHistoryId,
+                    FailureMessage = ""
+                };
             }
             catch (Exception e)
             {
@@ -176,7 +181,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
                     $"Begin Add for Cert Store {$@"\\{ClientMachine}\{Path}"}");
 
                 // Instanciate a new Powershell instance
-                CreatePowerShellInstance();
+                //CreatePowerShellInstance();       //  Moved to different method
 
                 // Add Certificate 
                 var funcScript = @"
@@ -229,7 +234,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
                 Logger.LogTrace("Commands Cleared..");
 
                 // Install the certifiacte
-                return BindCertificate();
+                //return BindCertificate();     // Not used any longer; moved to separate method
+                                                // The JobResult is necessary because the line above returns the job result.
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = JobHistoryId,
+                    FailureMessage = ""
+                };
             }
             catch (Exception e)
             {
@@ -258,7 +270,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
             Logger.LogTrace("RunSpace Opened");
             Logger.LogTrace(
                 $"Creating Cert Store with ClientMachine: {ClientMachine}, JobProperties: {Path}");
-            var _ = new PowerShellUtilities.CertificateStore( 
+            var _ = new CertificateStore( 
                 ClientMachine, Path,
                 runSpace);
             Logger.LogTrace("Cert Store Created");

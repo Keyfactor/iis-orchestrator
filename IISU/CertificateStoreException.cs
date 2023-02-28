@@ -13,28 +13,26 @@
 // limitations under the License.
 
 using System;
-using System.Collections.Generic;
 using System.Runtime.Serialization;
-using System.Text;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.PowerShellUtilities
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
     [Serializable]
-    internal class CertificateException : Exception
+    internal class CertificateStoreException : Exception
     {
-        public CertificateException()
+        public CertificateStoreException()
         {
         }
 
-        public CertificateException(string message) : base(message)
+        public CertificateStoreException(string message) : base(message)
         {
         }
 
-        public CertificateException(string message, Exception innerException) : base(message, innerException)
+        public CertificateStoreException(string message, Exception innerException) : base(message, innerException)
         {
         }
 
-        protected CertificateException(SerializationInfo info, StreamingContext context) : base(info, context)
+        protected CertificateStoreException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }
     }

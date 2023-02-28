@@ -12,24 +12,29 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="ImplementedStoreTypes\WinExch\**" />
+    <Compile Remove="ImplementedStoreTypes\WinSQL\**" />
+    <EmbeddedResource Remove="ImplementedStoreTypes\WinExch\**" />
+    <EmbeddedResource Remove="ImplementedStoreTypes\WinSQL\**" />
+    <None Remove="ImplementedStoreTypes\WinExch\**" />
+    <None Remove="ImplementedStoreTypes\WinSQL\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="PowerShellCertRequest.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
-    <PackageReference Include="System.Management.Automation" Version="7.0.5" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.0.13" />
+    <PackageReference Include="System.Management.Automation" Version="7.0.13" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="ImplementedStoreTypes\WinExch\" />
-    <Folder Include="ImplementedStoreTypes\WinSQL\" />
   </ItemGroup>
 
 </Project>
