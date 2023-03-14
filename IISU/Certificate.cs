@@ -13,27 +13,14 @@
 // limitations under the License.
 
 using System;
-using System.Runtime.Serialization;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    [Serializable]
-    internal class PsCertStoreException : Exception
+    public class Certificate
     {
-        public PsCertStoreException()
-        {
-        }
-
-        public PsCertStoreException(string message) : base(message)
-        {
-        }
-
-        public PsCertStoreException(string message, Exception innerException) : base(message, innerException)
-        {
-        }
-
-        protected PsCertStoreException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-        }
+        public string Thumbprint { get; set; }
+        public byte[] RawData { get; set; }
+        public bool HasPrivateKey { get; set; }
+        public string CertificateData => Convert.ToBase64String(RawData);
     }
 }

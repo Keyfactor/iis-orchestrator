@@ -12,30 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Keyfactor.Orchestrators.Extensions.Interfaces;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Runtime.Serialization;
 using System.Text;
 
-namespace Keyfactor.Extensions.Orchestrator.IISU
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    [Serializable]
-    internal class PowerShellCertException : Exception
+    internal class PAMUtilities
     {
-        public PowerShellCertException()
+        internal static string ResolvePAMField(IPAMSecretResolver resolver, ILogger logger, string name, string key)
         {
-        }
+            if (resolver == null) return key;
+            else
+            {
+                logger.LogDebug($"Attempting to resolve PAM eligible field {name} with key {key}");
+                return resolver.Resolve(key);
+            }
 
-        public PowerShellCertException(string message) : base(message)
-        {
-        }
-
-        public PowerShellCertException(string message, Exception innerException) : base(message, innerException)
-        {
-        }
-
-        protected PowerShellCertException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
         }
     }
 }

@@ -1,17 +1,29 @@
 ﻿{
   "extensions": {
     "Keyfactor.Orchestrators.Extensions.IOrchestratorJobExtension": {
-      "CertStores.IISU.Inventory": {
-        "assemblypath": "IISU.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISU.Jobs.Inventory"
+      "CertStores.WinIIS.Inventory": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS.Inventory"
       },
-      "CertStores.IISU.Management": {
-        "assemblypath": "IISU.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISU.Jobs.Management"
+      "CertStores.WinIIS.Management": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS.Management"
       },
-      "CertStores.IISU.ReEnrollment": {
-        "assemblypath": "IISU.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.IISU.Jobs.ReEnrollment"
+      "CertStores.WinIIS.ReEnrollment": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS.ReEnrollment"
+      },
+      "CertStores.Win.Inventory": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.Inventory"
+      },
+      "CertStores.Win.Management": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.Management"
+      },
+      "CertStores.Win.ReEnrollment": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.ReEnrollment"
       }
     }
   }
