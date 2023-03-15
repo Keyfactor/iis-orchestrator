@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "IISU": {
+    "WindowsCertStore": {
       "commandName": "Project",
       "remoteDebugEnabled": true,
       "authenticationMode": "None",

@@ -1,0 +1,56 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32616.157
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WindowsCertStore", "IISU\WindowsCertStore.csproj", "{33FBC5A1-3466-4F10-B9A6-7186F804A65A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1A6C93E7-24FD-47FD-883D-EDABF5CEE4C6}"
+	ProjectSection(SolutionItems) = preProject
+		CHANGELOG.md = CHANGELOG.md
+		integration-manifest.json = integration-manifest.json
+		.github\workflows\keyfactor-extension-release.yml = .github\workflows\keyfactor-extension-release.yml
+		readme_source.md = readme_source.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{6302034E-DF8C-4B65-AC36-CED24C068999}"
+	ProjectSection(SolutionItems) = preProject
+		images\AddCertStore.png = images\AddCertStore.png
+		images\CertStoreType-c.png = images\CertStoreType-c.png
+		images\CertStoreType.png = images\CertStoreType.png
+		images\IISCertStore.png = images\IISCertStore.png
+		images\ReEnrollment1.png = images\ReEnrollment1.png
+		images\ReEnrollment1a.png = images\ReEnrollment1a.png
+		images\ReEnrollment1b.png = images\ReEnrollment1b.png
+		images\Screen1.png = images\Screen1.png
+		images\Screen2.png = images\Screen2.png
+		images\WinCertStore.png = images\WinCertStore.png
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WinCertTestConsole", "WinCertTestConsole\WinCertTestConsole.csproj", "{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{33FBC5A1-3466-4F10-B9A6-7186F804A65A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33FBC5A1-3466-4F10-B9A6-7186F804A65A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33FBC5A1-3466-4F10-B9A6-7186F804A65A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33FBC5A1-3466-4F10-B9A6-7186F804A65A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6302034E-DF8C-4B65-AC36-CED24C068999} = {1A6C93E7-24FD-47FD-883D-EDABF5CEE4C6}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E0FA12DA-6B82-4E64-928A-BB9965E636C1}
+	EndGlobalSection
+EndGlobal
