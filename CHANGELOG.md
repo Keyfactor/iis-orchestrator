@@ -1,3 +1,6 @@
+2.0.1
+* Fixed issue that was occuring during renewal when there were bindings outside of http and https like net.tcp
+
 2.0.0
 * Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
 * Local PAM Support added (requires Univesal Orchestrator Framework version 10.1)
