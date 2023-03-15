@@ -1,3 +1,4 @@
+<<<<<<< HEAD:IISU/ImplementedStoreTypes/WinIIS/IISManager.cs
 ﻿// Copyright 2022 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,21 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+=======
+﻿// Copyright 2022 Keyfactor
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+>>>>>>> origin/release-2.0:IISU/IISManager.cs
 
 using System;
 using System.Linq;
@@ -44,7 +60,56 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
         private string ServerPassword { get; set; }
         private JobProperties Properties { get; set; }
         private string RenewalThumbprint { get; set; }
+<<<<<<< HEAD:IISU/ImplementedStoreTypes/WinIIS/IISManager.cs
         private WSManConnectionInfo ConnectionInfo { get; set; }
+=======
+        private WSManConnectionInfo ConnectionInfo { get; set; }
+
+
+        private X509Certificate2 x509Cert;
+        private Runspace runSpace;
+        private PowerShell ps;
+
+        #region Constructors
+        /// <summary>
+        /// Performs a Reenrollment of a certificate in IIS
+        /// </summary>
+        /// <param name="config"></param>
+        public IISManager(ReenrollmentJobConfiguration config,string serverUserName,string serverPassword)
+        {
+            Logger = LogHandler.GetClassLogger<IISManager>();
+
+            try
+            {
+                SiteName = config.JobProperties["SiteName"].ToString();
+                Port = config.JobProperties["Port"].ToString();
+                HostName = config.JobProperties["HostName"]?.ToString();
+                Protocol = config.JobProperties["Protocol"].ToString();
+                SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                IpAddress = config.JobProperties["IPAddress"].ToString();
+
+                PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
+                ServerUserName = serverUserName;
+                ServerPassword = serverPassword;
+                RenewalThumbprint = ""; // A reenrollment will always be empty
+                ClientMachine = config.CertificateStoreDetails.ClientMachine;
+                Path = config.CertificateStoreDetails.StorePath;
+                CertContents = ""; // Not needed for a reenrollment
+                JobHistoryId = config.JobHistoryId;
+
+                Properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+
+                ConnectionInfo =
+                    new WSManConnectionInfo(
+                        new Uri($"{Properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{Properties?.WinRmPort}/wsman"));
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Error when initiating an IIS ReEnrollment Job: {e.Message}", e.InnerException);
+            }
+        }
+>>>>>>> origin/release-2.0:IISU/IISManager.cs
 
 
         private X509Certificate2 x509Cert;
@@ -65,6 +130,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
                 SiteName = config.JobProperties["SiteName"].ToString();
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
+<<<<<<< HEAD:IISU/ImplementedStoreTypes/WinIIS/IISManager.cs
                 Protocol = config.JobProperties["Protocol"].ToString();
                 SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
                 IpAddress = config.JobProperties["IPAddress"].ToString();
@@ -104,6 +170,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
                 SiteName = config.JobProperties["SiteName"].ToString();
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
+=======
+>>>>>>> origin/release-2.0:IISU/IISManager.cs
                 Protocol = config.JobProperties["Protocol"].ToString();
                 SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
                 IpAddress = config.JobProperties["IPAddress"].ToString();

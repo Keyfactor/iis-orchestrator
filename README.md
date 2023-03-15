@@ -49,6 +49,7 @@ The secrets that this orchestrator extension supports for use with a PAM Provide
 |Server Password|The password that will be used to authenticate into the server hosting the store|
 
 
+<<<<<<< HEAD
 It is not necessary to use a PAM Provider for all of the secrets available above. If a PAM Provider should not be used, simply enter in the actual value to be used, as normal.
 
 If a PAM Provider will be used for one of the fields above, start by referencing the [Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam). The GitHub repo for the PAM Provider to be used contains important information such as the format of the `json` needed. What follows is an example but does not reflect the `json` values for all PAM Providers as they have different "instance" and "initialization" parameter names and values.
@@ -80,6 +81,11 @@ To have the __Server Password__ field resolved by the `Hashicorp-Vault` provider
 
 This text would be entered in as the value for the __Server Password__, instead of entering in the actual password. The Orchestrator will attempt to use the PAM Provider to retrieve the __Server Password__. If PAM should not be used, just directly enter in the value for the field.
 
+=======
+It is not necessary to implement all of the secrets available to be managed by a PAM provider.  For each value that you want managed by a PAM provider, simply enter the key value inside your specific PAM provider that will hold this value into the corresponding field when setting up the certificate store, discovery job, or API call.
+
+Setting up a PAM provider for use involves adding an additional section to the manifest.json file for this extension as well as setting up the PAM provider you will be using.  Each of these steps is specific to the PAM provider you will use and are documented in the specific GitHub repo for that provider.  For a list of Keyfactor supported PAM providers, please reference the [Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam).
+>>>>>>> origin/release-2.0
 
 
 
@@ -129,7 +135,17 @@ Job Types	|Inventory (Checked), Add, Remove, and Reenrollment are the supported 
 General Settings|Needs Server - Checked<br>Blueprint Allowed - Unchecked<br>Uses PowerShell - Unchecked
 Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be unchecked.
 Supports Entry Password	|Determined if an individual entry within a store can have a password.  This must be unchecked.
+<<<<<<< HEAD
 
+=======
+Supports Custom Alias	|Determines if an individual entry within a store can have a custom Alias.  This must be Forbidden.
+Uses PowerShell	|Unchecked
+Store Path Type	|Determines what restrictions are applied to the store path field when configuring a new store.  This must be Multiple Choice
+Store Path Value|A comma separated list of options to select from for the Store Path. This, combined with the hostname, will determine the location used for the certificate store management and inventory.  Must be My, WebHosting
+Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is required since IIS will need the private key material to establish TLS connections.
+PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
+Job Types	|Inventory, Add, Remove, and Reenrollment are the supported job types. 
+>>>>>>> origin/release-2.0
 
 ![](images/certstoretype.png)
 
@@ -178,8 +194,13 @@ This section must be configured with binding fields. The parameters will be popu
    - 1 - SNI Enabled
    - 2 - Non SNI Binding
    - 3 - SNI Binding
+<<<<<<< HEAD
 - **Provider Name\*** - Optional. Name of the Windows cryptographic provider to use when generating and storing the private key for the certificate being enrolled by a reenrollment job. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be changed when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target IIS server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' in a command shell on the target IIS Server.
 - **SAN\*** - Optional. Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs.
+=======
+- **Provider Name** - Optional. Name of the Windows cryptographic provider to use when generating and storing the private key for the certificate being enrolled by a reenrollment job. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be changed when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target IIS server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' in a command shell on the target IIS Server.
+- **SAN** - Optional. Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs.
+>>>>>>> origin/release-2.0
 
 Parameter Name|Parameter Type|Default Value|Required When
 ---|---|---|---
@@ -189,10 +210,15 @@ HostName |String||
 SiteName |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
 SniFlag  |String|0 - No SNI|
 Protocol  |Multiple Choice|https|Adding Entry, Removing Entry, Reenrolling an Entry
+<<<<<<< HEAD
 ProviderName\*	|String||
 SAN\*	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
 
 **NOTE: Elements with an asterisk (*) are only required when not binding certificates to a web server.
+=======
+ProviderName	|String||
+SAN	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
+>>>>>>> origin/release-2.0
 
 ![](images/screen2.png)
 
