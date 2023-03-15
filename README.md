@@ -82,6 +82,32 @@ This text would be entered in as the value for the __Server Password__, instead 
 
 
 
+### Register the PAM Provider
+
+A PAM Provider needs to be registered on the Universal Orchestrator in the same way other extensions are. Create a folder for the specific PAM Provider to be added, and place the contents of the PAM Provider into the folder. There needs to be a manifest.json with the PAM Provider.
+
+After a manifest.json is added, the final step for configuration is setting the "provider-level" parameters for the PAM Provider. These are also known as the "initialization-level" parameters. These need to be placed in a json file that gets loaded by the Orchestrator by default. 
+
+example manifest.json for MY-PROVIDER-NAME
+```
+{
+    "extensions": {
+        "Keyfactor.Platform.Extensions.IPAMProvider": {
+            "PAMProviders.MY-PROVIDER-NAME.PAMProvider": {
+                "assemblyPath": "my-pam-provider.dll",
+                "TypeFullName": "Keyfactor.Extensions.Pam.MyPamProviderClass"
+            }
+        }
+    },
+    "Keyfactor:PAMProviders:MY-PROVIDER-NAME:InitializationInfo": {
+        "InitParam1": "InitValue1",
+        "InitParam2": "InitValue2"
+    }
+}
+```
+
+
+
 
 ---
 
