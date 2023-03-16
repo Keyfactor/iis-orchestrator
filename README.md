@@ -110,8 +110,6 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note: There is an additional certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
 
-**Note: In version 3.0, the orchestrator has been renamed from IISU to WinCert.  There is currently no succession process to update previous certificate store types.**
-
 
 **1. Create the New Certificate Store Type**
 
@@ -122,9 +120,9 @@ In Keyfactor Command create a new Certificate Store Type similar to the one belo
 
 CONFIG ELEMENT	| DESCRIPTION
 ------------------|------------------
-Name	|A descriptive name for the extension.  Example:  WinCert (for general windows cert store), WinIIS (for IIS Webstore cert store)  
-Short Name	|The short name that identifies the registered functionality of the orchestrator. Currently must be either Win or WinIIS
-Custom Capability|Store type name orchestrator will register with. Currently must be Win or WinIIS.
+Name	|A descriptive name for the extension.  Example:  WinCert (for general windows cert store), IISU (for IIS Webstore cert store with bindings)  
+Short Name	|The short name that identifies the registered functionality of the orchestrator. Currently must be either WinCert or IISU
+Custom Capability|Store type name orchestrator will register with. Currently must be WinCert or IISU.
 Job Types	|Inventory (Checked), Add, Remove, and Reenrollment are the supported job types.
 General Settings|Needs Server - Checked<br>Blueprint Allowed - Unchecked<br>Uses PowerShell - Unchecked
 Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be unchecked.
@@ -201,7 +199,7 @@ See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your
 
 **3a. Create an IIS Binding Certificate Store within Keyfactor Command**
 
-In Keyfactor Command create a new Certificate Store similar to the one below, selecting "WinIIS" as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS AnyAgent&quot;.<br>
+In Keyfactor Command create a new Certificate Store similar to the one below, selecting "IISU" as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS AnyAgent&quot;.<br>
 
 ![](images/IISCertStore.png)
 
@@ -225,7 +223,7 @@ Inventory Schedule	|The interval that the system will use to report on what cert
 
 **3b. Create a Windows Certificate Store within Keyfactor Command**
 
-In Keyfactor Command create a new Certificate Store similar to the one below, selecting "WinIIS" as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS AnyAgent&quot;.<br>
+In Keyfactor Command create a new Certificate Store similar to the one below, selecting "IISU" as the Category and the parameters as described in &quot;Create the New Certificate Store Type for the New IIS AnyAgent&quot;.<br>
 
 ![](images/WinCertStore.png)
 

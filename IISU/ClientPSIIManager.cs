@@ -82,7 +82,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                SniFlag = config.JobProperties["SniFlag"]?.ToString()[..1];
                 IPAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
