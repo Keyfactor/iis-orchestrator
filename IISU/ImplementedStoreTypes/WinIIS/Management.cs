@@ -25,15 +25,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
         private ILogger _logger;
 
         public string ExtensionName => string.Empty;
-
-        private string _thumbprint = string.Empty;
 
         private Runspace myRunspace;
 
@@ -139,8 +137,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
         {
             _logger.LogTrace("Before Remove Certificate...");
 
-            string certificateContents = config.JobCertificate.Contents;
-            string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
             string storePath = config.CertificateStoreDetails.StorePath;
             long jobNumber = config.JobHistoryId;
 
