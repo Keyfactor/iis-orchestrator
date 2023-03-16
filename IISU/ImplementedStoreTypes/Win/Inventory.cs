@@ -25,7 +25,7 @@ using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {

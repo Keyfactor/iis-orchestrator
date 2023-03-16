@@ -17,7 +17,7 @@ using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class ReEnrollment: WinCertJobTypeBase, IReenrollmentJobExtension
     {
