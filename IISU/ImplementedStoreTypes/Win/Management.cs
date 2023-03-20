@@ -24,7 +24,7 @@ using System.Management.Automation;
 using System.Net;
 using Keyfactor.Logging;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
