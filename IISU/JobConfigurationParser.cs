@@ -50,7 +50,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             output.AppendLine($"Thumbprint: {config.JobCertificate.Thumbprint}");
             output.AppendLine($"Contents: {config.JobCertificate.Contents}");
             output.AppendLine($"Alias: {config.JobCertificate.Alias}");
-            output.AppendLine($"PrivateKeyPassword: {config.JobCertificate.PrivateKeyPassword}");
+            output.AppendLine($"Private Key Password: **************");
 
             output.AppendLine();        // Blank line
 
