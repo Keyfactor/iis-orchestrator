@@ -3,6 +3,7 @@
 * Added PAM registration/initialization documentation in README.md
 * Resolved Null HostName error 
 * Added WinCert Cert Store Type
+* Added custom property parser to not show any passwords
 
 2.0.0
 * Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.

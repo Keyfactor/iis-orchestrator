@@ -55,7 +55,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
             {
                 var inventoryItems = new List<CurrentInventoryItem>();
 
-                _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
+                _logger.LogTrace(JobConfigurationParser.ParseInventoryJobConfiguration(config));
 
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);

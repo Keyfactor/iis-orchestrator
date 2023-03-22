@@ -50,8 +50,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private long JobHistoryID { get; set; }
 
-        private ILogger _logger;
-        private Runspace _runSpace;
+        private readonly ILogger _logger;
+        private readonly Runspace _runSpace;
 
         private PowerShell ps;
 
@@ -119,7 +119,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
                 IPAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
