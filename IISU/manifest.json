@@ -1,29 +1,29 @@
 ﻿{
   "extensions": {
     "Keyfactor.Orchestrators.Extensions.IOrchestratorJobExtension": {
-      "CertStores.WinIIS.Inventory": {
+      "CertStores.IISU.Inventory": {
         "assemblypath": "WindowsCertStore.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS.Inventory"
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU.Inventory"
       },
-      "CertStores.WinIIS.Management": {
+      "CertStores.IISU.Management": {
         "assemblypath": "WindowsCertStore.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS.Management"
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU.Management"
       },
-      "CertStores.WinIIS.ReEnrollment": {
+      "CertStores.IISU.ReEnrollment": {
         "assemblypath": "WindowsCertStore.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS.ReEnrollment"
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU.ReEnrollment"
       },
-      "CertStores.Win.Inventory": {
+      "CertStores.WinCert.Inventory": {
         "assemblypath": "WindowsCertStore.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.Inventory"
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert.Inventory"
       },
-      "CertStores.Win.Management": {
+      "CertStores.WinCert.Management": {
         "assemblypath": "WindowsCertStore.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.Management"
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert.Management"
       },
-      "CertStores.Win.ReEnrollment": {
+      "CertStores.WinCert.ReEnrollment": {
         "assemblypath": "WindowsCertStore.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win.ReEnrollment"
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert.ReEnrollment"
       }
     }
   }

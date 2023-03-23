@@ -24,7 +24,7 @@ using System.Management.Automation;
 using System.Net;
 using Keyfactor.Logging;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
@@ -47,11 +47,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
 
         public JobResult ProcessJob(ManagementJobConfiguration config)
         {
-            _logger = LogHandler.GetClassLogger<Management>();
-            _logger.MethodEntry();
-
             try
             {
+                _logger = LogHandler.GetClassLogger<Management>();
+                _logger.MethodEntry();
+
+                _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
+
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 

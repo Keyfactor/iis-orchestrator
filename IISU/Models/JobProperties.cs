@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System.ComponentModel;
+using System.Reflection.Metadata.Ecma335;
 using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -35,6 +36,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         [JsonProperty("WinRm Port")]
         [DefaultValue("5985")]
         public string WinRmPort { get; set; }
+
+        [JsonProperty("ServerUsername")]
+        public string ServerUsername { get; set; }
+
+        [JsonProperty("ServerUseSsl")]
+        [DefaultValue(true)]
+        public bool ServerUseSsl { get; set; }
 
         [JsonProperty("sniflag")]
         [DefaultValue(SniFlag.None)]
