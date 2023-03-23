@@ -52,7 +52,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             {
                 var inventoryItems = new List<CurrentInventoryItem>();
 
-                _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
+                string myConfig = config.ToString();
+
+                _logger.LogTrace(JobConfigurationParser.ParseInventoryJobConfiguration(config));
 
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);

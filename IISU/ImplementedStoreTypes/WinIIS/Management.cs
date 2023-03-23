@@ -47,7 +47,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 _logger = LogHandler.GetClassLogger<Management>();
                 _logger.MethodEntry();
 
-                _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
+                _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
 
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);

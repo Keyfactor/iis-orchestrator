@@ -47,11 +47,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 
         public JobResult ProcessJob(ManagementJobConfiguration config)
         {
-            _logger = LogHandler.GetClassLogger<Management>();
-            _logger.MethodEntry();
-
             try
             {
+                _logger = LogHandler.GetClassLogger<Management>();
+                _logger.MethodEntry();
+
+                _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
+
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
