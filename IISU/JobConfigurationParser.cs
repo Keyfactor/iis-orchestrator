@@ -3,8 +3,10 @@ using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Configuration.Internal;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Management.Automation.Remoting;
 using System.Net;
 using System.Text;
 
@@ -12,154 +14,94 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
     internal class JobConfigurationParser
     {
-        public static string ParseManagementJobConfiguration(ManagementJobConfiguration config, bool IncludePreviousInventory = true)
+        public static string ParseManagementJobConfiguration(ManagementJobConfiguration config)
         {
-            StringBuilder output = new StringBuilder();
 
-            if (IncludePreviousInventory && config.LastInventory.Count() > 0)
-            {
-                output.AppendLine("Previous Inventory Items:");
-                foreach (PreviousInventoryItem item in config.LastInventory)
-                {
-                    output.AppendLine($"Alias: {item.Alias}");
-                    output.AppendLine($"Alias: {item.PrivateKeyEntry}");
-                    foreach (string thumbprint in item.Thumbprints)
-                    {
-                        output.AppendLine($"Thumbprint: {thumbprint}");
-                    }
+            IManagementJobLogger managementParser = new ManagementJobLogger();
 
-                    output.AppendLine();        // Blank line
-                }
-            }
+            // JobConfiguration
+            managementParser.JobCancelled = config.JobCancelled;
+            managementParser.ServerError = config.ServerError;
+            managementParser.JobHistoryID = config.JobHistoryId;
+            managementParser.RequestStatus = config.RequestStatus;
+            managementParser.ServerUserName = config.ServerUsername;
+            managementParser.ServerPassword = "**********";
+            managementParser.UseSSL = config.UseSSL;
+            managementParser.JobTypeID = config.JobTypeId;
+            managementParser.JobID = config.JobId;
+            managementParser.Capability = config.Capability;
 
-            // Certificate Store Properties
-            output.AppendLine("Certificate Store Properties:");
-            output.AppendLine($"Type: {config.CertificateStoreDetails.Type}");
-            output.AppendLine($"Client Machine: {config.CertificateStoreDetails.ClientMachine}");
-            output.AppendLine($"Store Path: {config.CertificateStoreDetails.StorePath}");
-            output.AppendLine($"Store Password: **************");
-
-            output.AppendLine();        // Blank line
-
-            output.AppendLine($"Operation Type: {config.OperationType}");
-            output.AppendLine($"Overwrite: {config.Overwrite}");
-
-            output.AppendLine();        // Blank line
-
-            output.AppendLine("Certificate Store Properties:");
-            output.AppendLine($"Thumbprint: {config.JobCertificate.Thumbprint}");
-            output.AppendLine($"Contents: {config.JobCertificate.Contents}");
-            output.AppendLine($"Alias: {config.JobCertificate.Alias}");
-            output.AppendLine($"Private Key Password: **************");
-
-            output.AppendLine();        // Blank line
-
+            // JobProperties
             JobProperties jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-            output.AppendLine("Cert Store Job Properties (Contains IIS and non-IIS Properties)");
-            output.AppendLine($"SPN With Port: {jobProperties.SpnPortFlag}");
-            output.AppendLine($"WinRm Protocol: {jobProperties.WinRmProtocol}");
-            output.AppendLine($"WinRm Port: {jobProperties.WinRmPort}");
-            output.AppendLine($"Server Username: {jobProperties.ServerUsername}");
-            output.AppendLine($"Server Username: ***************");
-            output.AppendLine($"Server Use SSL: {jobProperties.ServerUseSsl}");
+            managementParser.JobConfigurationProperties = jobProperties;
 
-            output.AppendLine();        // Blank line
+            // PreviousInventoryItem
+            managementParser.LastInventory = config.LastInventory;
 
-            output.AppendLine("Job Configuration Properties:");
-            output.AppendLine($"Job Cancelled: {config.JobCancelled}");
-            output.AppendLine($"ServerError: {config.ServerError}");
-            output.AppendLine($"Job History ID: {config.JobHistoryId}");
-            output.AppendLine($"Request Status: {config.RequestStatus}");
-            output.AppendLine($"Server Username: {config.ServerUsername}");
-            output.AppendLine($"Server Username: ***************");
-            output.AppendLine($"Use SSL: {config.UseSSL}");
-            output.AppendLine($"Job Type ID: {config.JobTypeId}");
-            output.AppendLine($"Job ID: {config.JobId}");
-            output.AppendLine($"Capability: {config.Capability}");
+            //CertificateStore
+            managementParser.CertificateStoreDetails.ClientMachine = config.CertificateStoreDetails.ClientMachine;
+            managementParser.CertificateStoreDetails.StorePath = config.CertificateStoreDetails.StorePath;
+            managementParser.CertificateStoreDetails.StorePassword = "**********";
+            managementParser.CertificateStoreDetails.Type = config.CertificateStoreDetails.Type;
 
             bool isEmpty = (config.JobProperties.Count == 0);       // Check if the dictionary is empty or not
             if (!isEmpty)
             {
-                output.AppendLine();        // Blank line
-                output.AppendLine($"JSON Job Properties:");
-                output.AppendLine($"Site Name: {config.JobProperties["SiteName"].ToString()}");
-                output.AppendLine($"Port: {config.JobProperties["Port"].ToString()}");
-                output.AppendLine($"Host Name: {config.JobProperties["HostName"]?.ToString()}");
-                output.AppendLine($"Protocol: {config.JobProperties["Protocol"].ToString()}");
-                output.AppendLine($"SniFlag: {config.JobProperties["SniFlag"].ToString()?[..1]}");
-                output.AppendLine($"IP Address: {config.JobProperties["IPAddress"].ToString()}");
-                output.AppendLine($"SAN: {config.JobProperties["SAN"]?.ToString()}");
+                managementParser.CertificateStoreDetailProperties.SiteName = config.JobProperties["SiteName"].ToString();
+                managementParser.CertificateStoreDetailProperties.Port = config.JobProperties["Port"].ToString();
+                managementParser.CertificateStoreDetailProperties.HostName = config.JobProperties["HostName"]?.ToString();
+                managementParser.CertificateStoreDetailProperties.Protocol = config.JobProperties["Protocol"].ToString();
+                managementParser.CertificateStoreDetailProperties.SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
+                managementParser.CertificateStoreDetailProperties.IPAddress = config.JobProperties["IPAddress"].ToString();
+                managementParser.CertificateStoreDetailProperties.ProviderName = config.JobProperties["ProviderName"]?.ToString();
+                managementParser.CertificateStoreDetailProperties.SAN = config.JobProperties["SAN"]?.ToString();
             }
 
-            return output.ToString();
+            // Management Base
+            managementParser.OperationType = config.OperationType;
+            managementParser.Overwrite = config.Overwrite;
+
+            // JobCertificate
+            managementParser.JobCertificateProperties.Thumbprint = config.JobCertificate.Thumbprint;
+            managementParser.JobCertificateProperties.Contents = config.JobCertificate.Contents;
+            managementParser.JobCertificateProperties.Alias = config.JobCertificate.Alias;
+            managementParser.JobCertificateProperties.PrivateKeyPassword = "**********";
+
+            return JsonConvert.SerializeObject(managementParser);
         }
 
-        public static string ParseInventoryJobConfiguration(InventoryJobConfiguration config, bool IncludePreviousInventory = true)
+        public static string ParseInventoryJobConfiguration(InventoryJobConfiguration config)
         {
-            StringBuilder output = new StringBuilder();
+            IInventoryJobLogger inventoryParser = new InventoryJobLogger();
 
-            if (IncludePreviousInventory && config.LastInventory.Count() > 0)
-            {
-                output.AppendLine("Previous Inventory Items:");
-                foreach (PreviousInventoryItem item in config.LastInventory)
-                {
-                    output.AppendLine($"Alias: {item.Alias}");
-                    output.AppendLine($"Alias: {item.PrivateKeyEntry}");
-                    foreach (string thumbprint in item.Thumbprints)
-                    {
-                        output.AppendLine($"Thumbprint: {thumbprint}");
-                    }
+            // JobConfiguration
+            inventoryParser.JobCancelled = config.JobCancelled;
+            inventoryParser.ServerError = config.ServerError;
+            inventoryParser.JobHistoryID = config.JobHistoryId;
+            inventoryParser.RequestStatus = config.RequestStatus;
+            inventoryParser.ServerUserName = config.ServerUsername;
+            inventoryParser.ServerPassword = "**********";
+            inventoryParser.UseSSL = config.UseSSL;
+            inventoryParser.JobTypeID = config.JobTypeId;
+            inventoryParser.JobID = config.JobId;
+            inventoryParser.Capability = config.Capability;
 
-                    output.AppendLine();        // Blank line
-                }
-            }
-
-            // Certificate Store Properties
-            output.AppendLine("Certificate Store Properties:");
-            output.AppendLine($"Type: {config.CertificateStoreDetails.Type}");
-            output.AppendLine($"Client Machine: {config.CertificateStoreDetails.ClientMachine}");
-            output.AppendLine($"Store Path: {config.CertificateStoreDetails.StorePath}");
-            output.AppendLine($"Store Password: **************");
-
-            output.AppendLine();        // Blank line
-
+            // JobProperties
             JobProperties jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-            output.AppendLine("Cert Store Job Properties (Contains IIS and non-IIS Properties)");
-            output.AppendLine($"SPN With Port: {jobProperties.SpnPortFlag}");
-            output.AppendLine($"WinRm Protocol: {jobProperties.WinRmProtocol}");
-            output.AppendLine($"WinRm Port: {jobProperties.WinRmPort}");
-            output.AppendLine($"Server Username: {jobProperties.ServerUsername}");
-            output.AppendLine($"Server Username: ***************");
-            output.AppendLine($"Server Use SSL: {jobProperties.ServerUseSsl}");
+            inventoryParser.JobConfigurationProperties = jobProperties;
 
-            output.AppendLine();        // Blank line
+            // PreviousInventoryItem
+            inventoryParser.LastInventory = config.LastInventory;
 
-            output.AppendLine("Job Configuration Properties:");
-            output.AppendLine($"Job Cancelled: {config.JobCancelled}");
-            output.AppendLine($"ServerError: {config.ServerError}");
-            output.AppendLine($"Job History ID: {config.JobHistoryId}");
-            output.AppendLine($"Request Status: {config.RequestStatus}");
-            output.AppendLine($"Server Username: {config.ServerUsername}");
-            output.AppendLine($"Server Username: ***************");
-            output.AppendLine($"Use SSL: {config.UseSSL}");
-            output.AppendLine($"Job Type ID: {config.JobTypeId}");
-            output.AppendLine($"Job ID: {config.JobId}");
-            output.AppendLine($"Capability: {config.Capability}");
+            //CertificateStore
+            
+            inventoryParser.CertificateStoreDetails.ClientMachine = config.CertificateStoreDetails.ClientMachine;
+            inventoryParser.CertificateStoreDetails.StorePath = config.CertificateStoreDetails.StorePath;
+            inventoryParser.CertificateStoreDetails.StorePassword = "**********";
+            inventoryParser.CertificateStoreDetails.Type = config.CertificateStoreDetails.Type;
 
-            if (config.JobProperties != null)
-            {
-                output.AppendLine();        // Blank line
-                output.AppendLine($"JSON Job Properties:");
-                output.AppendLine($"Site Name: {config.JobProperties["SiteName"].ToString()}");
-                output.AppendLine($"Port: {config.JobProperties["Port"].ToString()}");
-                output.AppendLine($"Host Name: {config.JobProperties["HostName"]?.ToString()}");
-                output.AppendLine($"Protocol: {config.JobProperties["Protocol"].ToString()}");
-                output.AppendLine($"SniFlag: {config.JobProperties["SniFlag"].ToString()?[..1]}");
-                output.AppendLine($"IP Address: {config.JobProperties["IPAddress"].ToString()}");
-                output.AppendLine($"SAN: {config.JobProperties["SAN"]?.ToString()}");
-            }
 
-            return output.ToString();
+            return JsonConvert.SerializeObject(inventoryParser);
         }
     }
 }
