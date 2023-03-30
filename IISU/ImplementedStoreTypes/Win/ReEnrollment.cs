@@ -16,7 +16,7 @@ using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     public class ReEnrollment : WinCertJobTypeBase, IReenrollmentJobExtension
     {
