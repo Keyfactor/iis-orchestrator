@@ -4,6 +4,7 @@
 * Resolved Null HostName error 
 * Added WinCert Cert Store Type
 * Added custom property parser to not show any passwords
+* Removed any password references in trace logs and output settings in JSON format
 
 2.0.0
 * Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
