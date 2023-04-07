@@ -22,7 +22,7 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Text;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     internal class WinIISInventory : ClientPSCertStoreInventory
     {

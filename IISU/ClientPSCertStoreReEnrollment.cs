@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -34,8 +33,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
     internal class ClientPSCertStoreReEnrollment
     {
-        private ILogger _logger;
-        private IPAMSecretResolver _resolver;
+        private readonly ILogger _logger;
+        private readonly IPAMSecretResolver _resolver;
 
         public ClientPSCertStoreReEnrollment(ILogger logger, IPAMSecretResolver resolver)
         {
@@ -59,8 +58,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 JobProperties properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
 
-                WSManConnectionInfo connectionInfo = new WSManConnectionInfo(new Uri($"{properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{properties?.WinRmPort}/wsman"));
-                connectionInfo.IncludePortInSPN = properties.SpnPortFlag;
+                WSManConnectionInfo connectionInfo = new WSManConnectionInfo(new Uri($"{properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{properties?.WinRmPort}/wsman"))
+                {
+                    IncludePortInSPN = properties.SpnPortFlag
+                };
                 var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
                 _logger.LogTrace($"Credentials: UserName:{serverUserName}");
 
@@ -91,7 +92,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 Collection<PSObject> results;
 
                 // If the provider name is null, default it to the Microsoft CA
-                if (providerName == null) providerName = "Microsoft Strong Cryptographic Provider";
+                providerName ??= "Microsoft Strong Cryptographic Provider";
 
                 // Create the script file
                 ps.AddScript("$infFilename = New-TemporaryFile");

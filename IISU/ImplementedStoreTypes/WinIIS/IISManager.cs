@@ -24,7 +24,7 @@ using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class IISManager
     {
@@ -66,7 +66,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
                 IpAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
@@ -105,7 +105,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString()?.Substring(0, 1);
+                SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
                 IpAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = config.JobCertificate.PrivateKeyPassword;
