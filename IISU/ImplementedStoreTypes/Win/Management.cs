@@ -24,7 +24,7 @@ using System.Management.Automation;
 using System.Net;
 using Keyfactor.Logging;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
@@ -47,11 +47,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
 
         public JobResult ProcessJob(ManagementJobConfiguration config)
         {
-            _logger = LogHandler.GetClassLogger<Management>();
-            _logger.MethodEntry();
-
             try
             {
+                _logger = LogHandler.GetClassLogger<Management>();
+                _logger.MethodEntry();
+
+                _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
+
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
@@ -111,56 +113,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
                 throw;
             }
         }
-
-        //private JobResult PerformManagement(ManagementJobConfiguration config)
-        //{
-        //    try
-        //    {
-        //        _logger.MethodEntry();
-
-        //        ServerUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
-        //        ServerPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
-
-        //        var complete = new JobResult
-        //        {
-        //            Result = OrchestratorJobStatusJobResult.Failure,
-        //            JobHistoryId = config.JobHistoryId,
-        //            FailureMessage =
-        //                "Invalid Management Operation"
-        //        };
-
-        //        switch (config.OperationType)
-        //        {
-        //            case CertStoreOperationType.Add:
-        //                {
-        //                    _logger.LogTrace("Adding...");
-        //                    if (config.JobProperties.ContainsKey("RenewalThumbprint"))
-        //                    {
-        //                        _thumbprint = config.JobProperties["RenewalThumbprint"].ToString();
-        //                        _logger.LogTrace($"Found Thumbprint Will renew all cers with this Thumbprint: {_thumbprint}");
-        //                    }
-
-        //                    _logger.LogTrace("Before PerformAddition...");
-        //                    complete = performAddition(config);
-        //                    _logger.LogTrace("After PerformAddition...");
-
-        //                    break;
-        //                }
-        //            case CertStoreOperationType.Remove:
-        //                {
-        //                    break;
-        //                }
-        //        }
-
-        //        return complete;
-        //    }
-
-        //    catch (Exception e)
-        //    {
-        //        _logger.LogError($"Error Occurred in Management.PerformManagement: {e.Message}");
-        //        throw;
-        //    }
-        //}
 
         private JobResult performAddition(ManagementJobConfiguration config)
         {

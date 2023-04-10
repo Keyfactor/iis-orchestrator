@@ -19,7 +19,7 @@ using System.Collections.Generic;
 using System.Management.Automation.Runspaces;
 using System.Text;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     internal class WinInventory : ClientPSCertStoreInventory
     {
