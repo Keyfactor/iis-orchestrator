@@ -19,11 +19,18 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{630203
 		images\CertStoreType-c.png = images\CertStoreType-c.png
 		images\CertStoreType.png = images\CertStoreType.png
 		images\IISCertStore.png = images\IISCertStore.png
+		images\IISUAddCertStore.png = images\IISUAddCertStore.png
+		images\IISUCertStoreBasic.png = images\IISUCertStoreBasic.png
+		images\IISUCustomFields.png = images\IISUCustomFields.png
+		images\IISUEntryParams.png = images\IISUEntryParams.png
 		images\ReEnrollment1.png = images\ReEnrollment1.png
 		images\ReEnrollment1a.png = images\ReEnrollment1a.png
 		images\ReEnrollment1b.png = images\ReEnrollment1b.png
 		images\Screen1.png = images\Screen1.png
 		images\Screen2.png = images\Screen2.png
+		images\WinCertAdvanced.png = images\WinCertAdvanced.png
+		images\WinCertBasic.png = images\WinCertBasic.png
+		images\WinCertEntryParams.png = images\WinCertEntryParams.png
 		images\WinCertStore.png = images\WinCertStore.png
 	EndProjectSection
 EndProject
