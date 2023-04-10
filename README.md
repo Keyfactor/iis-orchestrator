@@ -155,7 +155,7 @@ ServerUsername|Server Username|Secret||No|The username to log into the Server
 ServerPassword|Server Password|Secret||No|The password that matches the username to log into the Server
 ServerUseSsl|Use SSL|Bool|True|Yes|Determine whether the server uses SSL or not
 
-![](images/certstoretype-c.png)
+![](images/IISUCustomFields.png)
 
 **Entry Parameters:**
 
@@ -187,8 +187,7 @@ Protocol  |Multiple Choice|https|Adding Entry, Removing Entry, Reenrolling an En
 ProviderName |String||
 SAN	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
 
-
-![](images/screen2.png)
+![](images/IISUEntryParams.png)
 
 Click Save to save the Certificate Store Type.
 
