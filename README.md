@@ -221,7 +221,7 @@ Supports Custom Alias	|Determines if an individual entry within a store can have
 Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is required since IIS will need the private key material to establish TLS connections.
 PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
 
-![](images/wincertadvanced.png)
+![](images/WinCertAdvanced.png)
 
 **Custom Fields:**
 
@@ -236,7 +236,7 @@ ServerUsername|Server Username|Secret||No|The username to log into the Server
 ServerPassword|Server Password|Secret||No|The password that matches the username to log into the Server
 ServerUseSsl|Use SSL|Bool|True|Yes|Determine whether the server uses SSL or not
 
-![](images/certstoretype-c.png)
+![](images/WinCertCustom.png)
 
 **Entry Parameters:**
 - **Provider Name** - Optional. Name of the Windows cryptographic provider to use when generating and storing the private key for the certificate being enrolled by a reenrollment job. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be changed when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' in a command shell on the target Server.
@@ -248,7 +248,7 @@ ProviderName |String||
 SAN	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
 
 
-![](images/wincertentryparams.png)
+![](images/WinCertEntryParams.png)
 
 Click Save to save the Certificate Store Type.
 
