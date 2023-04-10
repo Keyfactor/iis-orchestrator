@@ -19,6 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{630203
 		images\CertStoreType-c.png = images\CertStoreType-c.png
 		images\CertStoreType.png = images\CertStoreType.png
 		images\IISCertStore.png = images\IISCertStore.png
+		images\IISUAddCertStore.png = images\IISUAddCertStore.png
 		images\IISUCertStoreBasic.png = images\IISUCertStoreBasic.png
 		images\ReEnrollment1.png = images\ReEnrollment1.png
 		images\ReEnrollment1a.png = images\ReEnrollment1a.png

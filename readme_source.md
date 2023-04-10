@@ -26,7 +26,7 @@ Currently this orchestrator handles two extensions: IISU for IIS servers with bo
 <details>
 	<summary>IISU Extension</summary>
 
-**1. In Keyfactor Command create a new Certificate Store Type similar to the one below:**
+**In Keyfactor Command create a new Certificate Store Type similar to the one below:**
 
 **Basic Settings:**
 
@@ -70,6 +70,7 @@ ServerUseSsl|Use SSL|Bool|True|Yes|Determine whether the server uses SSL or not
 ![](images/certstoretype-c.png)
 
 **Entry Parameters:**
+
 This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
 
 - **Site Name** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
@@ -101,32 +102,7 @@ SAN	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
 
 ![](images/screen2.png)
 
-**2. Register the IIS Universal Orchestrator with Keyfactor**
-See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your Keyfactor contact/representative.
-
-**3. Create the IIS Binding Certificate Store within Keyfactor Command**
-
-In Keyfactor Command create a new Certificate Store similar to the one below, selecting "IISU" as the Category and the parameters as described below.
-
-#### STORE CONFIGURATION 
-CONFIG ELEMENT	|DESCRIPTION
-----------------|---------------
-Category	|The type of certificate store to be configured. Select category based on the display name configured above.
-Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
-Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
-Credentials |Local or domain admin account that has permissions to manage iis (Has to be admin)
-Store Path	|My or WebHosting
-Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
-SPN with Port?|
-WinRm Protocol|http or https
-WinRm Port |Port to run WinRm on Default for http is 5985
-Server Username|Username to log into the IIS Server
-Server Password|Password for the username required to log into the IIS Server
-Use SSL|Determines whether SSL is used or not
-
-Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
-
-![](images/IISCertStore.png)
+Click Save to save the Certificate Store Type.
 
 </details>
 
@@ -187,12 +163,47 @@ SAN	|String||Reenrolling an Entry (if the CA follows RFC 2818 specifications)
 
 ![](images/wincertentryparams.png)
 
-**2. Register the WinCert Universal Orchestrator with Keyfactor**
-See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your Keyfactor contact/representative.
+Click Save to save the Certificate Store Type.
 
-**3. Create the WinCert Store within Keyfactor Command**
+</details>
 
-In Keyfactor Command create a new Certificate Store similar to the one below, selecting "WinCert" as the Category and the parameters as described below.
+
+## Creating New Certificate Stores
+Once the Certificate Store Types have been created, you need to create the Certificate Stores prior to using the extension.
+Here are the settings required for each Store Type previously configured.
+
+<details>
+<summary>IISU Certificate Store</summary>
+
+In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
+
+#### STORE CONFIGURATION 
+CONFIG ELEMENT	|DESCRIPTION
+----------------|---------------
+Category	|Select the IISU from the dropdown.  This is the name of the Certificate Store Type you previously create.
+Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
+Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
+Credentials |Local or domain admin account that has permissions to manage iis (Has to be admin)
+Store Path	|Select My or WebHosting from the dropdown.
+Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
+SPN with Port?| Defaulted to False
+WinRm Protocol|Select either http or https
+WinRm Port |Port to run WinRm on Default for http is 5985
+Server Username|Username to log into the IIS Server
+Server Password|Password for the username required to log into the IIS Server
+Use SSL|Determines whether SSL is used or not
+Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
+
+![](images/IISUAddCertStore.png)
+
+Click Save to save the settings for this Certificate Store
+</details>
+
+<details>
+<summary>WinCert Certificate Store</summary>
+
+In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
+
 
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
@@ -200,7 +211,7 @@ CONFIG ELEMENT	|DESCRIPTION
 Category	|The type of certificate store to be configured. Select category based on the display name configured above for WinCert.
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
 Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
-Store Path	|Enter the specific name of the certificate store you want to use. 
+Store Path	|Enter the specific name of the certificate store path you want to use. 
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
 SPN with Port?|Defaults to False
 WinRm Protocol|Select http or https
@@ -208,15 +219,14 @@ WinRm Port |Port to run WinRm on Default for http is 5985
 Server Username|Username to log into the IIS Server
 Server Password|Password for the username required to log into the IIS Server
 Use SSL|Determines whether SSL is used or not
-
 Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
 
 ![](images/WinCertStore.png)
 
 </details>
 
-<details>
-<summary>Test Cases</summary>
+
+## Test Cases
 
 Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 ----|------------------------|------------------------------------|--------------|----------------|-------------------------
@@ -236,7 +246,6 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 14	|New Cert Enrollment To New Binding With Pam Creds|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Created with Enrollment Params specified creds pulled from Pam Provider|True|![](images/TestCase1Results.gif)
 15	|New Cert Enrollment Default Site No HostName|**Site Name:** Default Web Site<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:**<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Installed with no HostName|True|![](images/TestCase15Results.gif)
 
-</details>
 
 
 
