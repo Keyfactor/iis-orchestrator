@@ -25,7 +25,7 @@ using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {
@@ -52,7 +52,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS
             {
                 var inventoryItems = new List<CurrentInventoryItem>();
 
-                _logger.LogTrace($"Job Configuration: {JsonConvert.SerializeObject(config)}");
+                string myConfig = config.ToString();
+
+                _logger.LogTrace(JobConfigurationParser.ParseInventoryJobConfiguration(config));
 
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);

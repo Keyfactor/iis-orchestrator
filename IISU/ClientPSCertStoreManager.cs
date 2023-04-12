@@ -78,6 +78,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             $certStore.Open(5)
                             $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $password, 18 <# Persist, Machine #>
                             $certStore.Add($cert)
+
                             $certStore.Close();
                         }";
 
