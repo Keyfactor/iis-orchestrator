@@ -27,7 +27,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             if (resolver == null) return key;
             else
             {
-                logger.LogDebug($"Attempting to resolve PAM eligible field {name} with key {key}");
                 return resolver.Resolve(key);
             }
 
