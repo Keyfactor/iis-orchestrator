@@ -12,13 +12,7 @@ The Universal Orchestrator is part of the Keyfactor software distribution and is
 
 The Universal Orchestrator is the successor to the Windows Orchestrator. This Orchestrator Extension plugin only works with the Universal Orchestrator and does not work with the Windows Orchestrator.
 
-
-
-
 ---
-
-
-
 
 ## Keyfactor Version Supported
 
@@ -114,31 +108,33 @@ Currently this orchestrator handles two extensions: IISU for IIS servers with bo
 <details>
 	<summary>IISU Extension</summary>
 
-**In Keyfactor Command create a new Certificate Store Type similar to the one below:**
+**In Keyfactor Command create a new Certificate Store Type as specified below:**
 
 **Basic Settings:**
 
-CONFIG ELEMENT	| DESCRIPTION
-------------------|------------------
-Name	|A descriptive name for the extension.  Example:  IISU
-Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be IISU.
-Custom Capability|Store type name orchestrator will register with. Check the box and enter IISU.
-Job Types	|Inventory (Checked), check the additional checkboxes: Add, Remove, and Reenrollment.
-General Settings|Needs Server - Checked<br>Blueprint Allowed - Unchecked<br>Uses PowerShell - Unchecked
-Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be unchecked.
-Supports Entry Password	|Determined if an individual entry within a store can have a password.  This must be unchecked.
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Name | IISU | Display name for the store type (may be customized)
+Short Name| IISU | Short display name for the store type
+Custom Capability | IISU | Store type name orchestrator will register with. Check the box to allow entry of value
+Supported Job Types | Inventory, Add, Remove, Reenrollment | Job types the extension supports
+Needs Server | Checked | Require target server name when creating store
+Blueprint Allowed | Unchecked | Store type may be included in an Orchestrator blueprint
+Uses PowerShell | Unchecked | 
+Requires Store Password	| Unchecked | Determines if a store password is required when configuring an individual store.
+Supports Entry Password	| Unchecked | Determines if an individual entry within a store can have a password.
 
 ![](images/IISUCertStoreBasic.png)
 
 **Advanced Settings:**
 
-CONFIG ELEMENT	| DESCRIPTION
-------------------|------------------
-Store Path Type	|Determines what restrictions are applied to the store path field when configuring a new store.  Select Multiple Choice.
-Store Path Value|This must be a comma separated list of options to select from for the Store Path. This, combined with the hostname, will determine the location used for the certificate store management and inventory.  Must be My, WebHosting
-Supports Custom Alias	|Determines if an individual entry within a store can have a custom Alias.  This must be Forbidden.
-Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is required since IIS will need the private key material to establish TLS connections.
-PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Store Path Type	| Multiple Choice | Determines what restrictions are applied to the store path field when configuring a new store.
+Store Path Value | My,WebHosting | Comma separated list of options configure multiple choice. This, combined with the hostname, will determine the location used for the certificate store management and inventory.
+Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias.
+Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be useless.
+PFX Password Style | Default or Custom |This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.
 
 ![](images/screen1-a.gif)
 
