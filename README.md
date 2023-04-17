@@ -45,7 +45,7 @@ The secrets that this orchestrator extension supports for use with a PAM Provide
 
 |Name|Description|
 |----|-----------|
-|Server UserName|The user id that will be used to authenticate into the server hosting the store|
+|Server Username|The user id that will be used to authenticate into the server hosting the store|
 |Server Password|The password that will be used to authenticate into the server hosting the store|
 
 
