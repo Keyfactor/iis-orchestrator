@@ -26,52 +26,55 @@ Currently this orchestrator handles two extensions: IISU for IIS servers with bo
 <details>
 	<summary>IISU Extension</summary>
 
-**In Keyfactor Command create a new Certificate Store Type similar to the one below:**
+**In Keyfactor Command create a new Certificate Store Type as specified below:**
 
 **Basic Settings:**
 
-CONFIG ELEMENT	| DESCRIPTION
-------------------|------------------
-Name	|A descriptive name for the extension.  Example:  IISU
-Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be IISU.
-Custom Capability|Store type name orchestrator will register with. Check the box and enter IISU.
-Job Types	|Inventory (Checked), check the additional checkboxes: Add, Remove, and Reenrollment.
-General Settings|Needs Server - Checked<br>Blueprint Allowed - Unchecked<br>Uses PowerShell - Unchecked
-Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be unchecked.
-Supports Entry Password	|Determined if an individual entry within a store can have a password.  This must be unchecked.
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Name | IISU | Display name for the store type (may be customized)
+Short Name| IISU | Short display name for the store type
+Custom Capability | IISU | Store type name orchestrator will register with. Check the box to allow entry of value
+Supported Job Types | Inventory, Add, Remove, Reenrollment | Job types the extension supports
+Needs Server | Checked | Require target server name when creating store
+Blueprint Allowed | Unchecked | Store type may be included in an Orchestrator blueprint
+Uses PowerShell | Unchecked | Underlying implementation is PowerShell
+Requires Store Password	| Unchecked | Determines if a store password is required when configuring an individual store.
+Supports Entry Password	| Unchecked | Determines if an individual entry within a store can have a password.
 
 ![](images/IISUCertStoreBasic.png)
 
 **Advanced Settings:**
 
-CONFIG ELEMENT	| DESCRIPTION
-------------------|------------------
-Store Path Type	|Determines what restrictions are applied to the store path field when configuring a new store.  Select Multiple Choice.
-Store Path Value|This must be a comma separated list of options to select from for the Store Path. This, combined with the hostname, will determine the location used for the certificate store management and inventory.  Must be My, WebHosting
-Supports Custom Alias	|Determines if an individual entry within a store can have a custom Alias.  This must be Forbidden.
-Private Keys	|This determines if Keyfactor can send the private key associated with a certificate to the store.  This is required since IIS will need the private key material to establish TLS connections.
-PFX Password Style	|This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.  This can be either Default (system generated) or Custom (user determined).
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Store Path Type	| Multiple Choice | Determines what restrictions are applied to the store path field when configuring a new store.
+Store Path Value | My,WebHosting | Comma separated list of options configure multiple choice. This, combined with the hostname, will determine the location used for the certificate store management and inventory.
+Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias.
+Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be useless.
+PFX Password Style | Default or Custom | This determines how the platform generate passwords to protect a PFX enrollment job that is delivered to the store.
 
 ![](images/screen1-a.gif)
 
 **Custom Fields:**
 
-- **SPN With Port** – Defaults to false but some customers need for remote PowerShell Access
+Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed
 
-Parameter Name|Display Name|Parameter Type|Default Value|Required|Description
+Parameter Name|Display Name|Parameter Type|Default Value / Options|Required|Description
 ---|---|---|---|---|---
-spnwithport|SPN With Port?|Boolean|false|No|An SPN is the name by which a client uniquely identifies an instance of a service
-WinRm Protocol|WinRm Protocol|Multiple Choice|http|Yes|Protocol that WinRM Runs on
-WinRm Port|WinRm Port|String|5985|Yes|Port that WinRM Runs on
-ServerUsername|Server Username|Secret||No|The username to log into the Server
-ServerPassword|Server Password|Secret||No|The password that matches the username to log into the Server
+ServerUsername|Server Username|Secret||No|The username to log into the target server
+ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server
 ServerUseSsl|Use SSL|Bool|True|Yes|Determine whether the server uses SSL or not
+WinRm Protocol|WinRm Protocol|Multiple Choice| https,http |Yes|Protocol that target server WinRM is using
+WinRm Port|WinRm Port|String|5986|Yes| Port that target server WinRM listener is using. Typically 5985 for HTTP and 5986 for HTTPS
+spnwithport|SPN With Port?|Boolean|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
 ![](images/IISUCustomFields.png)
 
 **Entry Parameters:**
 
-This section must be configured with binding fields. The parameters will be populated with the appropriate data when creating a new certificate store.<br/>
+Entry parameters are inventoried and maintained for each entry within a certificate store. They are typically used to support binding of a certificate to a resource
+
 
 - **Site Name** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The site name for the web site being bound to – i.e. &quot;Default Web Site&quot;
 - **IP Address** – Required (Adding an entry, Removing an entry, Reenrolling an entry). The IP address for the web site being bound to. Default is &quot;\*&quot; for all IP Addresses.
