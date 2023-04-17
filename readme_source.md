@@ -9,7 +9,7 @@ The returned list will contain the actual certificate store name to be used when
 
 By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
 
-This agent implements four job types:  Inventory, Management Add/Remove, and ReEnrollment.
+This extension implements four job types:  Inventory, Management Add/Remove, and ReEnrollment.
 
 WinRM is used to remotely manage the certificate stores and IIS bindings.  WinRM must be properly configured to allow the orchestrator on the server to manage the certificates.  Setting up WinRM is not in the scope of this document.
 
@@ -19,7 +19,7 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 1. Delete existing IIS stores. Delete the IISBin store type. Create the new IISU store type. Recreate the IIS stores using the new IISU store type.
 1. Convert existing IISBin certificate stores to IISU certificate stores. There is not currently a way to do this via the Keyfactor API, so direct updates to the underlying Keyfactor SQL database is required. A SQL script (IIS-Conversion.sql) is available in the repository to do this. Hosted customers, which do not have access to the underlying database, will need to work Keyfactor support to run the conversion. On-premises customers can run the script themselves, but are strongly encouraged to ensure that a SQL backup is taken prior running the script (and also be confident that they have a tested database restoration process.)
 
-**Note: There is an additional certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
+**Note: There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
 
 ## Creating New Certificate Store Types
 Currently this orchestrator handles two extensions: IISU for IIS servers with bound certificates and WinCert for general Windows Certificates.  Below describes how each of these certificate store types are created and configured.
@@ -90,7 +90,7 @@ This section must be configured with binding fields. The parameters will be popu
 
 Parameter Name|Parameter Type|Default Value|Required When
 ---|---|---|---
-Port|String|443|Adding Entry, Removing Entry, Reenrolling and Entry
+Port|String|443|Adding Entry, Removing Entry, Reenrolling an Entry
 IPAddress|String|*|Adding Entry, Reenrolling an Entry
 HostName |String||
 SiteName |String|Default Web Site|Adding Entry, Removing Entry, Reenrolling an Entry
@@ -179,7 +179,7 @@ In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  C
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
-Category	|Select the IISU from the dropdown.  This is the name of the Certificate Store Type you previously create.
+Category	|Select the IISU from the dropdown.  This is the name of the Certificate Store Type you previously created.
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
 Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
 Credentials |Local or domain admin account that has permissions to manage iis (Has to be admin)
