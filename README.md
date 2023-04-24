@@ -260,19 +260,18 @@ In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  C
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
-Category	|Select the IISU from the dropdown.  This is the name of the Certificate Store Type you previously created.
-Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
-Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
-Credentials |Local or domain admin account that has permissions to manage iis (Has to be admin)
-Store Path	|Select My or WebHosting from the dropdown.
-Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
-SPN with Port?| Defaulted to False
-WinRm Protocol|Select either http or https
-WinRm Port |Port to run WinRm on Default for http is 5985
-Server Username|Username to log into the IIS Server
-Server Password|Password for the username required to log into the IIS Server
-Use SSL|Determines whether SSL is used or not
-Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
+Category | Select the IISU or the customized certificate store type name from above.
+Container | Optional container to associate certificate store with.
+Client Machine | Hostname of the IIS server containing the certificate store to be managed.
+Store Path | Windows certificate store to manage. Choose "My" for the Personal Store or "WebHosting" for the Web Hosting Store. 
+Orchestrator | This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
+SPN with Port | Typically False. Needed in some Kerberos configurations.
+WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
+WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
+Server Username | Username to use when establishing the WinRM session to the Client Machine. Account needs to be an administrator or have been granted rights to manage IIS configuration and manipulate the local machine certificate store. 
+Server Password | Password to use when establishing the WinRM session to the Client Machine
+Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
+Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
 
 ![](images/IISUAddCertStore.png)
 
@@ -288,18 +287,18 @@ In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  C
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
-Category	|The type of certificate store to be configured. Select category based on the display name configured above for WinCert.
-Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
-Client Machine	|The hostname of the server to be managed. The Change Credentials option must be clicked to provide a username and password. This account will be used to manage the remote server via PowerShell.
-Store Path	|Enter the specific name of the certificate store path you want to use. 
-Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
-SPN with Port?|Defaults to False
-WinRm Protocol|Select http or https
-WinRm Port |Port to run WinRm on Default for http is 5985
-Server Username|Username to log into the IIS Server
-Server Password|Password for the username required to log into the IIS Server
-Use SSL|Determines whether SSL is used or not
-Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
+Category | Select the WinCert or the customized certificate store type name from above.
+Container | Optional container to associate certificate store with.
+Client Machine | Hostname of the server containing the certificate store to be managed.
+Store Path | Windows certificate store to manage. Store must exist in the Local Machine store on the target server. 
+Orchestrator | This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
+SPN with Port | Typically False. Needed in some Kerberos configurations.
+WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
+WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
+Server Username | Username to use when establishing the WinRM session to the Client Machine. Account needs to be an admin or have been granted rights to manipulate the local machine certificate store.
+Server Password | Password to use when establishing the WinRM session to the Client Machine
+Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
+Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
 
 ![](images/WinCertStore.png)
 
