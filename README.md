@@ -121,7 +121,7 @@ Below describes how each of these certificate store types are created and config
 
 CONFIG ELEMENT | VALUE | DESCRIPTION
 --|--|--
-Name | IISU | Display name for the store type (may be customized)
+Name | IIS Bound Certificate | Display name for the store type (may be customized)
 Short Name| IISU | Short display name for the store type
 Custom Capability | IISU | Store type name orchestrator will register with. Check the box to allow entry of value
 Supported Job Types | Inventory, Add, Remove, Reenrollment | Job types the extension supports
@@ -143,21 +143,24 @@ Supports Custom Alias | Forbidden | Determines if an individual entry within a s
 Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be useless.
 PFX Password Style | Default or Custom | "Default" - PFX password is randomly generated, "Custom" - PFX password may be specified when the enrollment job is created (Requires the *Allow Custom Password* application setting to be enabled.)
 
-![](images/screen1-a.gif)
+![](images/IISUCertStoreAdv.png)
 
 **Custom Fields:**
 
 Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote
 target server containing the certificate store to be managed
 
-Parameter Name|Display Name|Parameter Type|Default Value / Options|Required|Description
+Name|Display Name|Type|Default Value / Options|Required|Description
 ---|---|---|---|---|---
-ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created)
-ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created)
-ServerUseSsl|Use SSL|Bool|True|Yes|Determine whether the server uses SSL or not (This field is automatically created)
 WinRm Protocol|WinRm Protocol|Multiple Choice| https,http |Yes|Protocol that target server WinRM listener is using
 WinRm Port|WinRm Port|String|5986|Yes| Port that target server WinRM listener is using. Typically 5985 for HTTP and 5986 for HTTPS
-spnwithport|SPN With Port?|Boolean|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+spnwithport|SPN With Port|Bool|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created)
+ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created)
+ServerUseSsl|Use SSL|Bool|true|Yes|Determine whether the server uses SSL or not (This field is automatically created)
+
+*Note that some of the Names in the first column above have spaces and some do not, it is important to configure the Name field exactly as above.*
+
 
 ![](images/IISUCustomFields.png)
 
@@ -166,16 +169,18 @@ spnwithport|SPN With Port?|Boolean|false|No|Internally set the -IncludePortInSPN
 Entry parameters are inventoried and maintained for each entry within a certificate store.
 They are typically used to support binding of a certificate to a resource.
 
-Parameter Name|Parameter Type|Default Value|Depends On|Required When|Description
+Name|Display Name| Type|Default Value|Required When|Description
 ---|---|---|---|---|---
-SiteName |String|Default Web Site||Adding, Removing, Reenrolling|IIS web site to bind certificate to
-IPAddress|String|*||Adding, Removing, Reenrolling|IP address to bind certificate to (use '*' for all IP addresses)
-Port|String|443||Adding, Removing, Reenrolling|IP port for bind certificate to
-HostName |String||||Host name (host header) to bind certificate to, leave blank for all host names
-SniFlag  |Multiple Choice|0 - No SNI,<br>1 - SNI Enabled,<br>2 - Non SNI Binding,<br>3 - SNI Binding|||Type of SNI for binding<br>(Mutlple choice configuration should be entered as "0 - No SNI,1 - SNI Enabled,2 - Non SNI Binding,3 - SNI Binding")
-Protocol  |Multiple Choice|https||Adding, Removing, Reenrolling|Protocol to bind to (always "https"). 
-ProviderName |String||||Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server.
-SAN	|String|||Reenrolling|Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA.
+SiteName | IIS Site Name|String|Default Web Site|Adding, Removing, Reenrolling | IIS web site to bind certificate to
+IPAddress | IP Address | String | * | Adding, Removing, Reenrolling | IP address to bind certificate to (use '*' for all IP addresses)
+Port | Port | String | 443 || Adding, Removing, Reenrolling|IP port for bind certificate to
+HostName | Host Name | String |||| Host name (host header) to bind certificate to, leave blank for all host names
+SniFlag | SNI Support | Multiple Choice | 0 - No SNI||Type of SNI for binding<br>(Multiple choice configuration should be entered as "0 - No SNI,1 - SNI Enabled,2 - Non SNI Binding,3 - SNI Binding")
+Protocol | Protocol | Multiple Choice | https| Adding, Removing, Reenrolling|Protocol to bind to (always "https").<br>(Multiple choice configuration should be "https") 
+ProviderName | Crypto Provider Name | String ||| Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server.
+SAN | SAN | String || Reenrolling | Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA.
+
+None of the above entry parameters have the "Depends On" field set.
 
 ![](images/IISUEntryParams.png)
 
@@ -192,7 +197,7 @@ Click Save to save the Certificate Store Type.
 
 CONFIG ELEMENT | VALUE | DESCRIPTION
 --|--|--
-Name | WinCert | Display name for the store type (may be customized)
+Name | Windows Certificate | Display name for the store type (may be customized)
 Short Name| WinCert | Short display name for the store type
 Custom Capability | WinCert | Store type name orchestrator will register with. Check the box to allow entry of value
 Supported Job Types | Inventory, Add, Remove, Reenrollment | Job types the extension supports
@@ -219,14 +224,16 @@ PFX Password Style | Default or Custom | "Default" - PFX password is randomly ge
 
 Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed
 
-Parameter Name|Display Name|Parameter Type|Default Value / Options|Required|Description
+Name|Display Name|Type|Default Value / Options|Required|Description
 ---|---|---|---|---|---
+WinRm Protocol|WinRm Protocol|Multiple Choice| https,http |Yes|Protocol that target server WinRM listener is using
+WinRm Port|WinRm Port|String|5986|Yes| Port that target server WinRM listener is using. Typically 5985 for HTTP and 5986 for HTTPS
+spnwithport|SPN With Port|Bool|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created)
 ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created)
 ServerUseSsl|Use SSL|Bool|True|Yes|Determine whether the server uses SSL or not (This field is automatically created)
-WinRm Protocol|WinRm Protocol|Multiple Choice| https,http |Yes|Protocol that target server WinRM listener is using
-WinRm Port|WinRm Port|String|5986|Yes| Port that target server WinRM listener is using. Typically 5985 for HTTP and 5986 for HTTPS
-spnwithport|SPN With Port?|Boolean|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+
+*Note that some of the Names in the first column above have spaces and some do not, it is important to configure the Name field exactly as above.*
 
 ![](images/WinCertCustom.png)
 
@@ -236,10 +243,10 @@ Entry parameters are inventoried and maintained for each entry within a certific
 They are typically used to support binding of a certificate to a resource.
 For the WinCert store type they are used to control how reenrollment jobs are performed.
 
-Parameter Name|Parameter Type|Default Value|Depends On|Required When|Description
+Name|Display Name| Type|Default Value|Required When|Description
 ---|---|---|---|---|---
-ProviderName |String||||Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server.
-SAN	|String|||Reenrolling (if the CA follows RFC 2818 specifications)|Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA.
+ProviderName | Crypto Provider Name | String ||| Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server.
+SAN | SAN | String || Reenrolling | Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA.
 
 ![](images/WinCertEntryParams.png)
 
@@ -260,14 +267,14 @@ In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  C
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
-Category | Select the IISU or the customized certificate store type name from above.
+Category | Select IIS Bound Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
 Client Machine | Hostname of the IIS server containing the certificate store to be managed.
 Store Path | Windows certificate store to manage. Choose "My" for the Personal Store or "WebHosting" for the Web Hosting Store. 
-Orchestrator | This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
-SPN with Port | Typically False. Needed in some Kerberos configurations.
+Orchestrator | Select an approved orchestrator capable of managing IIS Bound Certificates (one that has declared the IISU capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
 WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
+SPN with Port | Typically False. Needed in some Kerberos configurations.
 Server Username | Username to use when establishing the WinRM session to the Client Machine. Account needs to be an administrator or have been granted rights to manage IIS configuration and manipulate the local machine certificate store. 
 Server Password | Password to use when establishing the WinRM session to the Client Machine
 Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
@@ -287,20 +294,20 @@ In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  C
 #### STORE CONFIGURATION 
 CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
-Category | Select the WinCert or the customized certificate store type name from above.
+Category | Select Windows Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
 Client Machine | Hostname of the server containing the certificate store to be managed.
 Store Path | Windows certificate store to manage. Store must exist in the Local Machine store on the target server. 
-Orchestrator | This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
-SPN with Port | Typically False. Needed in some Kerberos configurations.
+Orchestrator | Select an approved orchestrator capable of managing Windows Certificates (one that has declared the WinCert capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
 WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
+SPN with Port | Typically False. Needed in some Kerberos configurations.
 Server Username | Username to use when establishing the WinRM session to the Client Machine. Account needs to be an admin or have been granted rights to manipulate the local machine certificate store.
 Server Password | Password to use when establishing the WinRM session to the Client Machine
 Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
 Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
 
-![](images/WinCertStore.png)
+![](images/WinCertAddCertStore.png)
 
 </details>
 
@@ -318,11 +325,11 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 5   |New Cert Enrollment New Host Name|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.newhostname.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|New Binding Created With different host on Same Port and IP Address|True|![](images/TestCase5Results.gif)
 6   |New Cert Enrollment Same Site New Port |**Site Name:** FirstSite<br/>**Port:** 4443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.newhostname.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|New Binding on different port will be created with new cert enrolled|True|![](images/TestCase6Results.gif)
 7   |Remove Cert and Binding From Test Case 6|**Site Name:** FirstSite<br/>**Port:** 4443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.newhostname.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert and Binding From Test Case 6 Removed|True|![](images/TestCase7Results.gif)
-8   |Renew Same Cert on 2 Different Sites|`SITE 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`SITE 2`<br/>**First Site**<br/>**Site Name:** SecondSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** cstiis04.cstpki.int<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both sites because it has the same thrumbprint|True|![](images/TestCase8Site1.gif)![](images/TestCase8Site2.gif)
-9   |Renew Same Cert on Same Site Same Binding Settings Different Hostname|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding2.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thrumbprint|True|![](images/TestCase9Binding1.gif)![](images/TestCase9Binding2.gif)
-10  |Renew Single Cert on Same Site Same Binding Settings Different Hostname Different Certs|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding2.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on only one binding because the other binding does not match thrumbprint|True|![](images/TestCase10Binding1.gif)![](images/TestCase10Binding2.gif)
-11  |Renew Same Cert on Same Site Same Binding Settings Different IPs|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.160`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thrumbprint|True|![](images/TestCase11Binding1.gif)![](images/TestCase11Binding2.gif)
-12  |Renew Same Cert on Same Site Same Binding Settings Different Ports|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 543<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thrumbprint|True|![](images/TestCase12Binding1.gif)![](images/TestCase12Binding2.gif)
+8   |Renew Same Cert on 2 Different Sites|`SITE 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`SITE 2`<br/>**First Site**<br/>**Site Name:** SecondSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** cstiis04.cstpki.int<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both sites because it has the same thumbprint|True|![](images/TestCase8Site1.gif)![](images/TestCase8Site2.gif)
+9   |Renew Same Cert on Same Site Same Binding Settings Different Hostname|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding2.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thumbprint|True|![](images/TestCase9Binding1.gif)![](images/TestCase9Binding2.gif)
+10  |Renew Single Cert on Same Site Same Binding Settings Different Hostname Different Certs|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsitebinding2.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on only one binding because the other binding does not match thumbprint|True|![](images/TestCase10Binding1.gif)![](images/TestCase10Binding2.gif)
+11  |Renew Same Cert on Same Site Same Binding Settings Different IPs|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.160`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thumbprint|True|![](images/TestCase11Binding1.gif)![](images/TestCase11Binding2.gif)
+12  |Renew Same Cert on Same Site Same Binding Settings Different Ports|`BINDING 1`<br/>**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https<br/>`BINDING 2`<br/>**Site Name:** FirstSite<br/>**Port:** 543<br/>**IP Address:**`192.168.58.162`<br/>**Host Name:** www.firstsitebinding1.com<br/>**Sni Flag:** 1 - SNI Enabled<br/>**Protocol:** https|Cert will be renewed on both bindings because it has the same thumbprint|True|![](images/TestCase12Binding1.gif)![](images/TestCase12Binding2.gif)
 13	|ReEnrollment to Fortanix HSM|**Subject Name:** cn=www.mysite.com<br/>**Port:** 433<br/>**IP Address:**`*`<br/>**Host Name:** mysite.command.local<br/>**Site Name:**Default Web Site<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https<br/>**Provider Name:** Fortanix KMS CNG Provider<br/>**SAN:** dns=www.mysite.com&dns=mynewsite.com|Cert will be generated with keys stored in Fortanix HSM and the cert will be bound to the supplied site.|true|![](images/ReEnrollment1a.png)![](images/ReEnrollment1b.png)
 14	|New Cert Enrollment To New Binding With Pam Creds|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Created with Enrollment Params specified creds pulled from Pam Provider|True|![](images/TestCase1Results.gif)
 15	|New Cert Enrollment Default Site No HostName|**Site Name:** Default Web Site<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:**<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Installed with no HostName|True|![](images/TestCase15Results.gif)
