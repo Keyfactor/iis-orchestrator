@@ -1,5 +1,5 @@
 2.1.1
-* Bob's bug fix
+* Fixed the missing site name error when issuing a WinCert job when writing trace log settings to the log file.
 * Several display names changed in the documented certificate store type definitions. There are no changes to the internal type or parameter names, so no migration is necessary for currently configured stores.
 	* Display name for IISU changed to "IIS Bound Certificate".
 	* Display name for WinCert changed to "Windows Certificate".
