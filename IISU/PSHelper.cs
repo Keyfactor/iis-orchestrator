@@ -32,10 +32,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{WinRmPort}/wsman"));
             connInfo.IncludePortInSPN = includePortInSPN;
-
-            var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-            connInfo.Credential = new PSCredential(serverUserName, pw);
-
+            if (!string.IsNullOrEmpty(serverUserName))
+            {
+                _logger.LogTrace($"Credentials Specified");
+                var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                connInfo.Credential = new PSCredential(serverUserName, pw);
+            }
             return RunspaceFactory.CreateRunspace(connInfo);
         }
     }
