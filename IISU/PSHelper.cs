@@ -30,13 +30,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = LogHandler.GetClassLogger<PSHelper>();
             _logger.MethodEntry();
 
-            var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{WinRmPort}/wsman"));
-            connInfo.IncludePortInSPN = includePortInSPN;
+            if (clientMachineName.ToLower() != "localhost")
+            {
 
-            var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-            connInfo.Credential = new PSCredential(serverUserName, pw);
+                var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{WinRmPort}/wsman"));
+                connInfo.IncludePortInSPN = includePortInSPN;
 
-            return RunspaceFactory.CreateRunspace(connInfo);
+                var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                connInfo.Credential = new PSCredential(serverUserName, pw);
+
+                return RunspaceFactory.CreateRunspace(connInfo);
+
+            }
+            else return RunspaceFactory.CreateRunspace();
         }
     }
 }
