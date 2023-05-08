@@ -1,0 +1,38 @@
+﻿{
+  "LastInventory": [],
+  "CertificateStoreDetails": {
+    "ClientMachine": "ClientMachineGoesHere",
+    "StorePath": "StorePathGoesHere",
+    "StorePassword": null,
+    "Properties": "{\"spnwithport\":\"SpnWithPortGoesHere\",\"WinRm Protocol\":\"WinRmProtocolGoesHere\",\"WinRm Port\":\"WinRmPortGoesHere\",\"ServerUsername\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
+    "Type": 104
+  },
+  "OperationType": 2,
+  "Overwrite": false,
+  "JobCertificate": {
+    "Thumbprint": null,
+    "Contents": "CertificateContentGoesHere",
+    "Alias": "",
+    "PrivateKeyPassword": "WSymbLA6DbYA"
+  },
+  "JobCancelled": false,
+  "ServerError": null,
+  "JobHistoryId": 26009,
+  "RequestStatus": 1,
+  "ServerUsername": null,
+  "ServerPassword": null,
+  "UseSSL": true,
+  "JobProperties": {
+    "Port": "PortGoesHere",
+    "IPAddress": "IPAddressGoesHere",
+    "HostName": null,
+    "SiteName": "SiteNameGoesHere",
+    "SniFlag": "SniFlagGoesHere",
+    "Protocol": "ProtocolGoesHere",
+    "ProviderName": null,
+    "SAN": null
+  },
+  "JobTypeId": "00000000-0000-0000-0000-000000000000",
+  "JobId": "5f5addc3-afc9-4789-a0fe-04c6e623c233",
+  "Capability": "CertStores.IISU.Management"
+}
