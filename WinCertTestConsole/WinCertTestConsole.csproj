@@ -26,7 +26,7 @@
     <None Update="ManagementRemove.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="ManagementRenew.json">
+    <None Update="RenewalSetup.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

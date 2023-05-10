@@ -1,10 +1,7 @@
 ﻿using Keyfactor.Orchestrators.Extensions;
-//using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Win;
-//using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinIIS;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
@@ -36,6 +33,7 @@ namespace WinCertTestConsole
         public static string Port { get; set; }
         public static string WinRmPort { get; set; }
         public static string IpAddress { get; set; }
+        public static string IsSetupCert { get; set; }
         public static Dictionary<string, string> Arguments { get; set; }
         public static string[] Args { get; set; }
 
@@ -92,11 +90,11 @@ namespace WinCertTestConsole
 
                     if (mgmtType?.ToUpper() == "ADD")
                     {
-                        ProcessManagementJob("Management", true);
+                        ProcessManagementJob("Management");
                     }
                     else if (mgmtType?.ToUpper() == "REMOVE")
                     {
-                        ProcessManagementJob("Remove", true);
+                        ProcessManagementJob("Remove");
                     }
 
                     break;
@@ -104,7 +102,7 @@ namespace WinCertTestConsole
                     
         }
 
-        private static void ProcessManagementJob(string jobType, bool isRenewal)
+        private static void ProcessManagementJob(string jobType)
         {
             if (Args.Length > 0)
             {
@@ -117,6 +115,7 @@ namespace WinCertTestConsole
                 SniCert = Arguments["-snicert"];
                 Protocol = Arguments["-protocol"];
                 Domain = Arguments["-domain"];
+                IsSetupCert = Arguments["-setupcert"];
             }
 
             Console.WriteLine($"Start Generated Cert in KF API for {jobType}");
@@ -125,12 +124,27 @@ namespace WinCertTestConsole
             CertificateContent = kfResult.CertificateInformation.Pkcs12Blob;
             Console.WriteLine($"End Generated Cert in KF API for {jobType}");
 
-            if (Renewal.ToUpper() == "FALSE")
+            var isRenewal = Renewal.ToUpper() == "TRUE";
+            var isSetup = IsSetupCert.ToUpper() == "TRUE";
+
+            ManagementJobConfiguration jobConfiguration;
+
+            if (!isSetup)
             {
-                SetRenewThumbprint(kfResult.CertificateInformation.Thumbprint);
+                jobConfiguration = jobType.ToUpper() == "REMOVE" ? GetRemoveJobConfiguration() : GetManagementJobConfiguration("Management");
+
+                if (isRenewal)
+                {
+                    var setupConfiguration = GetManagementJobConfiguration("RenewalSetup");
+                    var renewalThumbprint = setupConfiguration.JobCertificate.Thumbprint;
+                    jobConfiguration.JobProperties.Add("RenewalThumbprint",renewalThumbprint);
+                }               
+            }
+            else
+            {
+                jobConfiguration = GetManagementJobConfiguration("RenewalSetup");
             }
 
-            var jobConfiguration = jobType.ToUpper()=="REMOVE"? GetRemoveJobConfiguration(): GetManagementJobConfiguration(isRenewal ? "ManagementRenewModified" : jobType);
 
             var mgmtSecretResolver = new Mock<IPAMSecretResolver>();
             mgmtSecretResolver
@@ -140,7 +154,6 @@ namespace WinCertTestConsole
                 .Setup(m => m.Resolve(It.Is<string>(s => s == jobConfiguration.ServerPassword)))
                 .Returns(() => jobConfiguration.ServerPassword);
             var mgmt = new Management(mgmtSecretResolver.Object);
-
             var result = mgmt.ProcessJob(jobConfiguration);
             Console.Write(JsonConvert.SerializeObject(result));
             Console.ReadLine();
@@ -213,14 +226,5 @@ namespace WinCertTestConsole
         {
             return GetConfigurationFromFile("ManagementRemove");
         }
-
-
-        public static void SetRenewThumbprint(string lastThumbprint)
-        {
-            var fileContent = File.ReadAllText("ManagementRenew.json")
-                .Replace("ThumbprintGoesHere", lastThumbprint);
-            File.WriteAllText("ManagementRenewModified.json", fileContent, Encoding.UTF8);
-        }
-
     }
 }

@@ -26,7 +26,7 @@ echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname= -sitename=FirstSite -domain=www.fromtesttool.com -snicert="0 - No SNI" -iisport=443 -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname= -sitename=FirstSite -domain=www.fromtesttool.com -snicert="0 - No SNI" -iisport=443 -protocol=https -overwrite=%overwrite% -setupcert=false
 
 
 set cert=%random%
@@ -42,7 +42,7 @@ echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname= -sitename=FirstSite -domain=www.fromtesttool2.com -snicert="0 - No SNI" -iisport=443 -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname= -sitename=FirstSite -domain=www.fromtesttool2.com -snicert="0 - No SNI" -iisport=443 -protocol=https -overwrite=%overwrite% -setupcert=false
 
 
 set cert=%random%
@@ -58,7 +58,7 @@ echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname=www.snitest.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -iisport=443 -snicert="1 - SNI Enabled" -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname=www.snitest.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -iisport=443 -snicert="1 - SNI Enabled" -protocol=https -overwrite=%overwrite% -setupcert=false
 
 set cert=%random%
 set casename=Management
@@ -73,7 +73,7 @@ echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.snitest.com -sitename=FirstSite -domain=www.fromtesttool2sni.com  -iisport=443 -snicert="1 - SNI Enabled" -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.snitest.com -sitename=FirstSite -domain=www.fromtesttool2sni.com  -iisport=443 -snicert="1 - SNI Enabled" -protocol=https -overwrite=%overwrite% -setupcert=false
 
 set cert=%random%
 set casename=Management
@@ -88,7 +88,7 @@ echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=443 -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=443 -protocol=https -overwrite=%overwrite% -setupcert=false
 
 set cert=%random%
 set casename=Management
@@ -103,9 +103,8 @@ echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=4443 -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=4443 -protocol=https -overwrite=%overwrite% -setupcert=false
 
-:SNI
 set cert=%random%
 set casename=Management
 set mgt=remove
@@ -119,7 +118,61 @@ echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=4443 -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=4443 -protocol=https -overwrite=%overwrite% -setupcert=false
+
+
+:SNI
+
+echo:
+echo ***********************************
+echo Starting Renewal Test Cases
+echo ***********************************
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC8 %mgt% renewal setup, installing Cert to Site 1
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress= -winrmport=5986 -hostname=www.renewtest1.com -sitename=FirstSite -domain=www.renewthis.com -snicert="1 - SNI Enabled" -iisport=443 -protocol=https -overwrite=%overwrite% -setupcert=true
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC9 %mgt% renewal setup, installing Cert to Site 2
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress= -winrmport=5986 -hostname=www.renewtestsite1.com -sitename=SecondSite -domain=www.renewthis.com -snicert="1 - SNI Enabled" -iisport=443 -protocol=https -overwrite=%overwrite% -setupcert=true
+
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC10 %mgt% renewal cert binded in TC8 and TC9 with another cert, should find all thumprints and replace
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=true -ipaddress= -winrmport=5986 -hostname=www.renewtestsite2.com -sitename=FirstSite -domain=www.renewthis.com -snicert="1 - SNI Enabled" -iisport=443 -protocol=https -overwrite=%overwrite% -setupcert=false
 
 echo:
 echo ***********************************

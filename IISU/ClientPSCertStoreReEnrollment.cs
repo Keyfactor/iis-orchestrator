@@ -52,8 +52,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 var serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 var serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
-
-
                 // Extract values necessary to create remote PS connection
                 JobProperties properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
