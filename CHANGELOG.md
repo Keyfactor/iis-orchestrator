@@ -1,3 +1,6 @@
+2.2.0
+* Added feature to Creating Certificate Store process; when the Client Machine value is set to localhost, no remote PowerShell connection is made thus remote credentials are not necessary.  This change was tested on KF Command ver 10.3.
+
 2.1.1
 * Fixed the missing site name error when issuing a WinCert job when writing trace log settings to the log file.
 * Several display names changed in the documented certificate store type definitions. There are no changes to the internal type or parameter names, so no migration is necessary for currently configured stores.
