@@ -130,7 +130,7 @@ namespace WinCertTestConsole
                 SetRenewThumbprint(kfResult.CertificateInformation.Thumbprint);
             }
 
-            var jobConfiguration = GetManagementJobConfiguration(isRenewal ? "ManagementRenewModified" : jobType);
+            var jobConfiguration = jobType.ToUpper()=="REMOVE"? GetRemoveJobConfiguration(): GetManagementJobConfiguration(isRenewal ? "ManagementRenewModified" : jobType);
 
             var mgmtSecretResolver = new Mock<IPAMSecretResolver>();
             mgmtSecretResolver
@@ -162,7 +162,7 @@ namespace WinCertTestConsole
             return result;
         }
 
-        private static ManagementJobConfiguration GetConfigurationFromFile(string fileName, params string[] replaceStrings)
+        private static ManagementJobConfiguration GetConfigurationFromFile(string fileName)
         {
             var hostNameReplaceString = "\"HostName\": null";
             if (!string.IsNullOrEmpty(HostName))
@@ -206,12 +206,12 @@ namespace WinCertTestConsole
 
         public static ManagementJobConfiguration GetManagementJobConfiguration(string fileName)
         {
-            return GetConfigurationFromFile(fileName, CertificateContent);
+            return GetConfigurationFromFile(fileName);
         }
 
         public static ManagementJobConfiguration GetRemoveJobConfiguration()
         {
-            return GetConfigurationFromFile("ManagementRemove", string.Empty);
+            return GetConfigurationFromFile("ManagementRemove");
         }
 
 

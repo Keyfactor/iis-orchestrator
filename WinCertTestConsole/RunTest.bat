@@ -11,7 +11,7 @@ echo Starting Management Test Cases
 echo ***********************************
 set casename=Management
 
-#goto SNI
+goto SNI
 
 set cert=%random%
 set casename=Management
@@ -105,7 +105,7 @@ echo cert name: %cert%
 
 WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=4443 -protocol=https -overwrite=%overwrite%
 
-#:SNI
+:SNI
 set cert=%random%
 set casename=Management
 set mgt=remove
