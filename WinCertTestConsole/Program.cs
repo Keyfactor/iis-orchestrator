@@ -34,30 +34,31 @@ namespace WinCertTestConsole
         public static string SiteName { get; set; }
         public static string HostName { get; set; }
         public static string Port { get; set; }
+        public static string WinRmPort { get; set; }
         public static string IpAddress { get; set; }
+        public static Dictionary<string, string> Arguments { get; set; }
+        public static string[] Args { get; set; }
 
-
-#pragma warning disable 1998
         private static async Task Main(string[] args)
-#pragma warning restore 1998
         {
 
-
-            var arguments = new Dictionary<string, string>();
+            Args = args;
+            Arguments = new Dictionary<string, string>();
             Thread.Sleep(10000);
             foreach (var argument in args)
             {
                 var splitted = argument.Split('=');
 
-                if (splitted.Length == 2) arguments[splitted[0]] = splitted[1];
+                if (splitted.Length == 2) Arguments[splitted[0]] = splitted[1];
             }
             if (args.Length > 0)
             {
-                CaseName = arguments["-casename"];
-                UserName = arguments["-user"];
-                Password = arguments["-password"];
-                StorePath = arguments["-storepath"];
-                ClientMachine = arguments["-clientmachine"];
+                CaseName = Arguments["-casename"];
+                UserName = Arguments["-user"];
+                Password = Arguments["-password"];
+                StorePath = Arguments["-storepath"];
+                ClientMachine = Arguments["-clientmachine"];
+                WinRmPort= Arguments["-winrmport"];
             }
 
             // Display message to user to provide parameters.
@@ -83,77 +84,67 @@ namespace WinCertTestConsole
                     Console.Write(JsonConvert.SerializeObject(invResponse));
                     Console.ReadLine();
                     break;
+
                 case "Management":
                     Console.WriteLine("Select Management Type Add or Remove");
                     string mgmtType;
-                    mgmtType = args.Length == 0 ? Console.ReadLine() : arguments["-managementtype"];
+                    mgmtType = args.Length == 0 ? Console.ReadLine() : Arguments["-managementtype"];
 
                     if (mgmtType?.ToUpper() == "ADD")
                     {
-                        if (args.Length > 0)
-                        {
-                            IpAddress = arguments["-ipaddress"];
-                            Port = arguments["-port"];
-                            Overwrite = arguments["-overwrite"];
-                            Renewal = arguments["-isrenew"];
-                            HostName = arguments["-hostname"];
-                            SiteName = arguments["-sitename"];
-                            SniCert = arguments["-snicert"];
-                            Protocol = arguments["-protocol"];
-                        }
-
-                        Console.WriteLine("Start Generated Cert in KF API");
-                        var client = new KeyfactorClient();
-                        var kfResult = client.EnrollCertificate($"{Domain}").Result;
-                        CertificateContent = kfResult.CertificateInformation.Pkcs12Blob;
-                        Console.WriteLine("End Generated Cert in KF API");
-
-                        if (Renewal.ToUpper() == "FALSE")
-                            SetRenewThumbprint(kfResult.CertificateInformation.Thumbprint);
-
-                        var jobConfiguration = GetManagementJobConfiguration(Renewal.ToUpper() == "TRUE" ? "ManagementRenewModified" : "Management");
-
-                        var mgmtSecretResolver = new Mock<IPAMSecretResolver>();
-                        mgmtSecretResolver
-                            .Setup(m => m.Resolve(It.Is<string>(s => s == jobConfiguration.ServerUsername)))
-                            .Returns(() => jobConfiguration.ServerUsername);
-                        mgmtSecretResolver
-                            .Setup(m => m.Resolve(It.Is<string>(s => s == jobConfiguration.ServerPassword)))
-                            .Returns(() => jobConfiguration.ServerPassword);
-                        var mgmt = new Management(mgmtSecretResolver.Object);
-
-
-                        var result = mgmt.ProcessJob(jobConfiguration);
-                        Console.Write(JsonConvert.SerializeObject(result));
-                        Console.ReadLine();
+                        ProcessManagementJob("Management", true);
                     }
-
-                    if (mgmtType != null && mgmtType.ToUpper() == "REMOVE")
+                    else if (mgmtType?.ToUpper() == "REMOVE")
                     {
-                        if (args.Length > 0)
-                        {
-                            CertAlias = arguments["-certalias"];
-                        }
-
-                        var jobConfig = GetRemoveJobConfiguration();
-
-                        var mgmtSecretResolver = new Mock<IPAMSecretResolver>();
-                        mgmtSecretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == jobConfig.ServerUsername)))
-                            .Returns(() => jobConfig.ServerUsername);
-                        mgmtSecretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == jobConfig.ServerPassword)))
-                            .Returns(() => jobConfig.ServerPassword);
-                        var mgmt = new Management(mgmtSecretResolver.Object);
-                        var result = mgmt.ProcessJob(jobConfig);
-                        Thread.Sleep(5000);
-                        Console.Write(JsonConvert.SerializeObject(result));
-                        Console.ReadLine();
+                        ProcessManagementJob("Remove", true);
                     }
 
                     break;
             }
+                    
         }
 
+        private static void ProcessManagementJob(string jobType, bool isRenewal)
+        {
+            if (Args.Length > 0)
+            {
+                IpAddress = Arguments["-ipaddress"];
+                Port = Arguments["-iisport"];
+                Overwrite = Arguments["-overwrite"];
+                Renewal = Arguments["-isrenew"];
+                HostName = Arguments["-hostname"];
+                SiteName = Arguments["-sitename"];
+                SniCert = Arguments["-snicert"];
+                Protocol = Arguments["-protocol"];
+                Domain = Arguments["-domain"];
+            }
 
+            Console.WriteLine($"Start Generated Cert in KF API for {jobType}");
+            var client = new KeyfactorClient();
+            var kfResult = client.EnrollCertificate($"{Domain}").Result;
+            CertificateContent = kfResult.CertificateInformation.Pkcs12Blob;
+            Console.WriteLine($"End Generated Cert in KF API for {jobType}");
+
+            if (Renewal.ToUpper() == "FALSE")
+            {
+                SetRenewThumbprint(kfResult.CertificateInformation.Thumbprint);
+            }
+
+            var jobConfiguration = GetManagementJobConfiguration(isRenewal ? "ManagementRenewModified" : jobType);
+
+            var mgmtSecretResolver = new Mock<IPAMSecretResolver>();
+            mgmtSecretResolver
+                .Setup(m => m.Resolve(It.Is<string>(s => s == jobConfiguration.ServerUsername)))
+                .Returns(() => jobConfiguration.ServerUsername);
+            mgmtSecretResolver
+                .Setup(m => m.Resolve(It.Is<string>(s => s == jobConfiguration.ServerPassword)))
+                .Returns(() => jobConfiguration.ServerPassword);
+            var mgmt = new Management(mgmtSecretResolver.Object);
+
+            var result = mgmt.ProcessJob(jobConfiguration);
+            Console.Write(JsonConvert.SerializeObject(result));
+            Console.ReadLine();
+        }
 
         public static bool GetItems(IEnumerable<CurrentInventoryItem> items)
         {
@@ -164,15 +155,18 @@ namespace WinCertTestConsole
         public static InventoryJobConfiguration GetInventoryJobConfiguration()
         {
             var fileContent = File.ReadAllText("Inventory.json").Replace("UserNameGoesHere", UserName)
-                .Replace("PasswordGoesHere", Password).Replace("TemplateNameGoesHere", StorePath)
+                .Replace("PasswordGoesHere", Password).Replace("StorePathGoesHere", StorePath)
                 .Replace("ClientMachineGoesHere", ClientMachine);
             var result =
                 JsonConvert.DeserializeObject<InventoryJobConfiguration>(fileContent);
             return result;
         }
 
-        public static ManagementJobConfiguration GetManagementJobConfiguration(string fileName)
+        private static ManagementJobConfiguration GetConfigurationFromFile(string fileName, params string[] replaceStrings)
         {
+            var hostNameReplaceString = "\"HostName\": null";
+            if (!string.IsNullOrEmpty(HostName))
+                hostNameReplaceString = $"\"HostName\": \"{HostName}\"";
 
             var overWriteReplaceString = "\"Overwrite\": false";
             if (Overwrite.ToUpper() == "TRUE")
@@ -180,26 +174,46 @@ namespace WinCertTestConsole
                 overWriteReplaceString = "\"Overwrite\": true";
             }
 
-            var hostNameReplaceString = "\"HostName\": null";
-            if (!string.IsNullOrEmpty(HostName))
-                hostNameReplaceString = $"\"HostName\": \"{HostName}\"";
+            var replaceDict = new Dictionary<string,string>();
+            replaceDict.Add("UserNameGoesHere",UserName);
+            replaceDict.Add("PasswordGoesHere",Password);
+            replaceDict.Add("StorePathGoesHere",StorePath);
+            replaceDict.Add("AliasGoesHere",CertAlias);
+            replaceDict.Add("ClientMachineGoesHere",ClientMachine);
+            replaceDict.Add("WinRmPortGoesHere",WinRmPort);
+            replaceDict.Add("IPAddressGoesHere",IpAddress);
+            replaceDict.Add("SiteNameGoesHere",SiteName);
+            replaceDict.Add("ProtocolGoesHere",Protocol);
+            replaceDict.Add("SniFlagGoesHere",SniCert);
+            replaceDict.Add("IISPortGoesHere",Port);
+            replaceDict.Add("PortGoesHere", Port);
+            replaceDict.Add("HostNameGoesHere", HostName);
+            replaceDict.Add("CertificateContentGoesHere", CertificateContent);
             
-            var fileContent = File.ReadAllText($"{fileName}.json").Replace("UserNameGoesHere", UserName)
-                .Replace("PasswordGoesHere", Password).Replace("TemplateNameGoesHere", StorePath)
-                .Replace("AliasGoesHere", CertAlias)
-                .Replace("ClientMachineGoesHere", ClientMachine)
-                .Replace("PortGoesHere", Port)
-                .Replace("IPAddressGoesHere", IpAddress)
-                .Replace("SiteNameGoesHere", SiteName)
-                .Replace("ProtocolGoesHere", Protocol)
-                .Replace("SniFlagGoesHere", SniCert)
-                .Replace("\"HostName\": null", hostNameReplaceString)
-                .Replace("\"Overwrite\": false", overWriteReplaceString)
-                .Replace("CertificateContentGoesHere", CertificateContent);
-            var result =
-                JsonConvert.DeserializeObject<ManagementJobConfiguration>(fileContent);
+
+            replaceDict.Add("\"HostName\": null",hostNameReplaceString);
+            replaceDict.Add("\"Overwrite\": false", overWriteReplaceString);
+
+            var fileContent = File.ReadAllText($"{fileName}.json");
+            foreach (var replaceString in replaceDict)
+            {
+                fileContent = fileContent.Replace(replaceString.Key, replaceString.Value);
+            }
+
+            var result = JsonConvert.DeserializeObject<ManagementJobConfiguration>(fileContent);
             return result;
         }
+
+        public static ManagementJobConfiguration GetManagementJobConfiguration(string fileName)
+        {
+            return GetConfigurationFromFile(fileName, CertificateContent);
+        }
+
+        public static ManagementJobConfiguration GetRemoveJobConfiguration()
+        {
+            return GetConfigurationFromFile("ManagementRemove", string.Empty);
+        }
+
 
         public static void SetRenewThumbprint(string lastThumbprint)
         {
@@ -208,17 +222,5 @@ namespace WinCertTestConsole
             File.WriteAllText("ManagementRenewModified.json", fileContent, Encoding.UTF8);
         }
 
-
-        public static ManagementJobConfiguration GetRemoveJobConfiguration()
-        {
-            var fileContent = File.ReadAllText("ManagementRemove.json").Replace("UserNameGoesHere", UserName)
-                .Replace("PasswordGoesHere", Password).Replace("TemplateNameGoesHere", StorePath)
-                .Replace("AliasGoesHere", CertAlias)
-                .Replace("ClientMachineGoesHere", ClientMachine)
-                .Replace("virtualServerNameGoesHere", VirtualServerName);
-            var result =
-                JsonConvert.DeserializeObject<ManagementJobConfiguration>(fileContent);
-            return result;
-        }
     }
 }

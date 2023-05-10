@@ -1,39 +1,38 @@
 ﻿{
   "LastInventory": [],
   "CertificateStoreDetails": {
-    "ClientMachine": "iisbindingstest.command.local",
-    "StorePath": "My",
+    "ClientMachine": "ClientMachineGoesHere",
+    "StorePath": "StorePathGoesHere",
     "StorePassword": null,
-    "Properties": "{\"spnwithport\":\"SpnWithPortGoesHere\",\"WinRm Protocol\":\"WinRmProtocolGoesHere\",\"WinRm Port\":\"WinRmPortGoesHere\",\"ServerUsername\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
+    "Properties": "{\"spnwithport\":\"false\",\"WinRm Protocol\":\"ProtocolGoesHere\",\"WinRm Port\":\"WinRmPortGoesHere\",\"ServerUsername\":\"UserNameGoesHere\",\"ServerPassword\":\"PasswordGoesHere\",\"ServerUseSsl\":\"true\"}",
     "Type": 104
   },
   "OperationType": 2,
-  "Overwrite": true,
+  "Overwrite": false,
   "JobCertificate": {
     "Thumbprint": null,
     "Contents": "CertificateContentGoesHere",
     "Alias": "",
-    "PrivateKeyPassword": "rknGjZm57qeJ"
+    "PrivateKeyPassword": "sldfklsdfsldjfk"
   },
   "JobCancelled": false,
   "ServerError": null,
-  "JobHistoryId": 26014,
+  "JobHistoryId": 26009,
   "RequestStatus": 1,
-  "ServerUsername": null,
-  "ServerPassword": null,
+  "ServerUsername": "UserNameGoesHere",
+  "ServerPassword": "PasswordGoesHere",
   "UseSSL": true,
   "JobProperties": {
-    "Port": "PortGoesHere",
+    "Port": "IISPortGoesHere",
     "IPAddress": "IPAddressGoesHere",
-    "HostName": "HostNameGoesHere",
+    "HostName": null,
     "SiteName": "SiteNameGoesHere",
     "SniFlag": "SniFlagGoesHere",
     "Protocol": "ProtocolGoesHere",
     "ProviderName": null,
-    "SAN": null,
-    "RenewalThumbprint": "ThumbprintGoesHere"
+    "SAN": null
   },
   "JobTypeId": "00000000-0000-0000-0000-000000000000",
-  "JobId": "d48a41ac-2767-425f-b27f-f48429cc50b7",
+  "JobId": "5f5addc3-afc9-4789-a0fe-04c6e623c233",
   "Capability": "CertStores.IISU.Management"
 }

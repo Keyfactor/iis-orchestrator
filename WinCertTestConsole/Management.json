@@ -4,7 +4,7 @@
     "ClientMachine": "ClientMachineGoesHere",
     "StorePath": "StorePathGoesHere",
     "StorePassword": null,
-    "Properties": "{\"spnwithport\":\"SpnWithPortGoesHere\",\"WinRm Protocol\":\"WinRmProtocolGoesHere\",\"WinRm Port\":\"WinRmPortGoesHere\",\"ServerUsername\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
+    "Properties": "{\"spnwithport\":\"false\",\"WinRm Protocol\":\"ProtocolGoesHere\",\"WinRm Port\":\"WinRmPortGoesHere\",\"ServerUsername\":\"UserNameGoesHere\",\"ServerPassword\":\"PasswordGoesHere\",\"ServerUseSsl\":\"true\"}",
     "Type": 104
   },
   "OperationType": 2,
@@ -13,17 +13,17 @@
     "Thumbprint": null,
     "Contents": "CertificateContentGoesHere",
     "Alias": "",
-    "PrivateKeyPassword": "WSymbLA6DbYA"
+    "PrivateKeyPassword": "sldfklsdfsldjfk"
   },
   "JobCancelled": false,
   "ServerError": null,
   "JobHistoryId": 26009,
   "RequestStatus": 1,
-  "ServerUsername": null,
-  "ServerPassword": null,
+  "ServerUsername": "UserNameGoesHere",
+  "ServerPassword": "PasswordGoesHere",
   "UseSSL": true,
   "JobProperties": {
-    "Port": "PortGoesHere",
+    "Port": "IISPortGoesHere",
     "IPAddress": "IPAddressGoesHere",
     "HostName": null,
     "SiteName": "SiteNameGoesHere",

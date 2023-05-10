@@ -1,15 +1,32 @@
 @echo off
 
-cd C:\Users\bhill\source\repos\iis-orchestrator\WinCertTestConsole\bin\Debug\netcoreapp3.1
+cd C:\Users\KFAdmin\source\repos\iis-orchestrator\WinCertTestConsole\bin\Debug\netcoreapp3.1
 set ClientMachine=iisbindingstest.command.local
-set user=null
-Set password=null
+set user=KFAdmin
+Set password=Wh5G2Tc6VBYjSMpC
 set storepath=My
 
 echo ***********************************
 echo Starting Management Test Cases
 echo ***********************************
 set casename=Management
+
+#goto SNI
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC1 %mgt% new Cert To New Binding.  Should do the %mgt%, add the binding and add the cert to the binding
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname= -sitename=FirstSite -domain=www.fromtesttool.com -snicert="0 - No SNI" -iisport=443 -protocol=https -overwrite=%overwrite%
 
 
 set cert=%random%
@@ -19,13 +36,90 @@ set trusted=false
 set overwrite=false
 
 echo ************************************************************************************************************************
-echo TC1 %mgt% with no biding information.  Should do the %mgt% but give you a warning about missing bindings *not* trusted root
+echo TC2 %mgt% /update Cert On Existing Binding.  Should do the %mgt%, and update the cert on the binding to the new cert
 echo ************************************************************************************************************************
 echo overwrite: %overwrite%
 echo trusted: %trusted%
 echo cert name: %cert%
 
-WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -port=443 -hostname= -sitename=FirstSite -snicert="0 - No SNI" -protocol=https -overwrite=%overwrite%
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname= -sitename=FirstSite -domain=www.fromtesttool2.com -snicert="0 - No SNI" -iisport=443 -protocol=https -overwrite=%overwrite%
+
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC3 %mgt% /update Cert set SNI.  Should do the %mgt%, the cert on the new binding to and Set SNI
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=* -winrmport=5986 -hostname=www.snitest.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -iisport=443 -snicert="1 - SNI Enabled" -protocol=https -overwrite=%overwrite%
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC4 %mgt% new bind, new sni, new ip.  Should do the %mgt%, of the cert on new binding set new IP and Set SNI
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.snitest.com -sitename=FirstSite -domain=www.fromtesttool2sni.com  -iisport=443 -snicert="1 - SNI Enabled" -protocol=https -overwrite=%overwrite%
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC5 %mgt% new bind, new sni, same ip.  Should do the %mgt%, of the cert on new binding set same IP and Set SNI new host
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=443 -protocol=https -overwrite=%overwrite%
+
+set cert=%random%
+set casename=Management
+set mgt=add
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC6 %mgt% new bind, same ip, same host, new port. Should do the %mgt%, of the cert on new binding b/c different port
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=4443 -protocol=https -overwrite=%overwrite%
+
+#:SNI
+set cert=%random%
+set casename=Management
+set mgt=remove
+set trusted=false
+set overwrite=false
+
+echo ************************************************************************************************************************
+echo TC7 %mgt% remove TC6 Cert. Should do the %mgt%, of the cert
+echo ************************************************************************************************************************
+echo overwrite: %overwrite%
+echo trusted: %trusted%
+echo cert name: %cert%
+
+WinCertTestConsole.exe -clientmachine=%ClientMachine% -casename=%casename% -user=%user% -password=%password% -storepath=%storepath% -managementtype=%mgt% -isrenew=false -ipaddress=10.3.10.12 -winrmport=5986 -hostname=www.tc5.com -sitename=FirstSite -domain=www.fromtesttool2sni.com -snicert="1 - SNI Enabled" -iisport=4443 -protocol=https -overwrite=%overwrite%
 
 echo:
 echo ***********************************

@@ -4,7 +4,7 @@
     "ClientMachine": "ClientMachineGoesHere",
     "StorePath": "StorePathGoesHere",
     "StorePassword": null,
-    "Properties": "{\"spnwithport\":\"SpnWithPortGoesHere\",\"WinRm Protocol\":\"WinRmProtocolGoesHere\",\"WinRm Port\":\"5986\",\"WinRmPortGoesHere\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
+    "Properties": "{\"spnwithport\":\"false\",\"WinRm Protocol\":\"ProtocolGoesHere\",\"WinRm Port\":\"WinRmPortGoesHere\",\"ServerUsername\":\"UserNameGoesHere\",\"ServerPassword\":\"PasswordGoesHere\",\"ServerUseSsl\":\"true\"}",
     "Type": 104
   },
   "OperationType": 3,
@@ -23,9 +23,9 @@
   "ServerPassword": null,
   "UseSSL": true,
   "JobProperties": {
-    "Port": "PortGoesHere",
+    "Port": "IISPortGoesHere",
     "IPAddress": "IPAddressGoesHere",
-    "HostName": "HostNameGoesHere",
+    "HostName": null,
     "SiteName": "SiteNameGoesHere",
     "SniFlag": "SniFlagGoesHere",
     "Protocol": "ProtocolGoesHere",

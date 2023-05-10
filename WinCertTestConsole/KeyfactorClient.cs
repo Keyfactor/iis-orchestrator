@@ -10,12 +10,12 @@ namespace WinCertTestConsole
     {
         public async Task<KeyfactorEnrollmentResult> EnrollCertificate(string commonName)
         {
-            var options = new RestClientOptions("https://SomeKeyfactorCommandBaseUrl");
+            var options = new RestClientOptions("https://bhillkf10.kfdelivery.com");
             var client = new RestClient(options);
             var request = new RestRequest("/KeyfactorAPI/Enrollment/PFX", Method.Post);
             request.AddHeader("X-Keyfactor-Requested-With", "APIClient");
             request.AddHeader("x-certificateformat", "PFX");
-            request.AddHeader("Authorization", "Basic SomeKeyFactorApiKey");
+            request.AddHeader("Authorization", "Basic Y29tbWFuZFxLRkFkbWluOldoNUcyVGM2VkJZalNNcEM=");
             request.AddHeader("Content-Type", "application/json");
             var enrollRequest = new KeyfactorEnrollmentRequest
             {
@@ -25,7 +25,7 @@ namespace WinCertTestConsole
                 Subject = $"CN={commonName}",
                 IncludeChain = true,
                 RenewalCertificateId = 0,
-                CertificateAuthority = "SomeCert\\Authority",
+                CertificateAuthority = "DC-CA.Command.local\\CommandCA1",
                 Timestamp = DateTime.Now,
                 Template = "2YearTestWebServer"
             };
