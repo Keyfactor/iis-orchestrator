@@ -1,13 +1,13 @@
-﻿using Keyfactor.Orchestrators.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
-using Newtonsoft.Json;
-using Moq;
+using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
+using Moq;
+using Newtonsoft.Json;
 
 namespace WinCertTestConsole
 {
@@ -19,13 +19,10 @@ namespace WinCertTestConsole
         public static string CertAlias { get; set; }
         public static string ClientMachine { get; set; }
         public static string StorePath { get; set; }
-        public static string VirtualServerName { get; set; }
-        public static string KeyPairName { get; set; }
         public static string Overwrite { get; set; }
         public static string Renewal { get; set; }
         public static string Domain { get; set; }
         public static string SniCert { get; set; }
-        public static string ManagementType { get; set; }
         public static string CertificateContent { get; set; }
         public static string Protocol { get; set; }
         public static string SiteName { get; set; }
@@ -37,9 +34,10 @@ namespace WinCertTestConsole
         public static Dictionary<string, string> Arguments { get; set; }
         public static string[] Args { get; set; }
 
+#pragma warning disable 1998
         private static async Task Main(string[] args)
+#pragma warning restore 1998
         {
-
             Args = args;
             Arguments = new Dictionary<string, string>();
             Thread.Sleep(10000);
@@ -49,6 +47,7 @@ namespace WinCertTestConsole
 
                 if (splitted.Length == 2) Arguments[splitted[0]] = splitted[1];
             }
+
             if (args.Length > 0)
             {
                 CaseName = Arguments["-casename"];
@@ -56,7 +55,7 @@ namespace WinCertTestConsole
                 Password = Arguments["-password"];
                 StorePath = Arguments["-storepath"];
                 ClientMachine = Arguments["-clientmachine"];
-                WinRmPort= Arguments["-winrmport"];
+                WinRmPort = Arguments["-winrmport"];
             }
 
             // Display message to user to provide parameters.
@@ -89,17 +88,11 @@ namespace WinCertTestConsole
                     mgmtType = args.Length == 0 ? Console.ReadLine() : Arguments["-managementtype"];
 
                     if (mgmtType?.ToUpper() == "ADD")
-                    {
                         ProcessManagementJob("Management");
-                    }
-                    else if (mgmtType?.ToUpper() == "REMOVE")
-                    {
-                        ProcessManagementJob("Remove");
-                    }
+                    else if (mgmtType?.ToUpper() == "REMOVE") ProcessManagementJob("Remove");
 
                     break;
             }
-                    
         }
 
         private static void ProcessManagementJob(string jobType)
@@ -131,14 +124,16 @@ namespace WinCertTestConsole
 
             if (!isSetup)
             {
-                jobConfiguration = jobType.ToUpper() == "REMOVE" ? GetRemoveJobConfiguration() : GetManagementJobConfiguration("Management");
+                jobConfiguration = jobType.ToUpper() == "REMOVE"
+                    ? GetRemoveJobConfiguration()
+                    : GetManagementJobConfiguration("Management");
 
                 if (isRenewal)
                 {
                     var setupConfiguration = GetManagementJobConfiguration("RenewalSetup");
                     var renewalThumbprint = setupConfiguration.JobCertificate.Thumbprint;
-                    jobConfiguration.JobProperties.Add("RenewalThumbprint",renewalThumbprint);
-                }               
+                    jobConfiguration.JobProperties.Add("RenewalThumbprint", renewalThumbprint);
+                }
             }
             else
             {
@@ -182,36 +177,32 @@ namespace WinCertTestConsole
                 hostNameReplaceString = $"\"HostName\": \"{HostName}\"";
 
             var overWriteReplaceString = "\"Overwrite\": false";
-            if (Overwrite.ToUpper() == "TRUE")
+            if (Overwrite.ToUpper() == "TRUE") overWriteReplaceString = "\"Overwrite\": true";
+
+            var replaceDict = new Dictionary<string, string>
             {
-                overWriteReplaceString = "\"Overwrite\": true";
-            }
+                {"UserNameGoesHere", UserName},
+                {"PasswordGoesHere", Password},
+                {"StorePathGoesHere", StorePath},
+                {"AliasGoesHere", CertAlias},
+                {"ClientMachineGoesHere", ClientMachine},
+                {"WinRmPortGoesHere", WinRmPort},
+                {"IPAddressGoesHere", IpAddress},
+                {"SiteNameGoesHere", SiteName},
+                {"ProtocolGoesHere", Protocol},
+                {"SniFlagGoesHere", SniCert},
+                {"IISPortGoesHere", Port},
+                {"PortGoesHere", Port},
+                {"HostNameGoesHere", HostName},
+                {"CertificateContentGoesHere", CertificateContent},
+                {"\"HostName\": null", hostNameReplaceString},
+                {"\"Overwrite\": false", overWriteReplaceString}
+            };
 
-            var replaceDict = new Dictionary<string,string>();
-            replaceDict.Add("UserNameGoesHere",UserName);
-            replaceDict.Add("PasswordGoesHere",Password);
-            replaceDict.Add("StorePathGoesHere",StorePath);
-            replaceDict.Add("AliasGoesHere",CertAlias);
-            replaceDict.Add("ClientMachineGoesHere",ClientMachine);
-            replaceDict.Add("WinRmPortGoesHere",WinRmPort);
-            replaceDict.Add("IPAddressGoesHere",IpAddress);
-            replaceDict.Add("SiteNameGoesHere",SiteName);
-            replaceDict.Add("ProtocolGoesHere",Protocol);
-            replaceDict.Add("SniFlagGoesHere",SniCert);
-            replaceDict.Add("IISPortGoesHere",Port);
-            replaceDict.Add("PortGoesHere", Port);
-            replaceDict.Add("HostNameGoesHere", HostName);
-            replaceDict.Add("CertificateContentGoesHere", CertificateContent);
-            
-
-            replaceDict.Add("\"HostName\": null",hostNameReplaceString);
-            replaceDict.Add("\"Overwrite\": false", overWriteReplaceString);
 
             var fileContent = File.ReadAllText($"{fileName}.json");
             foreach (var replaceString in replaceDict)
-            {
                 fileContent = fileContent.Replace(replaceString.Key, replaceString.Value);
-            }
 
             var result = JsonConvert.DeserializeObject<ManagementJobConfiguration>(fileContent);
             return result;
