@@ -66,7 +66,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 long JobHistoryID = config.JobHistoryId;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                myRunspace = PSHelper.GetClientPSRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
 
                 var complete = new JobResult
                 {

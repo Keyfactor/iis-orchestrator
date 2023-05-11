@@ -1,0 +1,29 @@
+﻿{
+	"LastInventory": [
+		{
+			"Alias": "479D92068614E33B3CB84123AF76F1C40DF4B6F6",
+			"PrivateKeyEntry": true,
+			"Thumbprints": [
+				"479D92068614E33B3CB84123AF76F1C40DF4B6F6"
+			]
+		}
+	],
+	"CertificateStoreDetails": {
+		"ClientMachine": "iisbindingstest.command.local",
+		"StorePath": "My",
+		"StorePassword": "",
+		"Properties": "{\"spnwithport\":\"false\",\"WinRm Protocol\":\"https\",\"WinRm Port\":\"5986\",\"ServerUsername\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
+		"Type": 104
+	},
+	"JobCancelled": false,
+	"ServerError": null,
+	"JobHistoryId": 26010,
+	"RequestStatus": 1,
+	"ServerUsername": null,
+	"ServerPassword": null,
+	"UseSSL": true,
+	"JobProperties": null,
+	"JobTypeId": "00000000-0000-0000-0000-000000000000",
+	"JobId": "e92f7350-251c-4c0a-9e5d-9b3fdb745ca9",
+	"Capability": "CertStores.IISU.Inventory"
+}
