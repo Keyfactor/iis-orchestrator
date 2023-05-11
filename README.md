@@ -110,6 +110,8 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note: There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
 
+**Note: If Looking to use GSMA Accounts to run the Service Kefyactor Command 10.3 or greater is required for No Value checkbox to work**
+
 ## Creating New Certificate Store Types
 Currently this orchestrator handles two extensions: IISU for IIS servers with bound certificates and WinCert for general Windows Certificates.
 Below describes how each of these certificate store types are created and configured.
@@ -156,8 +158,8 @@ Name|Display Name|Type|Default Value / Options|Required|Description
 WinRm Protocol|WinRm Protocol|Multiple Choice| https,http |Yes|Protocol that target server WinRM listener is using
 WinRm Port|WinRm Port|String|5986|Yes| Port that target server WinRM listener is using. Typically 5985 for HTTP and 5986 for HTTPS
 spnwithport|SPN With Port|Bool|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
-ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created)
-ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created)
+ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created).   Check the No Value Checkbox when using GSMA Accounts.
+ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created).  Check the No Value Checkbox when using GSMA Accounts.
 ServerUseSsl|Use SSL|Bool|true|Yes|Determine whether the server uses SSL or not (This field is automatically created)
 
 *Note that some of the Names in the first column above have spaces and some do not, it is important to configure the Name field exactly as above.*
