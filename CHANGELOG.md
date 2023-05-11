@@ -11,7 +11,7 @@
 * Significant readme cleanup
 
 2.1.0
-* Fixed issue that was occuring during renewal when there were bindings outside of http and https like net.tcp
+* Fixed issue that was occurring during renewal when there were bindings outside of http and https like net.tcp
 * Added PAM registration/initialization documentation in README.md
 * Resolved Null HostName error 
 * Added WinCert Cert Store Type
@@ -20,7 +20,7 @@
 
 2.0.0
 * Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
-* Local PAM Support added (requires Univesal Orchestrator Framework version 10.1)
+* Local PAM Support added (requires Universal Orchestrator Framework version 10.1)
 * Certificate store type changed from IISBin to IISU. See readme for migration notes.
 
 
