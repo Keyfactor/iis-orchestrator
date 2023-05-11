@@ -29,8 +29,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             _logger = LogHandler.GetClassLogger<PSHelper>();
             _logger.MethodEntry();
-
-            var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{WinRmPort}/wsman"));
+            if (clientMachineName.ToLower() != "localhost")
+            {
+                var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{WinRmPort}/wsman"));
             connInfo.IncludePortInSPN = includePortInSPN;
             if (!string.IsNullOrEmpty(serverUserName))
             {
@@ -39,6 +40,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 connInfo.Credential = new PSCredential(serverUserName, pw);
             }
             return RunspaceFactory.CreateRunspace(connInfo);
+            }
+            else return RunspaceFactory.CreateRunspace();
         }
     }
 }
