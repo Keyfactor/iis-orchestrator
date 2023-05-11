@@ -47,14 +47,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             bool isEmpty = (config.JobProperties.Count == 0);       // Check if the dictionary is empty or not
             if (!isEmpty)
             {
-                managementParser.CertificateStoreDetailProperties.SiteName = config.JobProperties["SiteName"].ToString();
-                managementParser.CertificateStoreDetailProperties.Port = config.JobProperties["Port"].ToString();
-                managementParser.CertificateStoreDetailProperties.HostName = config.JobProperties["HostName"]?.ToString();
-                managementParser.CertificateStoreDetailProperties.Protocol = config.JobProperties["Protocol"].ToString();
-                managementParser.CertificateStoreDetailProperties.SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
-                managementParser.CertificateStoreDetailProperties.IPAddress = config.JobProperties["IPAddress"].ToString();
-                managementParser.CertificateStoreDetailProperties.ProviderName = config.JobProperties["ProviderName"]?.ToString();
-                managementParser.CertificateStoreDetailProperties.SAN = config.JobProperties["SAN"]?.ToString();
+                object value = "";
+                if (config.JobProperties.TryGetValue("SiteName", out value)) managementParser.CertificateStoreDetailProperties.SiteName = config.JobProperties["SiteName"].ToString();
+                if (config.JobProperties.TryGetValue("Port", out value)) managementParser.CertificateStoreDetailProperties.Port = config.JobProperties["Port"].ToString();
+                if (config.JobProperties.TryGetValue("HostName", out value)) managementParser.CertificateStoreDetailProperties.HostName = config.JobProperties["HostName"]?.ToString();
+                if (config.JobProperties.TryGetValue("Protocol", out value)) managementParser.CertificateStoreDetailProperties.Protocol = config.JobProperties["Protocol"].ToString();
+                if (config.JobProperties.TryGetValue("SniFlag", out value)) managementParser.CertificateStoreDetailProperties.SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
+                if (config.JobProperties.TryGetValue("IPAddress", out value)) managementParser.CertificateStoreDetailProperties.IPAddress = config.JobProperties["IPAddress"].ToString();
+                if (config.JobProperties.TryGetValue("ProviderName", out value)) managementParser.CertificateStoreDetailProperties.ProviderName = config.JobProperties["ProviderName"]?.ToString();
+                if (config.JobProperties.TryGetValue("SAN", out value)) managementParser.CertificateStoreDetailProperties.SAN = config.JobProperties["SAN"]?.ToString();
             }
 
             // Management Base
