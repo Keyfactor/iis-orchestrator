@@ -5,6 +5,7 @@
 	* Display name for WinCert changed to "Windows Certificate".
 	* Display names for several Store and Entry parameters changed to be more descriptive and UI friendly.
 * Significant readme cleanup
+* Add Support for GMSA Account by using no value for UserId and Password
 
 2.1.0
 * Fixed issue that was occuring during renewal when there were bindings outside of http and https like net.tcp
