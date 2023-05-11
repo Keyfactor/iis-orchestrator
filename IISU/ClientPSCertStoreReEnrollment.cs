@@ -52,8 +52,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 var serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 var serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
-
-
                 // Extract values necessary to create remote PS connection
                 JobProperties properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
@@ -62,11 +60,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 {
                     IncludePortInSPN = properties.SpnPortFlag
                 };
-                var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                _logger.LogTrace($"Credentials: UserName:{serverUserName}");
+                //If using a GSMA account or similar, no credentials are needed
+                if (!string.IsNullOrEmpty(config.ServerUsername))
+                {
+                    _logger.LogTrace($"Credentials Specified");
+                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                    _logger.LogTrace($"Credentials: UserName:{serverUserName}");
 
-                connectionInfo.Credential = new PSCredential(serverUserName, pw);
-                _logger.LogTrace($"PSCredential Created {pw}");
+                    connectionInfo.Credential = new PSCredential(serverUserName, pw);
+                    _logger.LogTrace($"PSCredential Created {pw}");
+                }
 
                 // Establish new remote ps session
                 _logger.LogTrace("Creating remote PS Workspace");
