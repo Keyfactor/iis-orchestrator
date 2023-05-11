@@ -1,9 +1,9 @@
 @echo off
 
-cd C:\Users\KFAdmin\source\repos\iis-orchestrator\WinCertTestConsole\bin\Debug\netcoreapp3.1
-set ClientMachine=iisbindingstest.command.local
-set user=KFAdmin
-Set password=Wh5G2Tc6VBYjSMpC
+cd C:\Users\SomePathToBinaries
+set ClientMachine=SomeIISMachine
+set user=SomeUser
+Set password=SomePasssword
 set storepath=My
 
 echo ***********************************
