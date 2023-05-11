@@ -1,3 +1,15 @@
+2.2.0
+* Add Support for GMSA Account by using no value for UserId and Password
+* When using localhost for client machine, no remote PowerShell workspace will be generated.  This change was tested using KF Command 10.3.
+
+2.1.1
+* Fixed the missing site name error when issuing a WinCert job when writing trace log settings to the log file.
+* Several display names changed in the documented certificate store type definitions. There are no changes to the internal type or parameter names, so no migration is necessary for currently configured stores.
+	* Display name for IISU changed to "IIS Bound Certificate".
+	* Display name for WinCert changed to "Windows Certificate".
+	* Display names for several Store and Entry parameters changed to be more descriptive and UI friendly.
+* Significant readme cleanup
+
 2.1.0
 * Fixed issue that was occuring during renewal when there were bindings outside of http and https like net.tcp
 * Added PAM registration/initialization documentation in README.md
