@@ -185,7 +185,7 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category | Select IIS Bound Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
-Client Machine | Hostname of the IIS server containing the certificate store to be managed.
+Client Machine | Hostname of the IIS server containing the certificate store to be managed.  If this value is 'localhost' no WinRM session will be created and a local PowerShell workspace will be used against the local IIS server, otherwise a WinRM session will be created to the hostname to manage a remote IIS server.
 Store Path | Windows certificate store to manage. Choose "My" for the Personal Store or "WebHosting" for the Web Hosting Store. 
 Orchestrator | Select an approved orchestrator capable of managing IIS Bound Certificates (one that has declared the IISU capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
@@ -212,7 +212,7 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category | Select Windows Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
-Client Machine | Hostname of the server containing the certificate store to be managed.
+Client Machine | Hostname of the server containing the certificate store to be managed.  If this value is 'localhost' no WinRM session will be created and a local PowerShell workspace will be used against the local server, otherwise a WinRM session will be created to the hostname to manage a remote server.
 Store Path | Windows certificate store to manage. Store must exist in the Local Machine store on the target server. 
 Orchestrator | Select an approved orchestrator capable of managing Windows Certificates (one that has declared the WinCert capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
