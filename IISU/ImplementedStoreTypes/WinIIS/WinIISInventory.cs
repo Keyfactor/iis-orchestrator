@@ -15,6 +15,7 @@
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.PowerShell;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,7 +39,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             // Contains the inventory items to be sent back to KF
             List<CurrentInventoryItem> myBoundCerts = new List<CurrentInventoryItem>();
 
-            using (var ps = PowerShell.Create())
+            using (PowerShell ps = PowerShell.Create())
             {
                 ps.Runspace = runSpace;
 

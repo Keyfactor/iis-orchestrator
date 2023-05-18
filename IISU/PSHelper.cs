@@ -29,7 +29,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             _logger = LogHandler.GetClassLogger<PsHelper>();
             _logger.MethodEntry();
+
             if (clientMachineName.ToLower() != "localhost")
+            
             {
                 var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{winRmPort}/wsman"));
                 connInfo.IncludePortInSPN = includePortInSpn;

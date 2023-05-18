@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation.Runspaces;
 using System.Management.Automation;
+using System.Management.Automation.Remoting;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -28,6 +29,7 @@ using Microsoft.Extensions.Logging;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using System.Linq;
 using System.IO;
+using Microsoft.PowerShell;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -53,38 +55,26 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 var serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
                 // Extract values necessary to create remote PS connection
-                JobProperties properties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
+                JobProperties jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
                     new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
 
-                WSManConnectionInfo connectionInfo = new WSManConnectionInfo(new Uri($"{properties?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{properties?.WinRmPort}/wsman"))
-                {
-                    IncludePortInSPN = properties.SpnPortFlag
-                };
-                //If using a GSMA account or similar, no credentials are needed
-                if (!string.IsNullOrEmpty(config.ServerUsername))
-                {
-                    _logger.LogTrace($"Credentials Specified");
-                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                    _logger.LogTrace($"Credentials: UserName:{serverUserName}");
+                string protocol = jobProperties.WinRmProtocol;
+                string port = jobProperties.WinRmPort;
+                bool IncludePortInSPN = jobProperties.SpnPortFlag;
+                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
+                string storePath = config.CertificateStoreDetails.StorePath;
 
-                    connectionInfo.Credential = new PSCredential(serverUserName, pw);
-                    _logger.LogTrace($"PSCredential Created {pw}");
-                }
-
-                // Establish new remote ps session
-                _logger.LogTrace("Creating remote PS Workspace");
-                using var runSpace = RunspaceFactory.CreateRunspace(connectionInfo);
-                _logger.LogTrace("Workspace created");
+                _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
+                using var runSpace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                
+                _logger.LogTrace("Runspace created");
                 runSpace.Open();
-                _logger.LogTrace("Workspace opened");
+                _logger.LogTrace("Runspace opened");
 
-                // NEW
-                var ps = PowerShell.Create();
+                PowerShell ps = PowerShell.Create();
                 ps.Runspace = runSpace;
 
                 string CSR = string.Empty;
-
-                string storePath = config.CertificateStoreDetails.StorePath;
 
                 var subjectText = config.JobProperties["subjectText"];
                 var providerName = config.JobProperties["ProviderName"];
@@ -103,23 +93,23 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 ps.AddScript("if (Test-Path $csrFilename) { Remove-Item $csrFilename }");
 
-                ps.AddScript($"Set-Content $infFilename [NewRequest]");
-                ps.AddScript($"Add-Content $infFilename 'Subject = \"{subjectText}\"'");
-                ps.AddScript($"Add-Content $infFilename 'ProviderName = \"{providerName}\"'");
-                ps.AddScript($"Add-Content $infFilename 'MachineKeySet = True'");
-                ps.AddScript($"Add-Content $infFilename 'HashAlgorithm = SHA256'");
-                ps.AddScript($"Add-Content $infFilename 'KeyAlgorithm = {keyType}'");
-                ps.AddScript($"Add-Content $infFilename 'KeyLength={keySize}'");
-                ps.AddScript($"Add-Content $infFilename 'KeySpec = 0'");
+                ps.AddScript($"Set-Content $infFilename -Value [NewRequest]");
+                ps.AddScript($"Add-Content $infFilename -Value 'Subject = \"{subjectText}\"'");
+                ps.AddScript($"Add-Content $infFilename -Value 'ProviderName = \"{providerName}\"'");
+                ps.AddScript($"Add-Content $infFilename -Value 'MachineKeySet = True'");
+                ps.AddScript($"Add-Content $infFilename -Value 'HashAlgorithm = SHA256'");
+                ps.AddScript($"Add-Content $infFilename -Value 'KeyAlgorithm = {keyType}'");
+                ps.AddScript($"Add-Content $infFilename -Value 'KeyLength={keySize}'");
+                ps.AddScript($"Add-Content $infFilename -Value 'KeySpec = 0'");
 
                 if (SAN != null)
                 {
-                    ps.AddScript($"Add-Content $infFilename '[Extensions]'");
-                    ps.AddScript(@"Add-Content $infFilename '2.5.29.17 = ""{text}""'");
+                    ps.AddScript($"Add-Content $infFilename -Value '[Extensions]'");
+                    ps.AddScript(@"Add-Content $infFilename -Value '2.5.29.17 = ""{text}""'");
 
                     foreach (string s in SAN.ToString().Split("&"))
                     {
-                        ps.AddScript($"Add-Content $infFilename '_continue_ = \"{s + "&"}\"'");
+                        ps.AddScript($"Add-Content $infFilename -Value '_continue_ = \"{s + "&"}\"'");
                     }
                 }
 
@@ -156,7 +146,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 try
                 {
-                    ps.AddScript($"$CSR = Get-Content $csrFilename");
+                    ps.AddScript($"$CSR = Get-Content $csrFilename -Raw");
                     _logger.LogTrace("Attempting to get the contents of the CSR file.");
                     results = ps.Invoke();
                     _logger.LogTrace("Finished getting the CSR Contents.");
@@ -183,11 +173,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
 
                 // Get the byte array
-                var CSRContent = ps.Runspace.SessionStateProxy.GetVariable("CSR").ToString();
+                var RawContent = runSpace.SessionStateProxy.GetVariable("CSR");
 
                 // Sign CSR in Keyfactor
                 _logger.LogTrace("Get the signed CSR from KF.");
-                X509Certificate2 myCert = submitReenrollment.Invoke(CSRContent);
+                X509Certificate2 myCert = submitReenrollment.Invoke(RawContent.ToString());
 
                 if (myCert != null)
                 {
@@ -259,6 +249,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         FailureMessage = "The ReEnrollment job was unable to sign the CSR.  Please check the formatting of the SAN and other ReEnrollment properties."
                     };
                 }
+
+            }
+            catch (PSRemotingTransportException psEx)
+            {
+                var failureMessage = $"ReEnrollment job failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with a PowerShell Transport Exception: {psEx.Message}";
+                _logger.LogError(failureMessage + LogHandler.FlattenException(psEx));
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage = failureMessage
+                };
 
             }
             catch (Exception ex)
