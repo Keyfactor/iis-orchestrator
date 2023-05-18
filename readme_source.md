@@ -185,13 +185,13 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category | Select IIS Bound Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
-Client Machine | Hostname of the IIS server containing the certificate store to be managed.  If this value is 'localhost' no WinRM session will be created and a local PowerShell workspace will be used against the local IIS server, otherwise a WinRM session will be created to the hostname to manage a remote IIS server.
+Client Machine | Hostname of the Windows Server containing the certificate store to be managed. If this value is 'localhost', a local PowerShell runspace executing in the context of the Orchestrator service account will be used to access the certificate store and perform IIS binding operations. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
 Store Path | Windows certificate store to manage. Choose "My" for the Personal Store or "WebHosting" for the Web Hosting Store. 
 Orchestrator | Select an approved orchestrator capable of managing IIS Bound Certificates (one that has declared the IISU capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
 WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
 SPN with Port | Typically False. Needed in some Kerberos configurations.
-Server Username | Username to use when establishing the WinRM session to the Client Machine. Account needs to be an administrator or have been granted rights to manage IIS configuration and manipulate the local machine certificate store. 
+Server Username | Account to use when establishing the WinRM session to the Client Machine. Account needs to be an administrator or have been granted rights to manage IIS configuration and manipulate the local machine certificate store. If no account is specified, the security context of the Orchestrator service account will be used.
 Server Password | Password to use when establishing the WinRM session to the Client Machine
 Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
 Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
@@ -212,13 +212,13 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category | Select Windows Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
-Client Machine | Hostname of the server containing the certificate store to be managed.  If this value is 'localhost' no WinRM session will be created and a local PowerShell workspace will be used against the local server, otherwise a WinRM session will be created to the hostname to manage a remote server.
+Client Machine | Hostname of the Windows Server containing the certificate store to be managed. If this value is 'localhost', a local PowerShell runspace executing in the context of the Orchestrator service account will be used to access the certificate store. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
 Store Path | Windows certificate store to manage. Store must exist in the Local Machine store on the target server. 
 Orchestrator | Select an approved orchestrator capable of managing Windows Certificates (one that has declared the WinCert capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
 WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
 SPN with Port | Typically False. Needed in some Kerberos configurations.
-Server Username | Username to use when establishing the WinRM session to the Client Machine. Account needs to be an admin or have been granted rights to manipulate the local machine certificate store.
+Server Username | Account to use when establishing the WinRM session to the Client Machine. Account needs to be an admin or have been granted rights to manipulate the local machine certificate store. If no account is specified, the security context of the Orchestrator service account will be used.
 Server Password | Password to use when establishing the WinRM session to the Client Machine
 Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
 Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
