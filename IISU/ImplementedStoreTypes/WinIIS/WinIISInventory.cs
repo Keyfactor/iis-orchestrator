@@ -15,6 +15,7 @@
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.PowerShell;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,21 +39,30 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             // Contains the inventory items to be sent back to KF
             List<CurrentInventoryItem> myBoundCerts = new List<CurrentInventoryItem>();
 
-            using (var ps = PowerShell.Create())
+            using (PowerShell ps2 = PowerShell.Create())
             {
-                ps.Runspace = runSpace;
+                ps2.Runspace = runSpace;
 
-                ps.AddCommand("Import-Module")
-                    .AddParameter("Name", "WebAdministration")
-                    .AddStatement();
+                if (runSpace.RunspaceIsRemote)
+                {
+                    ps2.AddCommand("Import-Module")
+                        .AddParameter("Name", "WebAdministration")
+                        .AddStatement();
+                }
+                else
+                {
+                    ps2.AddScript("Set-ExecutionPolicy RemoteSigned");
+                    ps2.AddScript("Import-Module WebAdministration");
+                    //var result = ps.Invoke();
+                }
 
                 var searchScript = "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash;sniFlg=$Bind.sslFlags}}}";
-                ps.AddScript(searchScript).AddStatement();
-                var iisBindings = ps.Invoke();  // Responsible for getting all bound certificates for each website
+                ps2.AddScript(searchScript);
+                var iisBindings = ps2.Invoke();  // Responsible for getting all bound certificates for each website
 
-                if (ps.HadErrors)
+                if (ps2.HadErrors)
                 {
-                    var psError = ps.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
+                    var psError = ps2.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
                 }
 
                 if (iisBindings.Count == 0)

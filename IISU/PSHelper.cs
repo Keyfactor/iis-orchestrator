@@ -21,22 +21,30 @@ using Microsoft.Extensions.Logging;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    public class PSHelper
+    public class PsHelper
     {
         private static ILogger _logger;
 
-        public static Runspace GetClientPSRunspace(string winRmProtocol, string clientMachineName, string WinRmPort, bool includePortInSPN, string serverUserName, string serverPassword)
+        public static Runspace GetClientPsRunspace(string winRmProtocol, string clientMachineName, string winRmPort, bool includePortInSpn, string serverUserName, string serverPassword)
         {
-            _logger = LogHandler.GetClassLogger<PSHelper>();
+            _logger = LogHandler.GetClassLogger<PsHelper>();
             _logger.MethodEntry();
 
-            var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{WinRmPort}/wsman"));
-            connInfo.IncludePortInSPN = includePortInSPN;
+            if (clientMachineName.ToLower() != "localhost")
+            
+            {
+                var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{winRmPort}/wsman"));
+                connInfo.IncludePortInSPN = includePortInSpn;
+                if (!string.IsNullOrEmpty(serverUserName))
+                {
+                    _logger.LogTrace($"Credentials Specified");
+                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                    connInfo.Credential = new PSCredential(serverUserName, pw);
+                }
+                return RunspaceFactory.CreateRunspace(connInfo);
+            }
 
-            var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-            connInfo.Credential = new PSCredential(serverUserName, pw);
-
-            return RunspaceFactory.CreateRunspace(connInfo);
+            return RunspaceFactory.CreateRunspace();
         }
     }
 }
