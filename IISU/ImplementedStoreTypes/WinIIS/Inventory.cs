@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Management.Automation;
-using System.Management.Automation.Runspaces;
-using System.Net;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
@@ -43,26 +39,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             _logger = LogHandler.GetClassLogger<Inventory>();
             _logger.MethodEntry();
 
-            //  Test just Local IIS Inventory
-
-            var rs = RunspaceFactory.CreateRunspace();
-            rs.Open();
-
-            using (PowerShell ps = PowerShell.Create())
-            {
-                ps.Runspace = rs;
-
-                ps.AddScript("Set-ExecutionPolicy RemoteSigned");
-                ps.AddScript("Import-Module WebAdministration");
-
-                var searchScript = "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash;sniFlg=$Bind.sslFlags}}}";
-                ps.AddScript(searchScript).AddStatement();
-
-                var iisBindings = ps.Invoke();  // Responsible for getting all bound certificates for each website
-            }
-
-            rs.Close();
-            //
 
             return PerformInventory(jobConfiguration, submitInventoryUpdate);
         }
@@ -98,7 +74,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     _logger.LogTrace($"Attempting to read bound IIS certificates from cert store: {storePath}");
                     WinIISInventory IISInventory = new WinIISInventory(_logger);
                     inventoryItems = IISInventory.GetInventoryItems(myRunspace, storePath);
-                    
+
                     _logger.LogTrace($"A total of {inventoryItems.Count} were found");
                     _logger.LogTrace("Closing runspace...");
                     myRunspace.Close();

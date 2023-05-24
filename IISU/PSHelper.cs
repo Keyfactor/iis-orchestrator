@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Keyfactor.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
-using Keyfactor.Logging;
-using Microsoft.Extensions.Logging;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -35,6 +35,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             {
                 var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{winRmPort}/wsman"));
                 connInfo.IncludePortInSPN = includePortInSpn;
+
+                _logger.LogTrace($"Creating remote session at: {connInfo.ConnectionUri}");
+
                 if (!string.IsNullOrEmpty(serverUserName))
                 {
                     _logger.LogTrace($"Credentials Specified");
@@ -44,7 +47,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 return RunspaceFactory.CreateRunspace(connInfo);
             }
 
-            return RunspaceFactory.CreateRunspace();
+            // Create an out of process PowerShell runspace and explictly use version 5.1
+            // This is needed when running as a service, which is how the orchestrator extension operates
+            // Interestingly this is not needd when running as a console application
+            // TODO: Consider refactoring this so that we properly dispose of these objects instead of waiting on the GC
+
+            PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
+
+            return rs;
         }
     }
 }
