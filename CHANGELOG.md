@@ -1,5 +1,18 @@
+2.2.0
+* Added Support for GMSA Account by using no value for UserId and Password
+* Added local PowerShell support, triggered when specifying 'localhost' as the client machine while using the IISU or WinCert Orchestrator.  This change was tested using KF Command 10.3.
+* Moved to .NET 6
+
+2.1.1
+* Fixed the missing site name error when issuing a WinCert job when writing trace log settings to the log file.
+* Several display names changed in the documented certificate store type definitions. There are no changes to the internal type or parameter names, so no migration is necessary for currently configured stores.
+	* Display name for IISU changed to "IIS Bound Certificate".
+	* Display name for WinCert changed to "Windows Certificate".
+	* Display names for several Store and Entry parameters changed to be more descriptive and UI friendly.
+* Significant readme cleanup
+
 2.1.0
-* Fixed issue that was occuring during renewal when there were bindings outside of http and https like net.tcp
+* Fixed issue that was occurring during renewal when there were bindings outside of http and https like net.tcp
 * Added PAM registration/initialization documentation in README.md
 * Resolved Null HostName error 
 * Added WinCert Cert Store Type
@@ -8,7 +21,7 @@
 
 2.0.0
 * Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
-* Local PAM Support added (requires Univesal Orchestrator Framework version 10.1)
+* Local PAM Support added (requires Universal Orchestrator Framework version 10.1)
 * Certificate store type changed from IISBin to IISU. See readme for migration notes.
 
 
