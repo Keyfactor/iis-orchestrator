@@ -1,8 +1,7 @@
 2.2.0
 * Added Support for GMSA Account by using no value for UserId and Password
-* Added local PowerShell support when using the IISU or WinCert Orchestrator.  This change was tested using KF Command 10.3.
-* Move to .NET 6
-* Added logic to eliminate the need for using WinRM when using 'localhost' as the client machine.
+* Added local PowerShell support, triggered when specifying 'localhost' as the client machine while using the IISU or WinCert Orchestrator.  This change was tested using KF Command 10.3.
+* Moved to .NET 6
 
 2.1.1
 * Fixed the missing site name error when issuing a WinCert job when writing trace log settings to the log file.
