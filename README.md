@@ -118,6 +118,11 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note: If Looking to use GMSA Accounts to run the Service Kefyactor Command 10.2 or greater is required for No Value checkbox to work**
 
+**Note: In Command versions up to 10.3, a certificate store is uniquely identified by the target machine and certificate store path,
+which means that the WinCert and IISU store types cannot both be used at the same time on the same server for the same local machine store.
+(You can’t manage the “My” personal store on the same server with WinCert and IISU at the same time.)
+This is anticipated to be corrected in Command version 10.4, which will include the certificate store type as part of the uniqueness test.** 
+
 ## Creating New Certificate Store Types
 Currently this orchestrator handles two extensions: IISU for IIS servers with bound certificates and WinCert for general Windows Certificates.
 Below describes how each of these certificate store types are created and configured.
