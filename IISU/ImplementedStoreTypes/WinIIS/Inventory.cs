@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Management.Automation;
-using System.Management.Automation.Runspaces;
-using System.Net;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
@@ -42,6 +38,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         {
             _logger = LogHandler.GetClassLogger<Inventory>();
             _logger.MethodEntry();
+
 
             return PerformInventory(jobConfiguration, submitInventoryUpdate);
         }
@@ -70,14 +67,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 if (storePath != null)
                 {
                     _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                    using var myRunspace = PSHelper.GetClientPSRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                    using var myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
                     myRunspace.Open();
 
                     _logger.LogTrace("Runspace is now open");
                     _logger.LogTrace($"Attempting to read bound IIS certificates from cert store: {storePath}");
                     WinIISInventory IISInventory = new WinIISInventory(_logger);
                     inventoryItems = IISInventory.GetInventoryItems(myRunspace, storePath);
-                    
+
                     _logger.LogTrace($"A total of {inventoryItems.Count} were found");
                     _logger.LogTrace("Closing runspace...");
                     myRunspace.Close();
