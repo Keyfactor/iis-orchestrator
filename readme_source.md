@@ -21,7 +21,7 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note:** There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.
 
-**Note:** If Looking to use GMSA Accounts to run the Service Kefyactor Command 10.2 or greater is required for No Value checkbox to work**
+**Note:** In order to leverage GMSA accounts when running the Orchestrator service, version 10.2 of Keyfactor Command is required as it corrects an issue using the "No Value" checkbox when configuring certificate store server credentials.
 
 **Note:** In Command versions up to 10.3, a certificate store is uniquely identified by the target machine and certificate store path,
 which means that the WinCert and IISU store types cannot both be used at the same time on the same server for the same local machine store.
