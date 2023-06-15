@@ -4,6 +4,7 @@ The Windows Certificate Store Orchestrator Extension implements two certificate 
 
 #### Integration status: Production - Ready for use in production environments.
 
+
 ## About the Keyfactor Universal Orchestrator Extension
 
 This repository contains a Universal Orchestrator Extension which is a plugin to the Keyfactor Universal Orchestrator. Within the Keyfactor Platform, Orchestrators are used to manage “certificate stores” &mdash; collections of certificates and roots of trust that are found within and used by various applications.
@@ -11,6 +12,7 @@ This repository contains a Universal Orchestrator Extension which is a plugin to
 The Universal Orchestrator is part of the Keyfactor software distribution and is available via the Keyfactor customer portal. For general instructions on installing Extensions, see the “Keyfactor Command Orchestrator Installation and Configuration Guide” section of the Keyfactor documentation. For configuration details of this specific Extension see below in this readme.
 
 The Universal Orchestrator is the successor to the Windows Orchestrator. This Orchestrator Extension plugin only works with the Universal Orchestrator and does not work with the Windows Orchestrator.
+
 
 
 
@@ -114,14 +116,23 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 1. Delete existing IIS stores. Delete the IISBin store type. Create the new IISU store type. Recreate the IIS stores using the new IISU store type.
 1. Convert existing IISBin certificate stores to IISU certificate stores. There is not currently a way to do this via the Keyfactor API, so direct updates to the underlying Keyfactor SQL database is required. A SQL script (IIS-Conversion.sql) is available in the repository to do this. Hosted customers, which do not have access to the underlying database, will need to work Keyfactor support to run the conversion. On-premises customers can run the script themselves, but are strongly encouraged to ensure that a SQL backup is taken prior running the script (and also be confident that they have a tested database restoration process.)
 
-**Note: There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
+**Note:** There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.
 
-**Note: If Looking to use GMSA Accounts to run the Service Kefyactor Command 10.2 or greater is required for No Value checkbox to work**
+**Note:** In order to leverage GMSA accounts when running the Orchestrator service, version 10.2 of Keyfactor Command is required as it corrects an issue using the "No Value" checkbox when configuring certificate store server credentials.
 
-**Note: In Command versions up to 10.3, a certificate store is uniquely identified by the target machine and certificate store path,
+**Note:** In Command versions up to 10.3, a certificate store is uniquely identified by the target machine and certificate store path,
 which means that the WinCert and IISU store types cannot both be used at the same time on the same server for the same local machine store.
 (You can’t manage the “My” personal store on the same server with WinCert and IISU at the same time.)
-This is anticipated to be corrected in Command version 10.4, which will include the certificate store type as part of the uniqueness test.** 
+This is anticipated to be corrected in Command version 10.4, which will include the certificate store type as part of the uniqueness test.
+
+**Targeting IIS on Server 2016:** To align with modern security practices and to remove encryption algorithms that are no longer considered secure, version 10.3 of the Command platform changed the set of encryption algorithms used when generating PFX files from 3DES/SHA1/RC4 to AES256/SHA256/3DES.
+This change makes PFX files (which orchestrator management add jobs use internally) incompatible with Server 2016, as Server 2016 does not support the newer algorithms.
+If IIS running on Server 2016 needs to be targeted in your environment, the Command application setting “Enable Legacy Encryption” must be enabled to include the older insecure algorithms when generating PFX files.
+
+When targeting Server 2016 without the legacy encryption enabled, the orchestrator management add job may complete successfully, as the certificate will be delivered, however IIS will be unable to use the certificate as evidenced by a broken certificate binding.
+When examining the certificate, it will show that it has a private key, however attempts to manage or access the keys can generate errors such as “no key found” or “missing stored keyset”.
+Event logs on the target server may contain: "A fatal error occurred when attempting to access the TLS server credential private key. The error code returned from the cryptographic module is 0x8009030D. The internal error state is 10001."
+In some cases the orchestrator job can fail with "Add job failed for Site 'My' on server 'xxxxxx' with error: 'Index was outside the bounds of the array.'"
 
 ## Creating New Certificate Store Types
 Currently this orchestrator handles two extensions: IISU for IIS servers with bound certificates and WinCert for general Windows Certificates.
