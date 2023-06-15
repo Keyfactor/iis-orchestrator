@@ -28,7 +28,7 @@ which means that the WinCert and IISU store types cannot both be used at the sam
 (You can’t manage the “My” personal store on the same server with WinCert and IISU at the same time.)
 This is anticipated to be corrected in Command version 10.4, which will include the certificate store type as part of the uniqueness test.
 
-**Targeting IIS on Server 2016:** To align with modern security practices and to remove encryption algorithms that are no longer considered secure, version 10.3 of the Command platform changed the set of encryption algorithms used when generating PFX files from 3DES/SHA1/RC2 to AES256/SHA256/AES256.
+**Targeting IIS on Server 2016:** To align with modern security practices and to remove encryption algorithms that are no longer considered secure, version 10.3 of the Command platform changed the set of encryption algorithms used when generating PFX files from 3DES/SHA1/RC4 to AES256/SHA256/3DES.
 This change makes PFX files (which orchestrator management add jobs use internally) incompatible with Server 2016, as Server 2016 does not support the newer algorithms.
 If IIS running on Server 2016 needs to be targeted in your environment, the Command application setting “Enable Legacy Encryption” must be enabled to include the older insecure algorithms when generating PFX files.
 
