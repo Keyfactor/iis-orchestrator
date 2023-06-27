@@ -93,7 +93,7 @@
           "EntryParameters": [
             {
               "Name": "ProviderName",
-              "DisplayName": "Provider Name",
+              "DisplayName": "Crypto Provider Name",
               "Type": "String",
               "RequiredWhen": {
                 "HasPrivateKey": false,
@@ -146,7 +146,7 @@
           "Properties": [
             {
               "Name": "spnwithport",
-              "DisplayName": "SPN With Port?",
+              "DisplayName": "SPN With Port",
               "Type": "Bool",
               "DependsOn": "",
               "DefaultValue": "false",
@@ -186,7 +186,7 @@
             },
             {
               "Name": "ServerUseSsl",
-              "DisplayName": "Use SSL?",
+              "DisplayName": "Use SSL",
               "Type": "Bool",
               "DependsOn": "",
               "DefaultValue": "true",
@@ -231,7 +231,7 @@
             },
             {
               "Name": "SiteName",
-              "DisplayName": "Site Name",
+              "DisplayName": "IIS Site Name",
               "Type": "String",
               "RequiredWhen": {
                 "HasPrivateKey": false,
@@ -243,7 +243,7 @@
             },
             {
               "Name": "SniFlag",
-              "DisplayName": "SNI Flag",
+              "DisplayName": "SNI Support",
               "Type": "String",
               "RequiredWhen": {
                 "HasPrivateKey": false,
@@ -268,7 +268,7 @@
             },
             {
               "Name": "ProviderName",
-              "DisplayName": "Provider Name",
+              "DisplayName": "Crypto Provider Name",
               "Type": "String",
               "RequiredWhen": {
                 "HasPrivateKey": false,
