@@ -15,7 +15,7 @@ namespace WinCertTestConsole
             var request = new RestRequest("/KeyfactorAPI/Enrollment/PFX", Method.Post);
             request.AddHeader("X-Keyfactor-Requested-With", "APIClient");
             request.AddHeader("x-certificateformat", "PFX");
-            request.AddHeader("Authorization", "Basic SomeBasicAuthToken");
+            request.AddHeader("Authorization", "Basic Y29tbWFuZFxLRkFkbWluOldoNUcyVGM2VkJZalNNcEM=");
             request.AddHeader("Content-Type", "application/json");
             var enrollRequest = new KeyfactorEnrollmentRequest
             {
@@ -25,7 +25,7 @@ namespace WinCertTestConsole
                 Subject = $"CN={commonName}",
                 IncludeChain = true,
                 RenewalCertificateId = 0,
-                CertificateAuthority = "SomeMachine\\SomeCA",
+                CertificateAuthority = "DC-CA.Command.local\\CommandCA1",
                 Timestamp = DateTime.Now,
                 Template = "2YearTestWebServer"
             };
