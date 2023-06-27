@@ -29,7 +29,7 @@
       },
       "store_types": {
         "WinCert": {
-          "Name": "WinCert",
+          "Name": "Windows Certificate",
           "ShortName": "WinCert",
           "Capability": "WinCert",
           "LocalStore": false,
@@ -54,7 +54,7 @@
               "DisplayName": "WinRm Protocol",
               "Type": "MultipleChoice",
               "DependsOn": "",
-              "DefaultValue": "http, https",
+              "DefaultValue": "https, http",
               "Required": true
             },
             {
@@ -62,7 +62,7 @@
               "DisplayName": "WinRm Port",
               "Type": "String",
               "DependsOn": "",
-              "DefaultValue": "5985",
+              "DefaultValue": "5986",
               "Required": true
             },
             {
@@ -132,7 +132,7 @@
           "InventoryEndpoint": "/AnyInventory/Update"
         },
         "IISU": {
-          "Name": "IISU",
+          "Name": "IIS Bound Certificate",
           "ShortName": "IISU",
           "Capability": "IISU",
           "LocalStore": false,
@@ -157,7 +157,7 @@
               "DisplayName": "WinRm Protocol",
               "Type": "MultipleChoice",
               "DependsOn": "",
-              "DefaultValue": "http,https",
+              "DefaultValue": "https,http",
               "Required": true
             },
             {
@@ -165,7 +165,7 @@
               "DisplayName": "WinRm Port",
               "Type": "String",
               "DependsOn": "",
-              "DefaultValue": "5985",
+              "DefaultValue": "5986",
               "Required": true
             },
             {
@@ -264,7 +264,7 @@
                 "OnReenrollment": true
               },
               "DefaultValue": "https",
-              "Options": "http, https"
+              "Options": "https, http"
             },
             {
               "Name": "ProviderName",
