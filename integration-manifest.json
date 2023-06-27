@@ -27,8 +27,8 @@
         "supportsInventory": false,
         "platformSupport": "Unused"
       },
-      "store_types": {
-        "WinCert": {
+      "store_types": [
+        {
           "Name": "Windows Certificate",
           "ShortName": "WinCert",
           "Capability": "WinCert",
@@ -131,7 +131,7 @@
           "ServerRegistration": 7,
           "InventoryEndpoint": "/AnyInventory/Update"
         },
-        "IISU": {
+        {
           "Name": "IIS Bound Certificate",
           "ShortName": "IISU",
           "Capability": "IISU",
@@ -312,7 +312,7 @@
           "CustomAliasAllowed": "Forbidden",
           "InventoryEndpoint": "/AnyInventory/Update"
         }
-      }
+      ]
     }
   }
 }
