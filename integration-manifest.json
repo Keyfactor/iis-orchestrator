@@ -125,13 +125,8 @@
             "StoreRequired": false,
             "Style": "Default"
           },
-          "StorePathType": "",
           "StorePathValue": "",
           "PrivateKeyAllowed": "Required",
-          "JobProperties": [
-            "ProviderName",
-            "SAN"
-          ],
           "ServerRequired": true,
           "PowerShell": false,
           "BlueprintAllowed": false,
@@ -318,19 +313,8 @@
             "StoreRequired": false,
             "Style": "Default"
           },
-          "StorePathType": "",
-          "StorePathValue": "",
+          "StorePathValue": "[\"My\",\"WebHosting\"]",
           "PrivateKeyAllowed": "Required",
-          "JobProperties": [
-            "Port",
-            "IPAddress",
-            "HostName",
-            "SiteName",
-            "SniFlag",
-            "Protocol",
-            "ProviderName",
-            "SAN"
-          ],
           "ServerRequired": true,
           "PowerShell": false,
           "BlueprintAllowed": false,
