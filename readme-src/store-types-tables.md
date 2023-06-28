@@ -28,7 +28,7 @@ kfutil store - types create--name Windows Certificate
 ##### UI Advanced Tab
 | Field Name            | Required | Value                 |
 |-----------------------|----------|-----------------------|
-| Store Path Type       |          | undefined      |
+| Store Path Type       |          | Freeform      |
 | Supports Custom Alias |          | Forbidden |
 | Private Key Handling  |          | Required  |
 | PFX Password Style    |          | Default   |
@@ -72,7 +72,7 @@ kfutil store - types create--name IIS Bound Certificate
 ##### UI Advanced Tab
 | Field Name            | Required | Value                 |
 |-----------------------|----------|-----------------------|
-| Store Path Type       |          | undefined      |
+| Store Path Type       |          | Freeform      |
 | Supports Custom Alias |          | Forbidden |
 | Private Key Handling  |          | Required  |
 | PFX Password Style    |          | Default   |
