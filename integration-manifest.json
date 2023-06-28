@@ -51,15 +51,15 @@
             },
             {
               "Name": "WinRM Protocol",
-              "DisplayName": "WinRm Protocol",
+              "DisplayName": "WinRM Protocol",
               "Type": "MultipleChoice",
               "DependsOn": "",
-              "DefaultValue": "https, http",
+              "DefaultValue": "https,http",
               "Required": true
             },
             {
-              "Name": "WinRm Port",
-              "DisplayName": "WinRm Port",
+              "Name": "WinRM Port",
+              "DisplayName": "WinRM Port",
               "Type": "String",
               "DependsOn": "",
               "DefaultValue": "5986",
@@ -100,7 +100,10 @@
                 "OnAdd": false,
                 "OnRemove": false,
                 "OnReenrollment": false
-              }
+              },
+              "DependsOn": "",
+              "DefaultValue": "",
+              "Options": ""
             },
             {
               "Name": "SAN",
@@ -111,7 +114,10 @@
                 "OnAdd": false,
                 "OnRemove": false,
                 "OnReenrollment": true
-              }
+              },
+              "DependsOn": "",
+              "DefaultValue": "",
+              "Options": ""
             }
           ],
           "PasswordOptions": {
@@ -119,6 +125,8 @@
             "StoreRequired": false,
             "Style": "Default"
           },
+          "StorePathType": "",
+          "StorePathValue": "",
           "PrivateKeyAllowed": "Required",
           "JobProperties": [
             "ProviderName",
@@ -127,9 +135,7 @@
           "ServerRequired": true,
           "PowerShell": false,
           "BlueprintAllowed": false,
-          "CustomAliasAllowed": "Forbidden",
-          "ServerRegistration": 7,
-          "InventoryEndpoint": "/AnyInventory/Update"
+          "CustomAliasAllowed": "Forbidden"
         },
         {
           "Name": "IIS Bound Certificate",
@@ -153,7 +159,7 @@
               "Required": false
             },
             {
-              "Name": "WinRM Protocol",
+              "Name": "WinRm Protocol",
               "DisplayName": "WinRm Protocol",
               "Type": "MultipleChoice",
               "DependsOn": "",
@@ -195,6 +201,20 @@
           ],
           "EntryParameters": [
             {
+              "Name": "Port",
+              "DisplayName": "Port",
+              "Type": "String",
+              "RequiredWhen": {
+                "HasPrivateKey": false,
+                "OnAdd": false,
+                "OnRemove": false,
+                "OnReenrollment": false
+              },
+              "DependsOn": "",
+              "DefaultValue": "443",
+              "Options": ""
+            },
+            {
               "Name": "IPAddress",
               "DisplayName": "IP Address",
               "Type": "String",
@@ -204,19 +224,9 @@
                 "OnRemove": true,
                 "OnReenrollment": true
               },
-              "DefaultValue": "*"
-            },
-            {
-              "Name": "Port",
-              "DisplayName": "Port",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": true,
-                "OnRemove": true,
-                "OnReenrollment": true
-              },
-              "DefaultValue": "443"
+              "DependsOn": "",
+              "DefaultValue": "*",
+              "Options": ""
             },
             {
               "Name": "HostName",
@@ -227,7 +237,10 @@
                 "OnAdd": false,
                 "OnRemove": false,
                 "OnReenrollment": false
-              }
+              },
+              "DependsOn": "",
+              "DefaultValue": "",
+              "Options": ""
             },
             {
               "Name": "SiteName",
@@ -239,19 +252,23 @@
                 "OnRemove": true,
                 "OnReenrollment": true
               },
-              "DefaultValue": "Default Web Site"
+              "DependsOn": "",
+              "DefaultValue": "Default Web Site",
+              "Options": ""
             },
             {
               "Name": "SniFlag",
               "DisplayName": "SNI Support",
-              "Type": "String",
+              "Type": "MultipleChoice",
               "RequiredWhen": {
                 "HasPrivateKey": false,
                 "OnAdd": false,
                 "OnRemove": false,
                 "OnReenrollment": false
               },
-              "DefaultValue": "0 - No SNI"
+              "DependsOn": "",
+              "DefaultValue": "0 - No SNI",
+              "Options": "0 - No SNI,1 - SNI Enabled,2 - Non SNI Binding,3 - SNI Binding"
             },
             {
               "Name": "Protocol",
@@ -263,8 +280,9 @@
                 "OnRemove": true,
                 "OnReenrollment": true
               },
+              "DependsOn": "",
               "DefaultValue": "https",
-              "Options": "https, http"
+              "Options": "https,http"
             },
             {
               "Name": "ProviderName",
@@ -275,7 +293,10 @@
                 "OnAdd": false,
                 "OnRemove": false,
                 "OnReenrollment": false
-              }
+              },
+              "DependsOn": "",
+              "DefaultValue": "",
+              "Options": ""
             },
             {
               "Name": "SAN",
@@ -285,8 +306,11 @@
                 "HasPrivateKey": false,
                 "OnAdd": false,
                 "OnRemove": false,
-                "OnReenrollment": true
-              }
+                "OnReenrollment": false
+              },
+              "DependsOn": "",
+              "DefaultValue": "",
+              "Options": ""
             }
           ],
           "PasswordOptions": {
@@ -294,11 +318,12 @@
             "StoreRequired": false,
             "Style": "Default"
           },
-          "StorePathValue": "[\"My\",\"WebHosting\"]",
+          "StorePathType": "",
+          "StorePathValue": "",
           "PrivateKeyAllowed": "Required",
           "JobProperties": [
-            "IPAddress",
             "Port",
+            "IPAddress",
             "HostName",
             "SiteName",
             "SniFlag",
@@ -309,8 +334,7 @@
           "ServerRequired": true,
           "PowerShell": false,
           "BlueprintAllowed": false,
-          "CustomAliasAllowed": "Forbidden",
-          "InventoryEndpoint": "/AnyInventory/Update"
+          "CustomAliasAllowed": "Forbidden"
         }
       ]
     }
