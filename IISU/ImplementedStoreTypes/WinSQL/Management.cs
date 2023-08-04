@@ -25,7 +25,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSqlServer
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {

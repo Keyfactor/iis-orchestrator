@@ -23,7 +23,7 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Text;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSqlServer
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 {
     internal class SQLServerInventory : ClientPSCertStoreInventory
     {
@@ -59,10 +59,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSqlServer
 
                 foreach (var binding in sqlBindings)
                 {
-                    var thumbPrint = $"{(binding.Properties["thumbprint"]?.Value)}";
+                    var thumbPrint = $"{(binding.Properties["Certificate"]?.Value)}";
                     if (string.IsNullOrEmpty(thumbPrint)) continue;
+                    thumbPrint = thumbPrint.ToUpper();
 
-                    Certificate foundCert = certificates.Find(m => m.Thumbprint.Equals(thumbPrint));
+                    Certificate foundCert = certificates.Find(m => m.Thumbprint.ToUpper().Equals(thumbPrint));
 
                     if (foundCert == null) continue;
 

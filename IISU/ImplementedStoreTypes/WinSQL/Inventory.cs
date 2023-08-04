@@ -22,7 +22,7 @@ using System;
 using System.Collections.Generic;
 
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSqlServer
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 {
     public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {
