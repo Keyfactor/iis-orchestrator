@@ -127,8 +127,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             if (result.Result == OrchestratorJobStatusJobResult.Success)
             {
                 // Bind to IIS
-                ClientPsSqlManager iisManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
-                result = iisManager.BindCertificate(manager.X509Cert);
+                ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
+                result = sqlManager.BindCertificate(manager.X509Cert);
                 return result;
             } else return result;
         }
@@ -141,8 +141,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             long jobNumber = config.JobHistoryId;
 
             // First we need to unbind the certificate from IIS before we remove it from the store
-            ClientPsSqlManager iisManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
-            JobResult result = iisManager.BindCertificate(null);
+            ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
+            JobResult result = sqlManager.BindCertificate(null);
 
             if (result.Result == OrchestratorJobStatusJobResult.Success)
             {

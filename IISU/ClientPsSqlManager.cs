@@ -91,13 +91,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             try
             {
-                SiteName = config.JobProperties["SiteName"].ToString();
-                Port = config.JobProperties["Port"].ToString();
-                HostName = config.JobProperties["HostName"]?.ToString();
-                Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
-                IPAddress = config.JobProperties["IPAddress"].ToString();
-
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
                 RenewalThumbprint = ""; // A reenrollment will always be empty
                 CertContents = ""; // Not needed for a reenrollment
@@ -142,7 +135,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 if (x509Cert != null)
                     thumbPrint = x509Cert.Thumbprint;
 
-                var funcScript = string.Format($"Set-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate -Value={x509Cert.Thumbprint}");
+                var funcScript = string.Format($"Set-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate {x509Cert.Thumbprint}");
                 foreach (var cmd in ps.Commands.Commands)
                 {
                     _logger.LogTrace("Logging PowerShell Command");
