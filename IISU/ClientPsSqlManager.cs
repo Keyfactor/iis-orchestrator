@@ -148,6 +148,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 ps.Invoke();
                 _logger.LogTrace("funcScript Invoked...");
 
+                _logger.LogTrace("Setting up Acl Access for Manage Private Keys");
+                ps.Commands.Clear();
+                funcScript = string.Format("$Cert = Get-ChildItem Cert:\\LocalMachine\\My | Where-Object { $_.Thumbprint -eq $thumbprint } # Find private key$privKey = $Cert.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName$keyPath = \"$($env:ProgramData)\\Microsoft\\Crypto\\RSA\\MachineKeys\\\"$privKeyPath = (Get-Item \"$keyPath\\$privKey\")# Update ACL to allow \"READ\" permissions from \"NT AUTHORITY\\NETWORK SERVICE\"$Acl = Get-Acl $privKeyPath$Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(\"NETWORK SERVICE\", \"Read\", \"Allow\")$Acl.SetAccessRule($Ar)Set-Acl $privKeyPath.FullName $Acl");
+                ps.AddScript(funcScript);
+                ps.Invoke();
+                _logger.LogTrace("ACL FuncScript Invoked...");
 
                 if (ps.HadErrors)
                 {
