@@ -121,6 +121,67 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
+        public JobResult UnBindCertificate()
+        {
+            try
+            {
+                _logger.MethodEntry();
+
+                _runSpace.Open();
+                ps = PowerShell.Create();
+                ps.Runspace = _runSpace;
+
+                var funcScript = string.Format($"Clear-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate");
+                foreach (var cmd in ps.Commands.Commands)
+                {
+                    _logger.LogTrace("Logging PowerShell Command");
+                    _logger.LogTrace(cmd.CommandText);
+                }
+
+                _logger.LogTrace($"funcScript {funcScript}");
+                ps.AddScript(funcScript);
+                _logger.LogTrace("funcScript added...");
+                ps.Invoke();
+                _logger.LogTrace("funcScript Invoked...");
+
+                if (ps.HadErrors)
+                {
+                    var psError = ps.Streams.Error.ReadAll()
+                        .Aggregate(string.Empty, (current, error) => current + error.ErrorDetails.Message);
+                    {
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = JobHistoryID,
+                            FailureMessage = $"Unable to unbind certificate to Sql Server"
+                        };
+                    }
+                }
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = JobHistoryID,
+                    FailureMessage = ""
+                };
+            }
+            catch (Exception e)
+            {
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = JobHistoryID,
+                    FailureMessage = $"Error Occurred in unbind {LogHandler.FlattenException(e)}"
+                };
+            }
+            finally
+            {
+                _runSpace.Close();
+                ps.Runspace.Close();
+                ps.Dispose();
+            }
+        }
+
         public JobResult BindCertificate(X509Certificate2 x509Cert)
         {
             try
@@ -135,7 +196,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 if (x509Cert != null)
                     thumbPrint = x509Cert.Thumbprint;
 
-                var funcScript = string.Format($"Set-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate {x509Cert.Thumbprint}");
+                var funcScript = string.Format($"Set-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate {thumbPrint}");
                 foreach (var cmd in ps.Commands.Commands)
                 {
                     _logger.LogTrace("Logging PowerShell Command");
@@ -150,7 +211,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 _logger.LogTrace("Setting up Acl Access for Manage Private Keys");
                 ps.Commands.Clear();
-                funcScript = string.Format("$Cert = Get-ChildItem Cert:\\LocalMachine\\My | Where-Object { $_.Thumbprint -eq $thumbprint } # Find private key$privKey = $Cert.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName$keyPath = \"$($env:ProgramData)\\Microsoft\\Crypto\\RSA\\MachineKeys\\\"$privKeyPath = (Get-Item \"$keyPath\\$privKey\")# Update ACL to allow \"READ\" permissions from \"NT AUTHORITY\\NETWORK SERVICE\"$Acl = Get-Acl $privKeyPath$Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(\"NETWORK SERVICE\", \"Read\", \"Allow\")$Acl.SetAccessRule($Ar)Set-Acl $privKeyPath.FullName $Acl");
+                funcScript = $@"$thumbprint = '{thumbPrint}'
+                    $Cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {{ $_.Thumbprint -eq $thumbprint }}
+                    $privKey = $Cert.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName 
+                    $keyPath = ""$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\""
+                    $privKeyPath = (Get-Item ""$keyPath\$privKey"")
+                    $Acl = Get-Acl $privKeyPath
+                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""Everyone"", ""Read"", ""Allow"")
+                    $Acl.SetAccessRule($Ar)
+                    Set-Acl $privKeyPath.FullName $Acl";
+
                 ps.AddScript(funcScript);
                 ps.Invoke();
                 _logger.LogTrace("ACL FuncScript Invoked...");

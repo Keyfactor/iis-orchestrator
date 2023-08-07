@@ -142,7 +142,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
             // First we need to unbind the certificate from IIS before we remove it from the store
             ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
-            JobResult result = sqlManager.BindCertificate(null);
+            JobResult result = sqlManager.UnBindCertificate();
 
             if (result.Result == OrchestratorJobStatusJobResult.Success)
             {
