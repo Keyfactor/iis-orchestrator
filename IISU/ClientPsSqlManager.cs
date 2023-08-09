@@ -28,10 +28,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
     internal class ClientPsSqlManager
     {
         private string SqlServiceUser { get; set; }
+        private string SqlInstanceName { get; set; }
         private string RegistryPath { get; set; }
         private string RenewalThumbprint { get; set; } = "";
         private string ClientMachineName { get; set; }
-        private string StorePath { get; set; }
         private long JobHistoryID { get; set; }
         private readonly ILogger _logger;
         private readonly Runspace _runSpace;
@@ -45,7 +45,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             try
             {
                 ClientMachineName = config.CertificateStoreDetails.ClientMachine;
-                StorePath = config.CertificateStoreDetails.StorePath;
                 JobHistoryID = config.JobHistoryId;
 
                 if (config.JobProperties.ContainsKey("RenewalThumbprint"))
@@ -60,8 +59,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string winRmPort = jobProperties.WinRmPort;
                 bool includePortInSPN = jobProperties.SpnPortFlag;
                 SqlServiceUser = jobProperties.SqlServiceUser;
+                SqlInstanceName = jobProperties.SqlInstanceName;
 
-                RegistryPath = $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{StorePath}\\MSSQLServer\\SuperSocketNetLib\\";
+                RegistryPath = $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{SqlInstanceName}\\MSSQLServer\\SuperSocketNetLib\\";
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
                 _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);

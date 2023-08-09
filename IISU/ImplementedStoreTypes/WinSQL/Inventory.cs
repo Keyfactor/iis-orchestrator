@@ -75,7 +75,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     _logger.LogTrace($"Attempting to read bound SQL Server certificates from cert store: {storePath}");
 
                     SQLServerInventory sqlInventory = new SQLServerInventory(_logger);
-                    inventoryItems = sqlInventory.GetInventoryItems(myRunspace, storePath);
+                    inventoryItems = sqlInventory.GetInventoryItems(myRunspace, config);
 
                     _logger.LogTrace($"A total of {inventoryItems.Count} were found");
                     _logger.LogTrace("Closing runspace...");

@@ -51,6 +51,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         [JsonProperty("SqlServiceUser")]
         [DefaultValue("")]
         public string SqlServiceUser { get; set; }
+
+        [JsonProperty("SqlInstanceName")]
+        [DefaultValue("")]
+        public string SqlInstanceName { get; set; }
     }
 
     internal enum SniFlag
