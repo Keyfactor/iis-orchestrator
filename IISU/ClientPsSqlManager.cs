@@ -194,7 +194,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 var thumbPrint = string.Empty;
                 if (x509Cert != null)
-                    thumbPrint = x509Cert.Thumbprint;
+                    thumbPrint = x509Cert.Thumbprint.ToLower(); //sql server config mgr expects lower
 
                 var funcScript = string.Format($"Set-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate {thumbPrint}");
                 foreach (var cmd in ps.Commands.Commands)
