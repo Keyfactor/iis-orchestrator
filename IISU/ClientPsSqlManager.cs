@@ -18,72 +18,25 @@ using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using System.Net;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
     internal class ClientPsSqlManager
     {
-        private string SiteName { get; set; }
-        private string Port { get; set; }
-        private string Protocol { get; set; }
-        private string HostName { get; set; }
-        private string SniFlag { get; set; }
-        private string IPAddress { get; set; }
-
+        private string SqlServiceUser { get; set; }
+        private string RegistryPath { get; set; }
         private string RenewalThumbprint { get; set; } = "";
-
-        private string CertContents { get; set; } = "";
-
-        private string PrivateKeyPassword { get; set; } = "";
-
         private string ClientMachineName { get; set; }
         private string StorePath { get; set; }
-
         private long JobHistoryID { get; set; }
-
         private readonly ILogger _logger;
         private readonly Runspace _runSpace;
 
         private PowerShell ps;
-
-        public ClientPsSqlManager(ReenrollmentJobConfiguration config, string serverUsername, string serverPassword)
-        {
-            _logger = LogHandler.GetClassLogger<ClientPsSqlManager>();
-
-            try
-            {
-                PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
-                RenewalThumbprint = ""; // A reenrollment will always be empty
-                CertContents = ""; // Not needed for a reenrollment
-
-                ClientMachineName = config.CertificateStoreDetails.ClientMachine;
-                StorePath = config.CertificateStoreDetails.StorePath;
-
-                JobHistoryID = config.JobHistoryId;
-
-                // Establish PowerShell Runspace
-                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-                string winRmProtocol = jobProperties.WinRmProtocol;
-                string winRmPort = jobProperties.WinRmPort;
-                bool includePortInSPN = jobProperties.SpnPortFlag;
-
-                _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
-                _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"Error when initiating an IIS ReEnrollment Job: {e.Message}", e.InnerException);
-            }
-        }
 
         public ClientPsSqlManager(ManagementJobConfiguration config, string serverUsername, string serverPassword)
         {
@@ -91,13 +44,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             try
             {
-                PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
-                RenewalThumbprint = ""; // A reenrollment will always be empty
-                CertContents = ""; // Not needed for a reenrollment
-
                 ClientMachineName = config.CertificateStoreDetails.ClientMachine;
                 StorePath = config.CertificateStoreDetails.StorePath;
-
                 JobHistoryID = config.JobHistoryId;
 
                 if (config.JobProperties.ContainsKey("RenewalThumbprint"))
@@ -111,6 +59,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string winRmProtocol = jobProperties.WinRmProtocol;
                 string winRmPort = jobProperties.WinRmPort;
                 bool includePortInSPN = jobProperties.SpnPortFlag;
+                SqlServiceUser = jobProperties.SqlServiceUser;
+
+                RegistryPath = $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{StorePath}\\MSSQLServer\\SuperSocketNetLib\\";
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
                 _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
@@ -131,7 +82,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 ps = PowerShell.Create();
                 ps.Runspace = _runSpace;
 
-                var funcScript = string.Format($"Clear-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate");
+                var funcScript = string.Format($"Clear-ItemProperty -Path \"{RegistryPath}\" -Name Certificate");
                 foreach (var cmd in ps.Commands.Commands)
                 {
                     _logger.LogTrace("Logging PowerShell Command");
@@ -196,7 +147,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 if (x509Cert != null)
                     thumbPrint = x509Cert.Thumbprint.ToLower(); //sql server config mgr expects lower
 
-                var funcScript = string.Format($"Set-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate {thumbPrint}");
+                var funcScript = string.Format($"Set-ItemProperty -Path \"{RegistryPath}\" -Name Certificate {thumbPrint}");
                 foreach (var cmd in ps.Commands.Commands)
                 {
                     _logger.LogTrace("Logging PowerShell Command");
@@ -217,7 +168,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     $keyPath = ""$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\""
                     $privKeyPath = (Get-Item ""$keyPath\$privKey"")
                     $Acl = Get-Acl $privKeyPath
-                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""Everyone"", ""Read"", ""Allow"")
+                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""{SqlServiceUser}"", ""Read"", ""Allow"")
                     $Acl.SetAccessRule($Ar)
                     Set-Acl $privKeyPath.FullName $Acl";
 

@@ -13,16 +13,12 @@
 // limitations under the License.
 
 using System;
-using System.Linq;
-using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using System.Net;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
-using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
@@ -74,21 +70,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                 {
                     case CertStoreOperationType.Add:
                         _logger.LogTrace("Entering Add...");
-
                         myRunspace.Open();
                         complete = PerformAddCertificate(config, serverUserName, serverPassword);
                         myRunspace.Close();
-
                         _logger.LogTrace("After Perform Addition...");
                         break;
                     case CertStoreOperationType.Remove:
                         _logger.LogTrace("Entering Remove...");
-
                         _logger.LogTrace("After PerformRemoval...");
                         myRunspace.Open();
                         complete = PerformRemoveCertificate(config, serverUserName, serverPassword);
                         myRunspace.Close();
-
                         _logger.LogTrace("After Perform Removal...");
                         break;
                 }
@@ -126,7 +118,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
             if (result.Result == OrchestratorJobStatusJobResult.Success)
             {
-                // Bind to IIS
+                // Bind to SQL Server
                 ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
                 result = sqlManager.BindCertificate(manager.X509Cert);
                 return result;
@@ -140,7 +132,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             string storePath = config.CertificateStoreDetails.StorePath;
             long jobNumber = config.JobHistoryId;
 
-            // First we need to unbind the certificate from IIS before we remove it from the store
+            // Clear registry entry for SQL Server
             ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
             JobResult result = sqlManager.UnBindCertificate();
 

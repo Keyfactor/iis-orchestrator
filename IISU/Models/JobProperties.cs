@@ -48,6 +48,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         [DefaultValue(SniFlag.None)]
         public SniFlag SniFlag { get; set; }
 
+        [JsonProperty("SqlServiceUser")]
+        [DefaultValue("")]
+        public string SqlServiceUser { get; set; }
     }
 
     internal enum SniFlag
