@@ -29,6 +29,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
     {
         private string SqlServiceUser { get; set; }
         private string SqlInstanceName { get; set; }
+        private string SqlServerServiceName { get; set; }
         private string RegistryPath { get; set; }
         private string RenewalThumbprint { get; set; } = "";
         private string ClientMachineName { get; set; }
@@ -60,6 +61,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 bool includePortInSPN = jobProperties.SpnPortFlag;
                 SqlServiceUser = jobProperties.SqlServiceUser;
                 SqlInstanceName = jobProperties.SqlInstanceName;
+                SqlServerServiceName = jobProperties.SqlServerServiceName;
 
                 RegistryPath = $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{SqlInstanceName}\\MSSQLServer\\SuperSocketNetLib\\";
 
@@ -175,6 +177,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 ps.AddScript(funcScript);
                 ps.Invoke();
                 _logger.LogTrace("ACL FuncScript Invoked...");
+
+                //If user filled in a service name in the store then restart the SQL Server Services
+                if (SqlServerServiceName != null && SqlServerServiceName.Length > 0)
+                {
+                    _logger.LogTrace("Starting to Restart SQL Server Service...");
+                    ps.Commands.Clear();
+                    funcScript = $@"Restart-Service -Name ""{SqlServerServiceName}""";
+
+                    ps.AddScript(funcScript);
+                    ps.Invoke();
+                    _logger.LogTrace("Invoked Restart SQL Server Service....");
+                }
 
                 if (ps.HadErrors)
                 {
