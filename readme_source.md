@@ -268,7 +268,6 @@ Click Save to save the settings for this Certificate Store
 </details>
 
 <details>
-<details>
 <summary>SQL Server Certificate Store</summary>
 
 In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
