@@ -389,8 +389,8 @@ Inventory Schedule | The interval that the system will use to report on what cer
 
 Click Save to save the settings for this Certificate Store
 </details>
-<summary>WinCert Certificate Store</summary>
 <details>
+<summary>WinCert Certificate Store</summary>
 In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
 
 
