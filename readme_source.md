@@ -101,7 +101,73 @@ None of the above entry parameters have the "Depends On" field set.
 Click Save to save the Certificate Store Type.
 
 </details>
+<details>
+	<summary>SQL Server Extension</summary>
 
+**In Keyfactor Command create a new Certificate Store Type as specified below:**
+
+**Basic Settings:**
+
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Name | WinSql | Display name for the store type (may be customized)
+Short Name| WinSql | Short display name for the store type
+Custom Capability | Leave Unchecked | Store type name orchestrator will register with. Check the box to allow entry of value
+Supported Job Types | Inventory, Add, Remove | Job types the extension supports
+Needs Server | Checked | Determines if a target server name is required when creating store
+Blueprint Allowed | Unchecked | Determines if store type may be included in an Orchestrator blueprint
+Uses PowerShell | Unchecked | Determines if underlying implementation is PowerShell
+Requires Store Password	| Unchecked | Determines if a store password is required when configuring an individual store.
+Supports Entry Password	| Unchecked | Determines if an individual entry within a store can have a password.
+
+![](images/SQLServerCertStoreBasic.png)
+
+**Advanced Settings:**
+
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Store Path Type	| Fixed | Fixed to a defined path.  SQL Server Supports the Personal or "My" store on the Local Machine.
+Store Path Value | My | Fixed Value My on the Local Machine Store.
+Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias.
+Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because SQL Server certificates without private keys would be useless.
+PFX Password Style | Default or Custom | "Default" - PFX password is randomly generated, "Custom" - PFX password may be specified when the enrollment job is created (Requires the *Allow Custom Password* application setting to be enabled.)
+
+![](images/SQLServerCertStoreAdvanced.png)
+
+**Custom Fields:**
+
+Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote
+target server containing the certificate store to be managed
+
+Name|Display Name|Type|Default Value / Options|Required|Description
+---|---|---|---|---|---
+WinRm Protocol|WinRm Protocol|Multiple Choice| https,http |Yes|Protocol that target server WinRM listener is using
+WinRm Port|WinRm Port|String|5986|Yes| Port that target server WinRM listener is using. Typically 5985 for HTTP and 5986 for HTTPS
+spnwithport|SPN With Port|Bool|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created).   Check the No Value Checkbox when using GMSA Accounts.
+ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created).  Check the No Value Checkbox when using GMSA Accounts.
+ServerUseSsl|Use SSL|Bool|true|Yes|Determine whether the server uses SSL or not (This field is automatically created)
+SqlServiceUser|SQL Server Service User|String|NT Service\MSSQLSERVER|Yes|The Name of the Service User Running the SQL Server Service or Instance Service Typically NT Service\MSSQLSERVER.
+SqlInstanceName|SQL Server Instance Name|String||Yes|The Name of Instance Can be found in the Registry on the server in HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SQL Server\<InstanceName>.
+SqlServerServiceName|Service Name To Restart (Leave Blank To Not Restart Service)|String||Yes|The Name of Instance if named instances are not setup then typically MSSQLSERVER if named instance then MSSQL$<NamedInstance>.
+
+*Note that some of the Names in the first column above have spaces and some do not, it is important to configure the Name field exactly as above.*
+
+
+![](images/SQLServerCustomFields.png)
+
+**Entry Parameters:**
+
+Entry parameters are inventoried and maintained for each entry within a certificate store.
+They are typically used to support binding of a certificate to a resource.
+
+**There are no Entry Params for this Store Type**
+
+![](images/SQLServerEntryParams.png)
+
+Click Save to save the Certificate Store Type.
+
+</details>
 <details>
 	<summary>WinCert Extension</summary>
 
@@ -202,6 +268,31 @@ Click Save to save the settings for this Certificate Store
 </details>
 
 <details>
+<details>
+<summary>SQL Server Certificate Store</summary>
+
+In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
+
+#### STORE CONFIGURATION 
+CONFIG ELEMENT	|DESCRIPTION
+----------------|---------------
+Category | Select SQL Server Bound Certificate or the customized certificate store display name from above.
+Container | Optional container to associate certificate store with.
+Client Machine | Hostname of the Windows Server containing the certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
+Store Path | Windows certificate store to manage. Fixed to "My". 
+Orchestrator | Select an approved orchestrator capable of managing SQL Server Bound Certificates.
+WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
+WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
+SPN with Port | Typically False. Needed in some Kerberos configurations.
+Server Username | Account to use when establishing the WinRM session to the Client Machine. Account needs to be an administrator or have been granted rights to manage IIS configuration and manipulate the local machine certificate store. If no account is specified, the security context of the Orchestrator service account will be used.
+Server Password | Password to use when establishing the WinRM session to the Client Machine
+Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
+Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
+
+![](images/SQLServerAddCertStore.png)
+
+Click Save to save the settings for this Certificate Store
+</details>
 <summary>WinCert Certificate Store</summary>
 
 In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
@@ -226,6 +317,7 @@ Inventory Schedule | The interval that the system will use to report on what cer
 ![](images/WinCertAddCertStore.png)
 
 </details>
+
 
 
 ## Test Cases
