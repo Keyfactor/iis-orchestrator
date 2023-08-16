@@ -37,7 +37,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
         public List<CurrentInventoryItem> GetInventoryItems(Runspace runSpace, InventoryJobConfiguration jobConfig)
         {
             var jobProperties = JsonConvert.DeserializeObject<JobProperties>(jobConfig.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-            SqlInstanceName = jobProperties.SqlInstanceName;
+            //SqlInstanceName = jobProperties.SqlInstanceName;
 
             // Get the raw certificate inventory from cert store
             List<Certificate> certificates = base.GetCertificatesFromStore(runSpace, jobConfig.CertificateStoreDetails.StorePath);

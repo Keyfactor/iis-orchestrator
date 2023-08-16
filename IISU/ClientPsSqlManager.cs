@@ -30,6 +30,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private string SqlServiceUser { get; set; }
         private string SqlInstanceName { get; set; }
         private string SqlServerServiceName { get; set; }
+        private bool RestartService { get; set; }
         private string RegistryPath { get; set; }
         private string RenewalThumbprint { get; set; } = "";
         private string ClientMachineName { get; set; }
@@ -54,23 +55,24 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
                 }
 
+                if (config.JobProperties.ContainsKey("InstanceName") && config.JobProperties.ContainsKey("RestartService"))
+                {
+                    SqlInstanceName = config.JobProperties["InstanceName"].ToString();
+                    RestartService = Convert.ToBoolean(config.JobProperties["RestartService"].ToString());
+                }
+
                 // Establish PowerShell Runspace
                 var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 string winRmProtocol = jobProperties.WinRmProtocol;
                 string winRmPort = jobProperties.WinRmPort;
                 bool includePortInSPN = jobProperties.SpnPortFlag;
-                SqlServiceUser = jobProperties.SqlServiceUser;
-                SqlInstanceName = jobProperties.SqlInstanceName;
-                SqlServerServiceName = jobProperties.SqlServerServiceName;
-
-                RegistryPath = $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{SqlInstanceName}\\MSSQLServer\\SuperSocketNetLib\\";
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
                 _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
             }
             catch (Exception e)
             {
-                throw new Exception($"Error when initiating an IIS ReEnrollment Job: {e.Message}", e.InnerException);
+                throw new Exception($"Error when initiating a SQL Management Job: {e.Message}", e.InnerException);
             }
         }
 
@@ -83,6 +85,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _runSpace.Open();
                 ps = PowerShell.Create();
                 ps.Runspace = _runSpace;
+
+                RegistryPath = GetSqlCertRegistryLocation(SqlInstanceName, ps);
 
                 var funcScript = string.Format($"Clear-ItemProperty -Path \"{RegistryPath}\" -Name Certificate");
                 foreach (var cmd in ps.Commands.Commands)
@@ -135,6 +139,54 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
+        private string GetSqlInstanceValue(string instanceName,PowerShell ps)
+        {
+            try
+            {
+                var funcScript = string.Format(@$"Get-ItemPropertyValue ""HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL"" -Name {instanceName}");
+                foreach (var cmd in ps.Commands.Commands)
+                {
+                    _logger.LogTrace("Logging PowerShell Command");
+                    _logger.LogTrace(cmd.CommandText);
+                }
+
+                _logger.LogTrace($"funcScript {funcScript}");
+                ps.AddScript(funcScript);
+                _logger.LogTrace("funcScript added...");
+                var SqlInstanceValue = ps.Invoke()[0].ToString();
+                _logger.LogTrace("funcScript Invoked...");
+                ps.Commands.Clear();
+
+                if (!ps.HadErrors)
+                {
+                    return SqlInstanceValue;
+                }
+                return null;
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Error when initiating getting instance name from registry: {e.Message}", e.InnerException);
+            }
+        }
+
+         private string GetSqlCertRegistryLocation(string instanceName,PowerShell ps)
+        {
+            return $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{GetSqlInstanceValue(instanceName,ps)}\\MSSQLServer\\SuperSocketNetLib\\";
+        }
+
+        private string GetSqlServerServiceName(string instanceValue)
+        {
+            if(string.IsNullOrEmpty(instanceValue))
+                return string.Empty;
+
+            //Default SQL Instance has this format
+            if (instanceValue.Split('.')[1] == "MSSQLSERVER")
+                return "MSSQLSERVER";
+
+            //Named Instance service has this format
+            return $"MSSQL`${instanceValue.Split('.')[1]}";
+        }
+
         public JobResult BindCertificate(X509Certificate2 x509Cert)
         {
             try
@@ -144,6 +196,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _runSpace.Open();
                 ps = PowerShell.Create();
                 ps.Runspace = _runSpace;
+
+                RegistryPath = GetSqlCertRegistryLocation(SqlInstanceName, ps);
 
                 var thumbPrint = string.Empty;
                 if (x509Cert != null)
@@ -164,13 +218,24 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 _logger.LogTrace("Setting up Acl Access for Manage Private Keys");
                 ps.Commands.Clear();
+
+                //Get the SqlServer Service User Name
+                var serviceName = GetSqlServerServiceName(GetSqlInstanceValue(SqlInstanceName, ps));
+                funcScript = @$"(Get-WmiObject Win32_Service -Filter ""Name='{serviceName}'"").StartName";
+                ps.AddScript(funcScript);
+                _logger.LogTrace("funcScript added...");
+                SqlServiceUser = ps.Invoke()[0].ToString();
+                _logger.LogTrace("funcScript Invoked...");
+                _logger.LogTrace("Got service login user for ACL Permissions");
+                ps.Commands.Clear();
+
                 funcScript = $@"$thumbprint = '{thumbPrint}'
                     $Cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {{ $_.Thumbprint -eq $thumbprint }}
                     $privKey = $Cert.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName 
                     $keyPath = ""$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\""
                     $privKeyPath = (Get-Item ""$keyPath\$privKey"")
                     $Acl = Get-Acl $privKeyPath
-                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""{SqlServiceUser}"", ""Read"", ""Allow"")
+                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""{SqlServiceUser.Replace("$","`$")}"", ""Read"", ""Allow"")
                     $Acl.SetAccessRule($Ar)
                     Set-Acl $privKeyPath.FullName $Acl";
 
@@ -179,11 +244,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _logger.LogTrace("ACL FuncScript Invoked...");
 
                 //If user filled in a service name in the store then restart the SQL Server Services
-                if (SqlServerServiceName != null && SqlServerServiceName.Length > 0)
+                if (RestartService)
                 {
                     _logger.LogTrace("Starting to Restart SQL Server Service...");
                     ps.Commands.Clear();
-                    funcScript = $@"Restart-Service -Name ""{SqlServerServiceName}""";
+                    funcScript = $@"Restart-Service -Name ""{serviceName}"" -Force";
 
                     ps.AddScript(funcScript);
                     ps.Invoke();
@@ -193,7 +258,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 if (ps.HadErrors)
                 {
                     var psError = ps.Streams.Error.ReadAll()
-                        .Aggregate(string.Empty, (current, error) => current + error.ErrorDetails.Message);
+                        .Aggregate(string.Empty, (current, error) => current + error?.Exception.Message);
                     {
                         return new JobResult
                         {
