@@ -42,18 +42,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public ClientPsSqlManager(ManagementJobConfiguration config, string serverUsername, string serverPassword)
         {
-            _logger = LogHandler.GetClassLogger<ClientPSIIManager>();
+            _logger = LogHandler.GetClassLogger<ClientPsSqlManager>();
 
             try
             {
                 ClientMachineName = config.CertificateStoreDetails.ClientMachine;
                 JobHistoryID = config.JobHistoryId;
-
-                if (config.JobProperties.ContainsKey("RenewalThumbprint"))
-                {
-                    RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
-                    _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
-                }
 
                 if (config.JobProperties.ContainsKey("InstanceName") && config.JobProperties.ContainsKey("RestartService"))
                 {
@@ -69,6 +63,30 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
                 _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Error when initiating a SQL Management Job: {e.Message}", e.InnerException);
+            }
+        }
+
+        public ClientPsSqlManager(InventoryJobConfiguration config,Runspace runSpace)
+        {
+            _logger = LogHandler.GetClassLogger<ClientPsSqlManager>();
+
+            try
+            {
+                ClientMachineName = config.CertificateStoreDetails.ClientMachine;
+                JobHistoryID = config.JobHistoryId;
+
+                // Establish PowerShell Runspace
+                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                string winRmProtocol = jobProperties.WinRmProtocol;
+                string winRmPort = jobProperties.WinRmPort;
+                bool includePortInSPN = jobProperties.SpnPortFlag;
+
+                _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
+                _runSpace = runSpace;
             }
             catch (Exception e)
             {
@@ -139,7 +157,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
-        private string GetSqlInstanceValue(string instanceName,PowerShell ps)
+        public string GetSqlInstanceValue(string instanceName,PowerShell ps)
         {
             try
             {
@@ -169,12 +187,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
-         private string GetSqlCertRegistryLocation(string instanceName,PowerShell ps)
+        public string GetSqlCertRegistryLocation(string instanceName,PowerShell ps)
         {
             return $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{GetSqlInstanceValue(instanceName,ps)}\\MSSQLServer\\SuperSocketNetLib\\";
         }
 
-        private string GetSqlServerServiceName(string instanceValue)
+        public string GetSqlServerServiceName(string instanceValue)
         {
             if(string.IsNullOrEmpty(instanceValue))
                 return string.Empty;
@@ -187,15 +205,73 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return $"MSSQL`${instanceValue.Split('.')[1]}";
         }
 
-        public JobResult BindCertificate(X509Certificate2 x509Cert)
+        public JobResult BindCertificates(string renewalThumbprint, X509Certificate2 x509Cert)
         {
             try
             {
-                _logger.MethodEntry();
+                RenewalThumbprint = renewalThumbprint;
 
                 _runSpace.Open();
                 ps = PowerShell.Create();
                 ps.Runspace = _runSpace;
+                if (!string.IsNullOrEmpty(renewalThumbprint))
+                {
+                    var funcScript = string.Format(@$"(Get-ItemProperty ""HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server"").InstalledInstances");
+                    ps.AddScript(funcScript);
+                    _logger.LogTrace("funcScript added...");
+                    var instances = ps.Invoke();
+                    ps.Commands.Clear();
+                    foreach (var instance in instances)
+                    {
+                        var regLocation = GetSqlCertRegistryLocation(instance.ToString(), ps);
+
+                        funcScript = string.Format(@$"Get-ItemPropertyValue ""{regLocation}"" -Name Certificate");
+                        ps.AddScript(funcScript);
+                        _logger.LogTrace("funcScript added...");
+                        var thumbprint = ps.Invoke()[0].ToString();
+                        ps.Commands.Clear();
+
+                        if (RenewalThumbprint.Contains(thumbprint, StringComparison.CurrentCultureIgnoreCase))
+                        {
+                            BindCertificate(x509Cert, ps);
+                        }
+                    }
+                }
+                else
+                {
+                    BindCertificate(x509Cert, ps);
+                }
+
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = JobHistoryID,
+                    FailureMessage = ""
+                };
+            }
+            catch (Exception e)
+            {
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = JobHistoryID,
+                    FailureMessage = $"Error Occurred in BindCertificates {LogHandler.FlattenException(e)}"
+                };
+            }
+            finally
+            {
+                _runSpace.Close();
+                ps.Runspace.Close();
+                ps.Dispose();
+            }
+
+        }
+        public string BindCertificate(X509Certificate2 x509Cert,PowerShell ps)
+        {
+            try
+            {
+                _logger.MethodEntry();
 
                 RegistryPath = GetSqlCertRegistryLocation(SqlInstanceName, ps);
 
@@ -260,37 +336,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     var psError = ps.Streams.Error.ReadAll()
                         .Aggregate(string.Empty, (current, error) => current + error?.Exception.Message);
                     {
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = JobHistoryID,
-                            FailureMessage =$"Unable to bind certificate to Sql Server"
-                        };
+                        return psError;
                     }
                 }
 
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = JobHistoryID,
-                    FailureMessage = ""
-                };
+                return "";
             }
             catch (Exception e)
             {
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = JobHistoryID,
-                    FailureMessage = $"Error Occurred in InstallCertificate {LogHandler.FlattenException(e)}"
-                };
+                return LogHandler.FlattenException(e);
             }
-            finally
-            {
-                _runSpace.Close();
-                ps.Runspace.Close();
-                ps.Dispose();
-            }
+
         }
     }
 }

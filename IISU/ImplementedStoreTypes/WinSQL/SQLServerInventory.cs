@@ -15,14 +15,10 @@
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
-using Microsoft.PowerShell;
 using Newtonsoft.Json;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 {
@@ -44,50 +40,54 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
             // Contains the inventory items to be sent back to KF
             List<CurrentInventoryItem> myBoundCerts = new List<CurrentInventoryItem>();
-
             using (PowerShell ps2 = PowerShell.Create())
             {
-                ps2.Runspace = runSpace;
+                    //runSpace.Open();
+                    ps2.Runspace = runSpace;
 
-                var searchScript = $"Get-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{SqlInstanceName}\\MSSQLServer\\SuperSocketNetLib\" -Name Certificate";
-                ps2.AddScript(searchScript);
-                var sqlBindings = ps2.Invoke();  // Responsible for getting all bound certificates for each website
-
-                if (ps2.HadErrors)
-                {
-                    var psError = ps2.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
-                }
-
-                if (sqlBindings.Count == 0)
-                {
-                    return myBoundCerts;
-                }
-
-                foreach (var binding in sqlBindings)
-                {
-                    var thumbPrint = $"{(binding.Properties["Certificate"]?.Value)}";
-                    if (string.IsNullOrEmpty(thumbPrint)) continue;
-                    thumbPrint = thumbPrint.ToUpper();
-
-                    Certificate foundCert = certificates.Find(m => m.Thumbprint.ToUpper().Equals(thumbPrint));
-
-                    if (foundCert == null) continue;
-
-                    //in theory should only be one, but keeping for future update to chance inventory
-                    myBoundCerts.Add(
-                    new CurrentInventoryItem
+                    //Get all the installed instances of Sql Server
+                    var funcScript = string.Format(@$"(Get-ItemProperty ""HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server"").InstalledInstances");
+                    ps2.AddScript(funcScript);
+                    //.LogTrace("funcScript added...");
+                    var instances = ps2.Invoke();
+                    ps2.Commands.Clear();
+                    var psSqlManager = new ClientPsSqlManager(jobConfig, runSpace);
+                    foreach (var instance in instances)
                     {
-                        Certificates = new[] { foundCert.CertificateData },
-                        Alias = thumbPrint,
-                        PrivateKeyEntry = foundCert.HasPrivateKey,
-                        UseChainLevel = false,
-                        ItemStatus = OrchestratorInventoryItemStatus.Unknown
+                        var regLocation = psSqlManager.GetSqlCertRegistryLocation(instance.ToString(), ps2);
+
+                        funcScript = string.Format(@$"Get-ItemPropertyValue ""{regLocation}"" -Name Certificate");
+                        ps2.AddScript(funcScript);
+                        //_logger.LogTrace("funcScript added...");
+                        var thumbprint = ps2.Invoke()[0].ToString();
+                        ps2.Commands.Clear();
+                        if (string.IsNullOrEmpty(thumbprint)) continue;
+                        thumbprint = thumbprint.ToUpper();
+
+                        Certificate foundCert = certificates.Find(m => m.Thumbprint.ToUpper().Equals(thumbprint));
+
+                        if (foundCert == null) continue;
+
+                        var sqlSettingsDict = new Dictionary<string, object>
+                             {
+                                 { "InstanceName", instance.ToString() }
+                             };
+
+                        myBoundCerts.Add(
+                        new CurrentInventoryItem
+                        {
+                            Certificates = new[] { foundCert.CertificateData },
+                            Alias = thumbprint,
+                            PrivateKeyEntry = foundCert.HasPrivateKey,
+                            UseChainLevel = false,
+                            ItemStatus = OrchestratorInventoryItemStatus.Unknown,
+                            Parameters = sqlSettingsDict
+                        });
+
                     }
-                );
-                }
+                    return myBoundCerts;
             }
 
-            return myBoundCerts;
         }
     }
 }

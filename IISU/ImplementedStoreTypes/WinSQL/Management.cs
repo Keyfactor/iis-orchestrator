@@ -18,6 +18,7 @@ using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -30,6 +31,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
         public string ExtensionName => string.Empty;
 
         private Runspace myRunspace;
+
+        private string RenewalThumbprint;
 
         public Management(IPAMSecretResolver resolver)
         {
@@ -118,10 +121,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
             if (result.Result == OrchestratorJobStatusJobResult.Success)
             {
+
+                if (config.JobProperties.ContainsKey("RenewalThumbprint"))
+                {
+                    RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
+                    _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
+                }
+
                 // Bind to SQL Server
                 ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
-                result = sqlManager.BindCertificate(manager.X509Cert);
+                result = sqlManager.BindCertificates(RenewalThumbprint,manager.X509Cert);
                 return result;
+
+
+
             } else return result;
         }
 
