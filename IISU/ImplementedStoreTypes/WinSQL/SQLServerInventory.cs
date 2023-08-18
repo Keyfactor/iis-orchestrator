@@ -15,6 +15,7 @@
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Management.Infrastructure;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Management.Automation;
@@ -52,6 +53,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     var instances = ps2.Invoke();
                     ps2.Commands.Clear();
                     var psSqlManager = new ClientPsSqlManager(jobConfig, runSpace);
+                    var commonInstances=new Dictionary<string, string>();
                     foreach (var instance in instances)
                     {
                         var regLocation = psSqlManager.GetSqlCertRegistryLocation(instance.ToString(), ps2);
@@ -64,28 +66,39 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                         if (string.IsNullOrEmpty(thumbprint)) continue;
                         thumbprint = thumbprint.ToUpper();
 
-                        Certificate foundCert = certificates.Find(m => m.Thumbprint.ToUpper().Equals(thumbprint));
+                        if(!commonInstances.ContainsKey(thumbprint))
+                        {
+                            commonInstances.Add(thumbprint, instance.ToString());
+                        }
+                        else
+                        {
+                            commonInstances[thumbprint]= commonInstances[thumbprint]+ "," + instance.ToString();
+                        }
+                    }
+
+                    foreach (var kp in commonInstances)
+                    {
+                        Certificate foundCert = certificates.Find(m => m.Thumbprint.ToUpper().Equals(kp.Key));
 
                         if (foundCert == null) continue;
 
                         var sqlSettingsDict = new Dictionary<string, object>
-                             {
-                                 { "InstanceName", instance.ToString() }
-                             };
+                                         {
+                                             { "InstanceName", kp.Value.ToString() }
+                                         };
 
                         myBoundCerts.Add(
                         new CurrentInventoryItem
                         {
                             Certificates = new[] { foundCert.CertificateData },
-                            Alias = thumbprint,
+                            Alias = kp.Key,
                             PrivateKeyEntry = foundCert.HasPrivateKey,
                             UseChainLevel = false,
                             ItemStatus = OrchestratorInventoryItemStatus.Unknown,
                             Parameters = sqlSettingsDict
                         });
-
                     }
-                    return myBoundCerts;
+                return myBoundCerts;
             }
 
         }

@@ -16,6 +16,7 @@ using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Management.Infrastructure.Serialization;
 using Newtonsoft.Json;
 using System;
 using System.Linq;
@@ -29,7 +30,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
     {
         private string SqlServiceUser { get; set; }
         private string SqlInstanceName { get; set; }
-        private string SqlServerServiceName { get; set; }
         private bool RestartService { get; set; }
         private string RegistryPath { get; set; }
         private string RenewalThumbprint { get; set; } = "";
@@ -49,10 +49,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 ClientMachineName = config.CertificateStoreDetails.ClientMachine;
                 JobHistoryID = config.JobHistoryId;
 
-                if (config.JobProperties.ContainsKey("InstanceName") && config.JobProperties.ContainsKey("RestartService"))
+                if (config.JobProperties.ContainsKey("InstanceName"))
                 {
                     SqlInstanceName = config.JobProperties["InstanceName"].ToString();
-                    RestartService = Convert.ToBoolean(config.JobProperties["RestartService"].ToString());
                 }
 
                 // Establish PowerShell Runspace
@@ -60,6 +59,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string winRmProtocol = jobProperties.WinRmProtocol;
                 string winRmPort = jobProperties.WinRmPort;
                 bool includePortInSPN = jobProperties.SpnPortFlag;
+                RestartService = jobProperties.RestartService;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
                 _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
@@ -273,73 +273,79 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             {
                 _logger.MethodEntry();
 
-                RegistryPath = GetSqlCertRegistryLocation(SqlInstanceName, ps);
 
-                var thumbPrint = string.Empty;
-                if (x509Cert != null)
-                    thumbPrint = x509Cert.Thumbprint.ToLower(); //sql server config mgr expects lower
+                //If they comma separated the instance entry param, they are trying to install to more than 1 instance
+                var instances = SqlInstanceName.Split(',');
 
-                var funcScript = string.Format($"Set-ItemProperty -Path \"{RegistryPath}\" -Name Certificate {thumbPrint}");
-                foreach (var cmd in ps.Commands.Commands)
+                foreach (var instanceName in instances)
                 {
-                    _logger.LogTrace("Logging PowerShell Command");
-                    _logger.LogTrace(cmd.CommandText);
-                }
+                    RegistryPath = GetSqlCertRegistryLocation(instanceName, ps);
 
-                _logger.LogTrace($"funcScript {funcScript}");
-                ps.AddScript(funcScript);
-                _logger.LogTrace("funcScript added...");
-                ps.Invoke();
-                _logger.LogTrace("funcScript Invoked...");
+                    var thumbPrint = string.Empty;
+                    if (x509Cert != null)
+                        thumbPrint = x509Cert.Thumbprint.ToLower(); //sql server config mgr expects lower
 
-                _logger.LogTrace("Setting up Acl Access for Manage Private Keys");
-                ps.Commands.Clear();
+                    var funcScript = string.Format($"Set-ItemProperty -Path \"{RegistryPath}\" -Name Certificate {thumbPrint}");
+                    foreach (var cmd in ps.Commands.Commands)
+                    {
+                        _logger.LogTrace("Logging PowerShell Command");
+                        _logger.LogTrace(cmd.CommandText);
+                    }
 
-                //Get the SqlServer Service User Name
-                var serviceName = GetSqlServerServiceName(GetSqlInstanceValue(SqlInstanceName, ps));
-                funcScript = @$"(Get-WmiObject Win32_Service -Filter ""Name='{serviceName}'"").StartName";
-                ps.AddScript(funcScript);
-                _logger.LogTrace("funcScript added...");
-                SqlServiceUser = ps.Invoke()[0].ToString();
-                _logger.LogTrace("funcScript Invoked...");
-                _logger.LogTrace("Got service login user for ACL Permissions");
-                ps.Commands.Clear();
+                    _logger.LogTrace($"funcScript {funcScript}");
+                    ps.AddScript(funcScript);
+                    _logger.LogTrace("funcScript added...");
+                    ps.Invoke();
+                    _logger.LogTrace("funcScript Invoked...");
 
-                funcScript = $@"$thumbprint = '{thumbPrint}'
+                    _logger.LogTrace("Setting up Acl Access for Manage Private Keys");
+                    ps.Commands.Clear();
+
+                    //Get the SqlServer Service User Name
+                    var serviceName = GetSqlServerServiceName(GetSqlInstanceValue(instanceName, ps));
+                    funcScript = @$"(Get-WmiObject Win32_Service -Filter ""Name='{serviceName}'"").StartName";
+                    ps.AddScript(funcScript);
+                    _logger.LogTrace("funcScript added...");
+                    SqlServiceUser = ps.Invoke()[0].ToString();
+                    _logger.LogTrace("funcScript Invoked...");
+                    _logger.LogTrace("Got service login user for ACL Permissions");
+                    ps.Commands.Clear();
+
+                    funcScript = $@"$thumbprint = '{thumbPrint}'
                     $Cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {{ $_.Thumbprint -eq $thumbprint }}
                     $privKey = $Cert.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName 
                     $keyPath = ""$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\""
                     $privKeyPath = (Get-Item ""$keyPath\$privKey"")
                     $Acl = Get-Acl $privKeyPath
-                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""{SqlServiceUser.Replace("$","`$")}"", ""Read"", ""Allow"")
+                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""{SqlServiceUser.Replace("$", "`$")}"", ""Read"", ""Allow"")
                     $Acl.SetAccessRule($Ar)
                     Set-Acl $privKeyPath.FullName $Acl";
 
-                ps.AddScript(funcScript);
-                ps.Invoke();
-                _logger.LogTrace("ACL FuncScript Invoked...");
-
-                //If user filled in a service name in the store then restart the SQL Server Services
-                if (RestartService)
-                {
-                    _logger.LogTrace("Starting to Restart SQL Server Service...");
-                    ps.Commands.Clear();
-                    funcScript = $@"Restart-Service -Name ""{serviceName}"" -Force";
-
                     ps.AddScript(funcScript);
                     ps.Invoke();
-                    _logger.LogTrace("Invoked Restart SQL Server Service....");
-                }
+                    _logger.LogTrace("ACL FuncScript Invoked...");
 
-                if (ps.HadErrors)
-                {
-                    var psError = ps.Streams.Error.ReadAll()
-                        .Aggregate(string.Empty, (current, error) => current + error?.Exception.Message);
+                    //If user filled in a service name in the store then restart the SQL Server Services
+                    if (RestartService)
                     {
-                        return psError;
+                        _logger.LogTrace("Starting to Restart SQL Server Service...");
+                        ps.Commands.Clear();
+                        funcScript = $@"Restart-Service -Name ""{serviceName}"" -Force";
+
+                        ps.AddScript(funcScript);
+                        ps.Invoke();
+                        _logger.LogTrace("Invoked Restart SQL Server Service....");
+                    }
+
+                    if (ps.HadErrors)
+                    {
+                        var psError = ps.Streams.Error.ReadAll()
+                            .Aggregate(string.Empty, (current, error) => current + error?.Exception.Message);
+                        {
+                            return psError;
+                        }
                     }
                 }
-
                 return "";
             }
             catch (Exception e)
