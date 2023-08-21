@@ -76,21 +76,32 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
                     SQLServerInventory sqlInventory = new SQLServerInventory(_logger);
                     inventoryItems = sqlInventory.GetInventoryItems(myRunspace, config);
-
-                    _logger.LogTrace($"A total of {inventoryItems.Count} were found");
-                    _logger.LogTrace("Closing runspace...");
-                    myRunspace.Close();
-
-                    _logger.LogTrace("Invoking Inventory..");
-                    submitInventory.Invoke(inventoryItems);
-                    _logger.LogTrace($"Inventory Invoked... {inventoryItems.Count} Items");
-
-                    return new JobResult
+                    if (inventoryItems != null)
                     {
-                        Result = OrchestratorJobStatusJobResult.Success,
-                        JobHistoryId = config.JobHistoryId,
-                        FailureMessage = ""
-                    };
+                        _logger.LogTrace($"A total of {inventoryItems.Count} were found");
+                        _logger.LogTrace("Closing runspace...");
+                        myRunspace.Close();
+
+                        _logger.LogTrace("Invoking Inventory..");
+                        submitInventory.Invoke(inventoryItems);
+                        _logger.LogTrace($"Inventory Invoked... {inventoryItems.Count} Items");
+
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Success,
+                            JobHistoryId = config.JobHistoryId,
+                            FailureMessage = ""
+                        };
+                    }
+                    else
+                    {
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = config.JobHistoryId,
+                            FailureMessage = "Inventory Items was null, ensure sql server is installed on the machine."
+                        };
+                    }
                 }
 
                 return new JobResult

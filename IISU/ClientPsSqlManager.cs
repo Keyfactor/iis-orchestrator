@@ -51,7 +51,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 if (config.JobProperties.ContainsKey("InstanceName"))
                 {
-                    SqlInstanceName = config.JobProperties["InstanceName"].ToString();
+                    var instanceRef = config.JobProperties["InstanceName"]?.ToString();
+                    SqlInstanceName = string.IsNullOrEmpty(instanceRef) ? "MSSQLSERVER":instanceRef;
                 }
 
                 // Establish PowerShell Runspace
@@ -209,6 +210,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             try
             {
+                var bindingError = string.Empty;
                 RenewalThumbprint = renewalThumbprint;
 
                 _runSpace.Open();
@@ -233,22 +235,34 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                         if (RenewalThumbprint.Contains(thumbprint, StringComparison.CurrentCultureIgnoreCase))
                         {
-                            BindCertificate(x509Cert, ps);
+                            bindingError=BindCertificate(x509Cert, ps);
                         }
                     }
                 }
                 else
                 {
-                    BindCertificate(x509Cert, ps);
+                    bindingError=BindCertificate(x509Cert, ps);
                 }
 
-
-                return new JobResult
+                if (bindingError.Length == 0)
                 {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = JobHistoryID,
-                    FailureMessage = ""
-                };
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Success,
+                        JobHistoryId = JobHistoryID,
+                        FailureMessage = ""
+                    };
+                }
+                else
+                {
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = JobHistoryID,
+                        FailureMessage = bindingError
+                    };
+                }
+
             }
             catch (Exception e)
             {

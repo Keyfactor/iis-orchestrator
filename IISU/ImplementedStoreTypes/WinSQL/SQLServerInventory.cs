@@ -54,6 +54,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     ps2.Commands.Clear();
                     var psSqlManager = new ClientPsSqlManager(jobConfig, runSpace);
                     var commonInstances=new Dictionary<string, string>();
+
+                if (instances != null && instances[0] != null)
+                {
                     foreach (var instance in instances)
                     {
                         var regLocation = psSqlManager.GetSqlCertRegistryLocation(instance.ToString(), ps2);
@@ -66,13 +69,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                         if (string.IsNullOrEmpty(thumbprint)) continue;
                         thumbprint = thumbprint.ToUpper();
 
-                        if(!commonInstances.ContainsKey(thumbprint))
+                        if (!commonInstances.ContainsKey(thumbprint))
                         {
                             commonInstances.Add(thumbprint, instance.ToString());
                         }
                         else
                         {
-                            commonInstances[thumbprint]= commonInstances[thumbprint]+ "," + instance.ToString();
+                            commonInstances[thumbprint] = commonInstances[thumbprint] + "," + instance.ToString();
                         }
                     }
 
@@ -98,7 +101,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                             Parameters = sqlSettingsDict
                         });
                     }
-                return myBoundCerts;
+                    return myBoundCerts;
+                }
+                else
+                {
+                    return null;
+                }
             }
 
         }
