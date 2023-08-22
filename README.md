@@ -244,9 +244,8 @@ spnwithport|SPN With Port|Bool|false|No|Internally set the -IncludePortInSPN opt
 ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created).   Check the No Value Checkbox when using GMSA Accounts.
 ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created).  Check the No Value Checkbox when using GMSA Accounts.
 ServerUseSsl|Use SSL|Bool|true|Yes|Determine whether the server uses SSL or not (This field is automatically created)
-SqlServiceUser|SQL Server Service User|String|NT Service\MSSQLSERVER|Yes|The Name of the Service User Running the SQL Server Service or Instance Service Typically NT Service\MSSQLSERVER.
-SqlInstanceName|SQL Server Instance Name|String||Yes|The Name of Instance Can be found in the Registry on the server in HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SQL Server\<InstanceName>.
-SqlServerServiceName|Service Name To Restart (Leave Blank To Not Restart Service)|String||Yes|The Name of Instance if named instances are not setup then typically MSSQLSERVER if named instance then MSSQL$<NamedInstance>.
+RestartService|Restart SQL Service After Cert Installed|Bool|False|Yes|If true, Orchestrator will restart the SQL Server Service after installing the certificate.
+
 
 *Note that some of the Names in the first column above have spaces and some do not, it is important to configure the Name field exactly as above.*
 
@@ -258,7 +257,9 @@ SqlServerServiceName|Service Name To Restart (Leave Blank To Not Restart Service
 Entry parameters are inventoried and maintained for each entry within a certificate store.
 They are typically used to support binding of a certificate to a resource.
 
-**There are no Entry Params for this Store Type**
+Name|Display Name| Type|Default Value|Required When|Description
+---|---|---|---|---|---
+InstanceName | Instance Name|String||Not required | When enrolling leave blank or use MSSQLServer for the Default Instance, Instance Name for an Instance or MSSQLServer,Instance Name if enrolling to multiple instances plus the default instance.
 
 ![](images/SQLServerEntryParams.png)
 
@@ -382,6 +383,7 @@ WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
 SPN with Port | Typically False. Needed in some Kerberos configurations.
 Server Username | Account to use when establishing the WinRM session to the Client Machine. Account needs to be an administrator or have been granted rights to manage IIS configuration and manipulate the local machine certificate store. If no account is specified, the security context of the Orchestrator service account will be used.
 Server Password | Password to use when establishing the WinRM session to the Client Machine
+Restart SQL Service After Cert Installed | For each instance the certificate is tied to, the service for that instance will be restarted after the certificate is successfully installed.
 Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
 Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
 
