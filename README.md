@@ -450,7 +450,7 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 2	|New Cert Enrollment To Default Instance MSSQLServer|**Intance Name:** MSSQLServer|Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase2.gif)
 3	|New Cert Enrollment To Instance1|**Intance Name:** Instance1|Cert will be Installed to Instance1, Service will be restarted for Instance1|True|![](images/SQLTestCase3.gif)
 4	|New Cert Enrollment To Instance1 and Default Instance|**Intance Name:** MSSQLServer,Instance1|Cert will be Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase4.gif)
-5	|Renew Cert Enrollment To Instance1 and Default Instance|**Intance Name:** MSSQLServer,Instance1|Cert will be Renewed/Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase5.gif)
+5	|One Click Renew Cert Enrollment To Instance1 and Default Instance|N/A|Cert will be Renewed/Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase5.gif)
 6	|Remove Cert From Instance1 and Default Instance|**Intance Name:** |Cert from TC5 will be Removed From Default Instance and Instance1|True|![](images/SQLTestCase6.gif)
 7	|Inventory Different Certs Different Instance|N/A|2 Certs will be inventoried and each tied to its Instance|True|![](images/SQLTestCase7.gif)
 8	|Inventory Same Cert Different Instance|N/A|2 Certs will be inventoried the cert will have a comma separated list of Instances|True|![](images/SQLTestCase8.gif)
