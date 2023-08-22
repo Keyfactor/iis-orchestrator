@@ -344,3 +344,19 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 15	|New Cert Enrollment Default Site No HostName|**Site Name:** Default Web Site<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:**<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Installed with no HostName|True|![](images/TestCase15Results.gif)
 	
 </details>
+## Test Cases
+<details>
+<summary>WinSql</summary>
+
+Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
+----|------------------------|------------------------------------|--------------|----------------|-------------------------
+1	|New Cert Enrollment To Default Instance Leave Blank|**Intance Name:** |Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase1.gif)
+2	|New Cert Enrollment To Default Instance MSSQLServer|**Intance Name:** MSSQLServer|Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase2.gif)
+3	|New Cert Enrollment To Instance1|**Intance Name:** Instance1|Cert will be Installed to Instance1, Service will be restarted for Instance1|True|![](images/SQLTestCase3.gif)
+4	|New Cert Enrollment To Instance1 and Default Instance|**Intance Name:** MSSQLServer,Instance1|Cert will be Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase4.gif)
+5	|Renew Cert Enrollment To Instance1 and Default Instance|**Intance Name:** MSSQLServer,Instance1|Cert will be Renewed/Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase5.gif)
+5	|Remove Cert From Instance1 and Default Instance|**Intance Name:** |Cert will be Removed From Default Instance and Instance1|True|![](images/SQLTestCase6.gif)
+
+
+	
+</details>
