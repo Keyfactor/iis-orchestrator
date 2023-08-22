@@ -441,7 +441,6 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 15	|New Cert Enrollment Default Site No HostName|**Site Name:** Default Web Site<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:**<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Installed with no HostName|True|![](images/TestCase15Results.gif)
 	
 </details>
-## Test Cases
 <details>
 <summary>WinSql</summary>
 
