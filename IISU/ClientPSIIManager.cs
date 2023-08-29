@@ -178,16 +178,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     var bindings = ps.Invoke();
                     foreach (var binding in bindings)
                     {
-                        if (binding.Properties["Protocol"].Value.ToString().Contains("http"))
+                        if (binding.Properties["Protocol"].Value.ToString().Contains("https"))
                         {
                             _logger.LogTrace("Looping Bindings....");
                             var bindingSiteName = binding.Properties["name"].Value.ToString();
-                            var bindingIpAddress = binding.Properties["Bindings"].Value.ToString()?.Split(':')[0];
-                            var bindingPort = binding.Properties["Bindings"].Value.ToString()?.Split(':')[1];
-                            var bindingHostName = binding.Properties["Bindings"].Value.ToString()?.Split(':')[2];
-                            var bindingProtocol = binding.Properties["Protocol"].Value.ToString();
-                            var bindingThumbprint = binding.Properties["thumbprint"].Value.ToString();
-                            var bindingSniFlg = binding.Properties["sniFlg"].Value.ToString();
+                            var bindingBindings = binding.Properties["Bindings"].Value.ToString()?.Split(':');
+                            var bindingIpAddress = bindingBindings?.Length > 0 ? bindingBindings[0] : null;
+                            var bindingPort = bindingBindings?.Length > 1 ? bindingBindings[1] : null;
+                            var bindingHostName = bindingBindings?.Length > 2 ? bindingBindings[2] : null;
+                            var bindingProtocol = binding.Properties["Protocol"]?.Value?.ToString();
+                            var bindingThumbprint = binding.Properties["thumbprint"]?.Value?.ToString();
+                            var bindingSniFlg = binding.Properties["sniFlg"]?.Value?.ToString();
 
                             _logger.LogTrace(
                                 $"bindingSiteName: {bindingSiteName}, bindingIpAddress: {bindingIpAddress}, bindingPort: {bindingPort}, bindingHostName: {bindingHostName}, bindingProtocol: {bindingProtocol}, bindingThumbprint: {bindingThumbprint}, bindingSniFlg: {bindingSniFlg}");
