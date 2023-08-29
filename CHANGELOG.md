@@ -1,3 +1,6 @@
+2.3.0
+* Added support for SQL Server Bindings
+
 2.2.1
 * Fixed issue where https binding without cert was causing an error
   
