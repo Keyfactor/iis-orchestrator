@@ -21,7 +21,6 @@ WinCertStore Orchestrator
 ###### To report a problem or suggest a new feature, use the **[Issues](../../issues)** tab. If you want to contribute actual bug fixes or proposed enhancements, use the **[Pull requests](../../pulls)** tab.
 
 
-
 ---
 
 
