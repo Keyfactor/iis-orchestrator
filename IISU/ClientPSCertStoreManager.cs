@@ -104,7 +104,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 {
                     _logger.LogTrace("ps Has Errors");
                     var psError = ps.Streams.Error.ReadAll()
-                        .Aggregate(string.Empty, (current, error) => current + error.ErrorDetails.Message);
+                        .Aggregate(string.Empty, (current, error) => current + error?.ErrorDetails.Message);
                     {
                         return new JobResult
                         {
