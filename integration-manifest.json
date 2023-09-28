@@ -126,7 +126,7 @@
             "Style": "Default"
           },
           "StorePathValue": "",
-          "PrivateKeyAllowed": "Required",
+          "PrivateKeyAllowed": "Optional",
           "ServerRequired": true,
           "PowerShell": false,
           "BlueprintAllowed": false,
