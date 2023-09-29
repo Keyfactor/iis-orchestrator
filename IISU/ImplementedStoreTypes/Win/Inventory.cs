@@ -32,10 +32,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         private ILogger _logger;
         public string ExtensionName => string.Empty;
 
-        public Inventory()
-        {
-        }
-
         public Inventory(IPAMSecretResolver resolver)
         {
             _resolver = resolver;
