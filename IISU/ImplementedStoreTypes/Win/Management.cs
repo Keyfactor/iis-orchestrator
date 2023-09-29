@@ -36,10 +36,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 
         private string _thumbprint = string.Empty;
 
-        public Management()
-        {
-        }
-
         public Management(IPAMSecretResolver resolver)
         {
             _resolver= resolver;
