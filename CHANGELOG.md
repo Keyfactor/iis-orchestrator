@@ -1,3 +1,6 @@
+2.2.2
+* Removed empty constructor to resolve PAM provider error when using WinCert store types
+
 2.2.1
 * Fixed issue where https binding without cert was causing an error
   
