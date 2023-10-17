@@ -110,7 +110,7 @@ Click Save to save the Certificate Store Type.
 
 CONFIG ELEMENT | VALUE | DESCRIPTION
 --|--|--
-Name | WinSql | Display name for the store type (may be customized)
+Name | Windows SQL Server Certificate| Display name for the store type (may be customized)
 Short Name| WinSql | Short display name for the store type
 Custom Capability | Leave Unchecked | Store type name orchestrator will register with. Check the box to allow entry of value
 Supported Job Types | Inventory, Add, Remove | Job types the extension supports
