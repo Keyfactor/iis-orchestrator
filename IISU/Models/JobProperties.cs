@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2022 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,6 +48,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         [DefaultValue(SniFlag.None)]
         public SniFlag SniFlag { get; set; }
 
+        [JsonProperty("RestartService")]
+        [DefaultValue(true)]
+        public bool RestartService { get; set; }
     }
 
     internal enum SniFlag
