@@ -14,11 +14,8 @@
 
   <ItemGroup>
     <Compile Remove="ImplementedStoreTypes\WinExch\**" />
-    <Compile Remove="ImplementedStoreTypes\WinSQL\**" />
     <EmbeddedResource Remove="ImplementedStoreTypes\WinExch\**" />
-    <EmbeddedResource Remove="ImplementedStoreTypes\WinSQL\**" />
     <None Remove="ImplementedStoreTypes\WinExch\**" />
-    <None Remove="ImplementedStoreTypes\WinSQL\**" />
   </ItemGroup>
 
   <ItemGroup>
