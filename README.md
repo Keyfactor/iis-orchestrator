@@ -16,7 +16,7 @@ The Universal Orchestrator is the successor to the Windows Orchestrator. This Or
 
 ## Support for WinCertStore Orchestrator
 
-WinCertStore Orchestrator 
+WinCertStore Orchestrator is supported by Keyfactor for Keyfactor customers. If you have a support issue, please open a support ticket with your Keyfactor representative.
 
 ###### To report a problem or suggest a new feature, use the **[Issues](../../issues)** tab. If you want to contribute actual bug fixes or proposed enhancements, use the **[Pull requests](../../pulls)** tab.
 
