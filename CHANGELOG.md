@@ -1,3 +1,6 @@
+2.3.0
+* Added Sql Server Binding Support
+  
 2.2.2
 * Removed empty constructor to resolve PAM provider error when using WinCert store types
 
