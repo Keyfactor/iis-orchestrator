@@ -322,6 +322,96 @@
           "PowerShell": false,
           "BlueprintAllowed": false,
           "CustomAliasAllowed": "Forbidden"
+        },
+        {
+          "Name": "WinSql",
+          "ShortName": "WinSql",
+          "Capability": "WinSql",
+          "LocalStore": false,
+          "SupportedOperations": {
+            "Add": true,
+            "Create": false,
+            "Discovery": false,
+            "Enrollment": false,
+            "Remove": true
+          },
+          "Properties": [
+            {
+              "Name": "WinRm Protocol",
+              "DisplayName": "WinRm Protocol",
+              "Type": "MultipleChoice",
+              "DependsOn": null,
+              "DefaultValue": "https,http",
+              "Required": true
+            },
+            {
+              "Name": "WinRm Port",
+              "DisplayName": "WinRm Port",
+              "Type": "String",
+              "DependsOn": null,
+              "DefaultValue": "5986",
+              "Required": true
+            },
+            {
+              "Name": "ServerUsername",
+              "DisplayName": "Server Username",
+              "Type": "Secret",
+              "DependsOn": null,
+              "DefaultValue": null,
+              "Required": false
+            },
+            {
+              "Name": "ServerPassword",
+              "DisplayName": "Server Password",
+              "Type": "Secret",
+              "DependsOn": null,
+              "DefaultValue": null,
+              "Required": false
+            },
+            {
+              "Name": "ServerUseSsl",
+              "DisplayName": "Use SSL",
+              "Type": "Bool",
+              "DependsOn": null,
+              "DefaultValue": "true",
+              "Required": true
+            },
+            {
+              "Name": "RestartService",
+              "DisplayName": "Restart SQL Service After Cert Installed",
+              "Type": "Bool",
+              "DependsOn": null,
+              "DefaultValue": "false",
+              "Required": true
+            }
+          ],
+          "EntryParameters": [
+            {
+              "Name": "InstanceName",
+              "DisplayName": "Instance Name",
+              "Type": "String",
+              "RequiredWhen": {
+                "HasPrivateKey": false,
+                "OnAdd": false,
+                "OnRemove": false,
+                "OnReenrollment": false
+              }
+            }
+          ],
+          "PasswordOptions": {
+            "EntrySupported": false,
+            "StoreRequired": false,
+            "Style": "Default"
+          },
+          "StorePathValue": "My",
+          "PrivateKeyAllowed": "Optional",
+          "JobProperties": [
+            "InstanceName"
+          ],
+          "ServerRequired": true,
+          "PowerShell": false,
+          "BlueprintAllowed": true,
+          "CustomAliasAllowed": "Forbidden"
         }
       ]
     }
