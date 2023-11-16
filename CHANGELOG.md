@@ -1,3 +1,12 @@
+2.3.0
+* Added Sql Server Binding Support
+  
+2.2.2
+* Removed empty constructor to resolve PAM provider error when using WinCert store types
+
+2.2.1
+* Fixed issue where https binding without cert was causing an error
+  
 2.2.0
 * Added Support for GMSA Account by using no value for ServerUsernanme and ServerPassword. KF Command version 10.2 or later is required to specify empty credentials. 
 * Added local PowerShell support, triggered when specifying 'localhost' as the client machine while using the IISU or WinCert Orchestrator.  This change was tested using KF Command 10.3

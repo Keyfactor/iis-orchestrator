@@ -16,7 +16,7 @@ The Universal Orchestrator is the successor to the Windows Orchestrator. This Or
 
 ## Support for WinCertStore Orchestrator
 
-WinCertStore Orchestrator 
+WinCertStore Orchestrator is supported by Keyfactor for Keyfactor customers. If you have a support issue, please open a support ticket with your Keyfactor representative.
 
 ###### To report a problem or suggest a new feature, use the **[Issues](../../issues)** tab. If you want to contribute actual bug fixes or proposed enhancements, use the **[Pull requests](../../pulls)** tab.
 
@@ -120,23 +120,9 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 1. Delete existing IIS stores. Delete the IISBin store type. Create the new IISU store type. Recreate the IIS stores using the new IISU store type.
 1. Convert existing IISBin certificate stores to IISU certificate stores. There is not currently a way to do this via the Keyfactor API, so direct updates to the underlying Keyfactor SQL database is required. A SQL script (IIS-Conversion.sql) is available in the repository to do this. Hosted customers, which do not have access to the underlying database, will need to work Keyfactor support to run the conversion. On-premises customers can run the script themselves, but are strongly encouraged to ensure that a SQL backup is taken prior running the script (and also be confident that they have a tested database restoration process.)
 
-**Note:** There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.
+**Note: There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
 
-**Note:** In order to leverage GMSA accounts when running the Orchestrator service, version 10.2 of Keyfactor Command is required as it corrects an issue using the "No Value" checkbox when configuring certificate store server credentials.
-
-**Note:** In Command versions up to 10.3, a certificate store is uniquely identified by the target machine and certificate store path,
-which means that the WinCert and IISU store types cannot both be used at the same time on the same server for the same local machine store.
-(You can’t manage the “My” personal store on the same server with WinCert and IISU at the same time.)
-This is anticipated to be corrected in Command version 10.4, which will include the certificate store type as part of the uniqueness test.
-
-**Targeting IIS on Server 2016:** To align with modern security practices and to remove encryption algorithms that are no longer considered secure, version 10.3 of the Command platform changed the set of encryption algorithms used when generating PFX files from 3DES/SHA1/RC4 to AES256/SHA256/3DES.
-This change makes PFX files (which orchestrator management add jobs use internally) incompatible with Server 2016, as Server 2016 does not support the newer algorithms.
-If IIS running on Server 2016 needs to be targeted in your environment, the Command application setting “Enable Legacy Encryption” must be enabled to include the older insecure algorithms when generating PFX files.
-
-When targeting Server 2016 without the legacy encryption enabled, the orchestrator management add job may complete successfully, as the certificate will be delivered, however IIS will be unable to use the certificate as evidenced by a broken certificate binding.
-When examining the certificate, it will show that it has a private key, however attempts to manage or access the keys can generate errors such as “no key found” or “missing stored keyset”.
-Event logs on the target server may contain: "A fatal error occurred when attempting to access the TLS server credential private key. The error code returned from the cryptographic module is 0x8009030D. The internal error state is 10001."
-In some cases the orchestrator job can fail with "Add job failed for Site 'My' on server 'xxxxxx' with error: 'Index was outside the bounds of the array.'"
+**Note: If Looking to use GMSA Accounts to run the Service Kefyactor Command 10.2 or greater is required for No Value checkbox to work**
 
 ## Creating New Certificate Store Types
 Currently this orchestrator handles two extensions: IISU for IIS servers with bound certificates and WinCert for general Windows Certificates.
@@ -216,7 +202,74 @@ None of the above entry parameters have the "Depends On" field set.
 Click Save to save the Certificate Store Type.
 
 </details>
+<details>
+	<summary>SQL Server Extension</summary>
 
+**In Keyfactor Command create a new Certificate Store Type as specified below:**
+
+**Basic Settings:**
+
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Name | Windows SQL Server Certificate| Display name for the store type (may be customized)
+Short Name| WinSql | Short display name for the store type
+Custom Capability | Leave Unchecked | Store type name orchestrator will register with. Check the box to allow entry of value
+Supported Job Types | Inventory, Add, Remove | Job types the extension supports
+Needs Server | Checked | Determines if a target server name is required when creating store
+Blueprint Allowed | Unchecked | Determines if store type may be included in an Orchestrator blueprint
+Uses PowerShell | Unchecked | Determines if underlying implementation is PowerShell
+Requires Store Password	| Unchecked | Determines if a store password is required when configuring an individual store.
+Supports Entry Password	| Unchecked | Determines if an individual entry within a store can have a password.
+
+![](images/SQLServerCertStoreBasic.png)
+
+**Advanced Settings:**
+
+CONFIG ELEMENT | VALUE | DESCRIPTION
+--|--|--
+Store Path Type	| Fixed | Fixed to a defined path.  SQL Server Supports the Personal or "My" store on the Local Machine.
+Store Path Value | My | Fixed Value My on the Local Machine Store.
+Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias.
+Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because SQL Server certificates without private keys would be useless.
+PFX Password Style | Default or Custom | "Default" - PFX password is randomly generated, "Custom" - PFX password may be specified when the enrollment job is created (Requires the *Allow Custom Password* application setting to be enabled.)
+
+![](images/SQLServerCertStoreAdvanced.png)
+
+**Custom Fields:**
+
+Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote
+target server containing the certificate store to be managed
+
+Name|Display Name|Type|Default Value / Options|Required|Description
+---|---|---|---|---|---
+WinRm Protocol|WinRm Protocol|Multiple Choice| https,http |Yes|Protocol that target server WinRM listener is using
+WinRm Port|WinRm Port|String|5986|Yes| Port that target server WinRM listener is using. Typically 5985 for HTTP and 5986 for HTTPS
+spnwithport|SPN With Port|Bool|false|No|Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+ServerUsername|Server Username|Secret||No|The username to log into the target server (This field is automatically created).   Check the No Value Checkbox when using GMSA Accounts.
+ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created).  Check the No Value Checkbox when using GMSA Accounts.
+ServerUseSsl|Use SSL|Bool|true|Yes|Determine whether the server uses SSL or not (This field is automatically created)
+RestartService|Restart SQL Service After Cert Installed|Bool|False|Yes|If true, Orchestrator will restart the SQL Server Service after installing the certificate.
+
+
+*Note that some of the Names in the first column above have spaces and some do not, it is important to configure the Name field exactly as above.*
+
+
+![](images/SQLServerCustomFields.png)
+
+**Entry Parameters:**
+
+Entry parameters are inventoried and maintained for each entry within a certificate store.
+They are typically used to support binding of a certificate to a resource.
+
+Name|Display Name| Type|Default Value|Required When|Description
+---|---|---|---|---|---
+InstanceName | Instance Name|String||Not required | When enrolling leave blank or use MSSQLServer for the Default Instance, Instance Name for an Instance or MSSQLServer,Instance Name if enrolling to multiple instances plus the default instance.
+
+![](images/SQLServerEntryParams.png)
+
+Click Save to save the Certificate Store Type.
+
+</details>
 <details>
 	<summary>WinCert Extension</summary>
 
@@ -317,8 +370,33 @@ Click Save to save the settings for this Certificate Store
 </details>
 
 <details>
-<summary>WinCert Certificate Store</summary>
+<summary>SQL Server Certificate Store</summary>
 
+In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
+
+#### STORE CONFIGURATION 
+CONFIG ELEMENT	|DESCRIPTION
+----------------|---------------
+Category | Select SQL Server Bound Certificate or the customized certificate store display name from above.
+Container | Optional container to associate certificate store with.
+Client Machine | Hostname of the Windows Server containing the certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
+Store Path | Windows certificate store to manage. Fixed to "My". 
+Orchestrator | Select an approved orchestrator capable of managing SQL Server Bound Certificates.
+WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
+WinRm Port | Port WinRM listener is configured for (HTTPS default is 5986)
+SPN with Port | Typically False. Needed in some Kerberos configurations.
+Server Username | Account to use when establishing the WinRM session to the Client Machine. Account needs to be an administrator or have been granted rights to manage IIS configuration and manipulate the local machine certificate store. If no account is specified, the security context of the Orchestrator service account will be used.
+Server Password | Password to use when establishing the WinRM session to the Client Machine
+Restart SQL Service After Cert Installed | For each instance the certificate is tied to, the service for that instance will be restarted after the certificate is successfully installed.
+Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
+Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
+
+![](images/SQLServerAddCertStore.png)
+
+Click Save to save the settings for this Certificate Store
+</details>
+<details>
+<summary>WinCert Certificate Store</summary>
 In Keyfactor Command, navigate to Certificate Stores from the Locations Menu.  Click the Add button to create a new Certificate Store using the settings defined below.
 
 
@@ -343,6 +421,7 @@ Inventory Schedule | The interval that the system will use to report on what cer
 </details>
 
 
+
 ## Test Cases
 <details>
 <summary>IISU</summary>
@@ -364,6 +443,22 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 13	|ReEnrollment to Fortanix HSM|**Subject Name:** cn=www.mysite.com<br/>**Port:** 433<br/>**IP Address:**`*`<br/>**Host Name:** mysite.command.local<br/>**Site Name:**Default Web Site<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https<br/>**Provider Name:** Fortanix KMS CNG Provider<br/>**SAN:** dns=www.mysite.com&dns=mynewsite.com|Cert will be generated with keys stored in Fortanix HSM and the cert will be bound to the supplied site.|true|![](images/ReEnrollment1a.png)![](images/ReEnrollment1b.png)
 14	|New Cert Enrollment To New Binding With Pam Creds|**Site Name:** FirstSite<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:** www.firstsite.com<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Created with Enrollment Params specified creds pulled from Pam Provider|True|![](images/TestCase1Results.gif)
 15	|New Cert Enrollment Default Site No HostName|**Site Name:** Default Web Site<br/>**Port:** 443<br/>**IP Address:**`*`<br/>**Host Name:**<br/>**Sni Flag:** 0 - No SNI<br/>**Protocol:** https|New Binding Installed with no HostName|True|![](images/TestCase15Results.gif)
+	
+</details>
+<details>
+<summary>WinSql</summary>
+
+Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
+----|------------------------|------------------------------------|--------------|----------------|-------------------------
+1	|New Cert Enrollment To Default Instance Leave Blank|**Intance Name:** |Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase1.gif)
+2	|New Cert Enrollment To Default Instance MSSQLServer|**Intance Name:** MSSQLServer|Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase2.gif)
+3	|New Cert Enrollment To Instance1|**Intance Name:** Instance1|Cert will be Installed to Instance1, Service will be restarted for Instance1|True|![](images/SQLTestCase3.gif)
+4	|New Cert Enrollment To Instance1 and Default Instance|**Intance Name:** MSSQLServer,Instance1|Cert will be Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase4.gif)
+5	|One Click Renew Cert Enrollment To Instance1 and Default Instance|N/A|Cert will be Renewed/Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase5.gif)
+6	|Remove Cert From Instance1 and Default Instance|**Intance Name:** |Cert from TC5 will be Removed From Default Instance and Instance1|True|![](images/SQLTestCase6.gif)
+7	|Inventory Different Certs Different Instance|N/A|2 Certs will be inventoried and each tied to its Instance|True|![](images/SQLTestCase7.gif)
+8	|Inventory Same Cert Different Instance|N/A|2 Certs will be inventoried the cert will have a comma separated list of Instances|True|![](images/SQLTestCase8.gif)
+9	|Inventory Against Machine Without SQL Server|N/A|Will fail with error saying it can't find SQL Server|True|![](images/SQLTestCase9.gif)
 	
 </details>
 
