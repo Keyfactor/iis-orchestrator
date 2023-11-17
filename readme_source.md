@@ -54,7 +54,7 @@ CONFIG ELEMENT | VALUE | DESCRIPTION
 Store Path Type	| Multiple Choice | Determines what restrictions are applied to the store path field when configuring a new store.
 Store Path Value | My,WebHosting | Comma separated list of options configure multiple choice. This, combined with the hostname, will determine the location used for the certificate store management and inventory.
 Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias.
-Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be useless.
+Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid.
 PFX Password Style | Default or Custom | "Default" - PFX password is randomly generated, "Custom" - PFX password may be specified when the enrollment job is created (Requires the *Allow Custom Password* application setting to be enabled.)
 
 ![](images/IISUCertStoreAdv.png)
@@ -196,7 +196,7 @@ CONFIG ELEMENT | VALUE | DESCRIPTION
 --|--|--
 Store Path Type	| Freeform | Allows users to type in a valid certificate store.
 Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias.
-Private Keys | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be useless.
+Private Keys | Optional | This determines if Keyfactor can send the private key associated with a certificate to the store. Typically the personal store would have private keys, whereas trusted root would not.
 PFX Password Style | Default or Custom | "Default" - PFX password is randomly generated, "Custom" - PFX password may be specified when the enrollment job is created (Requires the *Allow Custom Password* application setting to be enabled.)
 
 ![](images/WinCertAdvanced.png)
