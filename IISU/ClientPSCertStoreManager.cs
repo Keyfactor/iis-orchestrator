@@ -65,9 +65,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         X509KeyStorageFlags.Exportable
                     );
 
-                _logger.LogTrace($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
-                _logger.LogTrace(
-                    $"Begin Add for Cert Store {$@"\\{_runspace.ConnectionInfo.ComputerName}\{storePath}"}");
+                _logger.LogDebug($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
+                _logger.LogDebug($"Begin Add for Cert Store {$@"\\{_runspace.ConnectionInfo.ComputerName}\{storePath}"}");
 
                 // Add Certificate 
                 var funcScript = @"
@@ -83,12 +82,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         }";
 
                 ps.AddScript(funcScript).AddStatement();
-                _logger.LogTrace("InstallPfxToMachineStore Statement Added...");
+                _logger.LogDebug("InstallPfxToMachineStore Statement Added...");
 
                 ps.AddCommand("InstallPfxToMachineStore")
                     .AddParameter("bytes", Convert.FromBase64String(certificateContents))
                     .AddParameter("password", privateKeyPassword)
                     .AddParameter("storeName", $@"\\{_runspace.ConnectionInfo.ComputerName}\{storePath}");
+                
                 _logger.LogTrace("InstallPfxToMachineStore Command Added...");
 
                 foreach (var cmd in ps.Commands.Commands)
@@ -100,6 +100,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _logger.LogTrace("Invoking ps...");
                 ps.Invoke();
                 _logger.LogTrace("ps Invoked...");
+
                 if (ps.HadErrors)
                 {
                     _logger.LogTrace("ps Has Errors");
@@ -119,6 +120,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _logger.LogTrace("Clearing Commands...");
                 ps.Commands.Clear();
                 _logger.LogTrace("Commands Cleared..");
+                _logger.LogInformation($"Certificate was successfully added to cert store: {storePath}");
                 
                 return new JobResult
                 {
@@ -129,6 +131,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             catch (Exception e)
             {
+                _logger.LogError($"Error Occurred in ClientPSCertStoreManager.AddCertificate(): {e.Message}");
+
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
