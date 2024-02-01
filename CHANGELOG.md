@@ -1,3 +1,6 @@
+2.3.1
+* Added additional error trapping for WinRM connections to allow actual error on failure.
+
 2.3.0
 * Added Sql Server Binding Support
 * Modified WinCert Advanced PrivateKeyAllowed setting from Required to Optional
