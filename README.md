@@ -269,6 +269,7 @@ ServerUsername|Server Username|Secret||No|The username to log into the target se
 ServerPassword|Server Password|Secret||No|The password that matches the username to log into the target server (This field is automatically created).  Check the No Value Checkbox when using GMSA Accounts.
 ServerUseSsl|Use SSL|Bool|true|Yes|Determine whether the server uses SSL or not (This field is automatically created)
 RestartService|Restart SQL Service After Cert Installed|Bool|False|Yes|If true, Orchestrator will restart the SQL Server Service after installing the certificate.
+=======
 
 
 *Note that some of the Names in the first column above have spaces and some do not, it is important to configure the Name field exactly as above.*
@@ -411,8 +412,9 @@ Restart SQL Service After Cert Installed | For each instance the certificate is 
 Use SSL | Ignored for this certificate store type. Transport encryption is determined by the WinRM Protocol Setting
 Inventory Schedule | The interval that the system will use to report on what certificates are currently in the store. 
 
-![](images/SQLServerAddCertStore.png)
+=======
 
+![](images/SQLServerAddCertStore.png)
 Click Save to save the settings for this Certificate Store
 </details>
 <details>
