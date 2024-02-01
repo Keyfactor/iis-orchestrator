@@ -119,26 +119,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 string storePath = config.CertificateStoreDetails.StorePath;
                 long jobNumber = config.JobHistoryId;
 
-                // Setup a new connection to the client machine
-                //var connectionInfo = new WSManConnectionInfo(new Uri($"{certStoreDetails?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{certStoreDetails?.WinRmPort}/wsman"));
-                //_logger.LogTrace($"WinRm URL: {certStoreDetails?.WinRmProtocol}://{config.CertificateStoreDetails.ClientMachine}:{certStoreDetails?.WinRmPort}/wsman");
-
                 if (storePath != null)
                 {
-                    _logger.LogTrace($"Attempting to get licenses from cert path: {storePath})");
+                    _logger.LogInformation($"Attempting to add certificate to cert store: {storePath}");
                     
                     ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
-                    JobResult result = manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
-                    
-                    _logger.LogTrace($"Certificate was successfully added to cert store: {storePath})");
+                    return manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
                 }
-
-                return new JobResult
+                else
                 {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = ""
-                };
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = config.JobHistoryId,
+                        FailureMessage = "Store Path is empty or null."
+                    };
+                }
             }
             catch (Exception e)
             {
