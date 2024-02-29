@@ -16,6 +16,7 @@ using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using System;
+using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
@@ -45,6 +46,145 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _jobNumber = jobNumber;
         }
 
+        public string CreatePFXFile(string certificateContents, string privateKeyPassword)
+        {
+            try
+            {
+                // Create the x509 certificate
+                //x509Cert = new X509Certificate2
+                //    (
+                //        Convert.FromBase64String(certificateContents),
+                //        privateKeyPassword,
+                //        X509KeyStorageFlags.MachineKeySet |
+                //        X509KeyStorageFlags.PersistKeySet |
+                //        X509KeyStorageFlags.Exportable
+                //    );
+
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.Runspace = _runspace;
+
+                    // Add script to write certificate contents to a temporary file
+                    string script = @"
+                            param($certificateContents)
+                            $filePath = [System.IO.Path]::GetTempFileName() + '.pfx'
+                            [System.IO.File]::WriteAllBytes($filePath, [System.Convert]::FromBase64String($certificateContents))
+                            $filePath
+                            ";
+
+                    ps.AddScript(script);
+                    ps.AddParameter("certificateContents", certificateContents); // Convert.ToBase64String(x509Cert.Export(X509ContentType.Pkcs12)));
+
+                    // Invoke the script on the remote computer
+                    var results = ps.Invoke();
+
+                    // Get the result (temporary file path) returned by the script
+                    return results[0].ToString();
+                }
+            }
+            catch (Exception)
+            {
+                throw new Exception("An error occurred while attempting to create and write the X509 contents.");
+            }
+        }
+
+        public void DeletePFXFile(string filePath, string fileName)
+        {
+            using (PowerShell ps = PowerShell.Create())
+            {
+                ps.Runspace = _runspace;
+
+                // Add script to delete the temporary file
+                string deleteScript = @"
+                        param($filePath)
+                        Remove-Item -Path $filePath -Force
+                        ";
+
+                ps.AddScript(deleteScript);
+                ps.AddParameter("filePath", Path.Combine(filePath, fileName) + "*");
+
+                // Invoke the script to delete the file
+                var results = ps.Invoke();
+            }
+        }
+
+        public JobResult ImportPFXFile(string filePath, string privateKeyPassword, string cryptoProviderName)
+        {
+            try
+            {
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.Runspace = _runspace;
+
+                    if (cryptoProviderName == null)
+                    {
+                        string script = @"
+                        param($pfxFilePath, $privateKeyPassword, $cspName)
+                        $output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
+                        $output
+                        ";
+
+                        ps.AddScript(script);
+                        ps.AddParameter("pfxFilePath", filePath);
+                        ps.AddParameter("privateKeyPassword", privateKeyPassword);
+                    }
+                    else
+                    {
+                        string script = @"
+                        param($pfxFilePath, $privateKeyPassword, $cspName)
+                        $output = certutil -importpfx -csp $cspName -p $privateKeyPassword $pfxFilePath 2>&1
+                        $output
+                        ";
+
+                        ps.AddScript(script);
+                        ps.AddParameter("pfxFilePath", filePath);
+                        ps.AddParameter("privateKeyPassword", privateKeyPassword);
+                        ps.AddParameter("cspName", cryptoProviderName);
+                    }
+
+                    // Invoke the script
+                    var results = ps.Invoke();
+
+                    // Check for errors in the output
+                    bool isError = false;
+                    foreach (var result in results)
+                    {
+                        string outputLine = result.ToString();
+                        if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error"))
+                        {
+                            isError = true;
+                            Console.WriteLine(outputLine); // Print the error message
+                        }
+                    }
+
+                    if (isError)
+                    {
+                        throw new Exception("Error occurred while attempting to import the pfx file.");
+                    }
+                    else
+                    {
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Success,
+                            JobHistoryId = _jobNumber,
+                            FailureMessage = ""
+                        };
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError($"Error Occurred in ClientPSCertStoreManager.ImportPFXFile(): {e.Message}");
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = _jobNumber,
+                    FailureMessage = $"Error Occurred in ImportPFXFile {LogHandler.FlattenException(e)}"
+                };
+            }
+        }
+
         public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string storePath)
         {
             try
@@ -64,9 +204,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         X509KeyStorageFlags.PersistKeySet | 
                         X509KeyStorageFlags.Exportable
                     );
-
-                _logger.LogDebug($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
-                _logger.LogDebug($"Begin Add for Cert Store {$@"\\{_runspace.ConnectionInfo.ComputerName}\{storePath}"}");
 
                 // Add Certificate 
                 var funcScript = @"

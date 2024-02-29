@@ -15,6 +15,8 @@
 using Keyfactor.Logging;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
@@ -54,8 +56,55 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
             Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
-
+            
             return rs;
+        }
+
+        public static IEnumerable<string> GetCSPList(Runspace myRunspace)
+        {
+            _logger.LogTrace("Getting the list of Crypto Service Providers");
+
+            using var ps = PowerShell.Create();
+
+            ps.Runspace = myRunspace;
+
+            var certStoreScript = $@"
+                                $certUtilOutput = certutil -csplist
+
+                                $cspInfoList = @()
+                                foreach ($line in $certUtilOutput) {{
+                                    if ($line -match ""Provider Name:"") {{
+                                        $cspName = ($line -split "":"")[1].Trim()
+                                        $cspInfoList += $cspName
+                                    }}
+                                }}
+
+                                $cspInfoList";
+
+            ps.AddScript(certStoreScript);
+
+            foreach (var result in ps.Invoke())
+            {
+                var cspName = result?.BaseObject?.ToString();
+                if (cspName != null) { yield return cspName; }
+            }
+
+            _logger.LogInformation("No Crypto Service Providers were found");
+            yield return null;
+        }
+
+        public static bool IsCSPFound(IEnumerable<string> cspList, string userCSP)
+        {
+            foreach (var csp in cspList)
+            {
+                if (string.Equals(csp, userCSP, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogTrace($"CSP found: {csp}");
+                    return true;
+                }
+            }
+            _logger.LogTrace($"CSP: {userCSP} was not found");
+            return false;
         }
     }
 }

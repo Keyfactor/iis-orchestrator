@@ -22,5 +22,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         public byte[] RawData { get; set; }
         public bool HasPrivateKey { get; set; }
         public string CertificateData => Convert.ToBase64String(RawData);
+        public string CryptoServiceProvider { get; set; }
+        public string SAN { get; set; }
     }
 }
