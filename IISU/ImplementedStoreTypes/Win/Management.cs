@@ -128,12 +128,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 {
                     _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
                     if (!PsHelper.IsCSPFound(PsHelper.GetCSPList(myRunspace), cryptoProvider))
-                        { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the Crypto Provider provided."); }
+                        { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
                 }
 
                 if (storePath != null)
                 {
-                    _logger.LogInformation($"Attempting to add certificate to cert store: {storePath}");
+                    _logger.LogInformation($"Attempting to add WinCert certificate to cert store: {storePath}");
 
                     ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
 
@@ -149,7 +149,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 
                     return result;
 
-                    // This method is being retired
+                    // This method is retired
                     // return manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
                 }
                 else

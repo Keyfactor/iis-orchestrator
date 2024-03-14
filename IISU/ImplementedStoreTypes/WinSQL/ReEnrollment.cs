@@ -17,28 +17,28 @@ using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSQL
 {
-    public class ReEnrollment: WinCertJobTypeBase, IReenrollmentJobExtension
+    public class ReEnrollment : WinCertJobTypeBase, IReenrollmentJobExtension
     {
         private ILogger _logger;
+        private string RenewalThumbprint;
 
+        public string ExtensionName => string.Empty;
 
         public ReEnrollment(IPAMSecretResolver resolver)
         {
             _resolver = resolver;
         }
 
-        public string ExtensionName => string.Empty;
-        
         public JobResult ProcessJob(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReEnrollmentUpdate)
         {
-
             _logger = LogHandler.GetClassLogger(typeof(ReEnrollment));
 
             ClientPSCertStoreReEnrollment myReEnrollment = new ClientPSCertStoreReEnrollment(_logger, _resolver);
-            return myReEnrollment.PerformReEnrollment(config, submitReEnrollmentUpdate, CertStoreBindingTypeENUM.WinIIS);
 
+            // SQL ReEnrollment performs a different type of binding.  Set the bindcertificate to false and call SQL Binding
+            return myReEnrollment.PerformReEnrollment(config, submitReEnrollmentUpdate, CertStoreBindingTypeENUM.WinSQL);
         }
     }
 }

@@ -95,6 +95,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
+        public ClientPsSqlManager(ReenrollmentJobConfiguration config, string serverUsername, string serverPassword)
+        {
+            _logger = LogHandler.GetClassLogger<ClientPsSqlManager>();
+        }
+
         public JobResult UnBindCertificate()
         {
             try

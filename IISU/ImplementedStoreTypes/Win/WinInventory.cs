@@ -39,7 +39,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                             { "SAN", cert.SAN }
                         };
 
-
                 inventoryItems.Add(new CurrentInventoryItem
                 {
                     Certificates = new[] { cert.CertificateData },

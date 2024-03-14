@@ -51,14 +51,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             try
             {
                 // Create the x509 certificate
-                //x509Cert = new X509Certificate2
-                //    (
-                //        Convert.FromBase64String(certificateContents),
-                //        privateKeyPassword,
-                //        X509KeyStorageFlags.MachineKeySet |
-                //        X509KeyStorageFlags.PersistKeySet |
-                //        X509KeyStorageFlags.Exportable
-                //    );
+                x509Cert = new X509Certificate2
+                    (
+                        Convert.FromBase64String(certificateContents),
+                        privateKeyPassword,
+                        X509KeyStorageFlags.MachineKeySet |
+                        X509KeyStorageFlags.PersistKeySet |
+                        X509KeyStorageFlags.Exportable
+                    );
 
                 using (PowerShell ps = PowerShell.Create())
                 {
@@ -185,6 +185,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
+        [Obsolete("This method is no longer used.  Certificates are added by creating and importing PFX files.", false)]
         public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string storePath)
         {
             try
@@ -211,7 +212,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                         function InstallPfxToMachineStore([byte[]]$bytes, [string]$password, [string]$storeName) {
                             $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, ""LocalMachine""
-                            $certStore.Open(5)
+                            $certStore.Open('MaxAllowed')
                             $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $password, 18 <# Persist, Machine #>
                             $certStore.Add($cert)
 

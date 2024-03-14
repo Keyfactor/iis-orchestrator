@@ -52,6 +52,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                             Thumbprint = $_.Thumbprint
                                             HasPrivateKey = $_.HasPrivateKey
                                             RawData = $_.RawData
+                                            san = $_.Extensions | Where-Object {{ $_.Oid.FriendlyName -eq ""Subject Alternative Name"" }} | ForEach-Object {{ $_.Format($false) }}
                                         }}
 
                                         if ($_.HasPrivateKey) {{
@@ -73,7 +74,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         HasPrivateKey = bool.Parse($"{c.Properties["HasPrivateKey"]?.Value}"),
                         RawData = (byte[])c.Properties["RawData"]?.Value,
                         CryptoServiceProvider = $"{c.Properties["CSP"]?.Value }",
-                        SAN = $"{c.Properties["Subject"]?.Value}"
+                        SAN = Certificate.Utilities.FormatSAN($"{c.Properties["san"]?.Value}")  
                     });
                 }
 
