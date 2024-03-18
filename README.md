@@ -236,7 +236,7 @@ Short Name| WinSql | Short display name for the store type
 Custom Capability | Leave Unchecked | Store type name orchestrator will register with. Check the box to allow entry of value
 Supported Job Types | Inventory, Add, Remove | Job types the extension supports
 Needs Server | Checked | Determines if a target server name is required when creating store
-Blueprint Allowed | Unchecked | Determines if store type may be included in an Orchestrator blueprint
+Blueprint Allowed | Checked | Determines if store type may be included in an Orchestrator blueprint
 Uses PowerShell | Unchecked | Determines if underlying implementation is PowerShell
 Requires Store Password	| Unchecked | Determines if a store password is required when configuring an individual store.
 Supports Entry Password	| Unchecked | Determines if an individual entry within a store can have a password.
@@ -284,6 +284,7 @@ They are typically used to support binding of a certificate to a resource.
 Name|Display Name| Type|Default Value|Required When|Description
 ---|---|---|---|---|---
 InstanceName | Instance Name|String||Not required | When enrolling leave blank or use MSSQLServer for the Default Instance, Instance Name for an Instance or MSSQLServer,Instance Name if enrolling to multiple instances plus the default instance.
+ProviderName | Crypto Provider Name | String ||| Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server.
 
 ![](images/SQLServerEntryParams.png)
 
