@@ -74,7 +74,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                         function InstallPfxToMachineStore([byte[]]$bytes, [string]$password, [string]$storeName) {
                             $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, ""LocalMachine""
-                            $certStore.Open(5)
+                            $certStore.Open('MaxAllowed')
                             $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $password, 18 <# Persist, Machine #>
                             $certStore.Add($cert)
 
