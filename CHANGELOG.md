@@ -2,7 +2,11 @@
 * Changed the way certificates are added to cert stores.  CertUtil is now used to import the PFX certificate into the associated store.  The CSP is now considered when maintaining certificates, empty CSP values will result in using the machines default CSP.
 * Added the Crypto Service Provider and SAN Entry Parameters to be used on Inventory queries, Adding and ReEnrollments for the WinCert and IISU extensions.  The CSP was added for WinSWL for Management Add jobs only.
 
+2.3.2
+* Changed the Open Cert Store access level from a '5' to 'MaxAllowed'
+
 2.3.1
+
 * Added additional error trapping for WinRM connections to allow actual error on failure.
 
 2.3.0
