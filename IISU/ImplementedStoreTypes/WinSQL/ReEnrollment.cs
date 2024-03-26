@@ -22,7 +22,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSQL
     public class ReEnrollment : WinCertJobTypeBase, IReenrollmentJobExtension
     {
         private ILogger _logger;
-        private string RenewalThumbprint;
 
         public string ExtensionName => string.Empty;
 

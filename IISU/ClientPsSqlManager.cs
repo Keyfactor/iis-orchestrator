@@ -187,6 +187,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
                 return null;
             }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                throw new Exception($"There were no SQL instances with the name: {instanceName}.  Please check the spelling of the SQL instance.");
+            }
             catch (Exception e)
             {
                 throw new Exception($"Error when initiating getting instance name from registry: {e.Message}", e.InnerException);

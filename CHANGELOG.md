@@ -1,12 +1,14 @@
 2.4.0
 * Changed the way certificates are added to cert stores.  CertUtil is now used to import the PFX certificate into the associated store.  The CSP is now considered when maintaining certificates, empty CSP values will result in using the machines default CSP.
-* Added the Crypto Service Provider and SAN Entry Parameters to be used on Inventory queries, Adding and ReEnrollments for the WinCert and IISU extensions.  The CSP was added for WinSWL for Management Add jobs only.
+* Added the Crypto Service Provider and SAN Entry Parameters to be used on Inventory queries, Adding and ReEnrollments for the WinCert, WinSQL and IISU extensions.
+* Changed how Client Machine Names are handled when a 'localhost' connection is desiered.  The new naming convention is:  {machineName}|localmachine.  This will eliminate the issue of unqiue naming conflicts.
+* Updated the manifest.json to now include WinSQL ReEnrollment.
+* Updated the integration-manifest.json file for new fields in cert store types.
 
 2.3.2
 * Changed the Open Cert Store access level from a '5' to 'MaxAllowed'
 
 2.3.1
-
 * Added additional error trapping for WinRM connections to allow actual error on failure.
 
 2.3.0

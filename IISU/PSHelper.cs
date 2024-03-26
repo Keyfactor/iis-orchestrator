@@ -32,8 +32,35 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = LogHandler.GetClassLogger<PsHelper>();
             _logger.MethodEntry();
 
-            if (clientMachineName.ToLower() != "localhost")
-            
+            // 2.4 - Client Machine Name now follows the naming conventions of {clientMachineName}|{localMachine}
+            // If the clientMachineName is just 'localhost', it will maintain that as locally only (as previosuly)
+            // If there is no 2nd part to the clientMachineName, a remote PowerShell session will be created
+
+            // Break the clientMachineName into parts
+            string[] parts = clientMachineName.Split('|');
+
+            // Extract the client machine name and arguments based upon the number of parts
+            string machineName = parts.Length > 1 ? parts[0] : clientMachineName;
+            string argument = parts.Length > 1 ? parts[1] : null;
+
+            // Determine if this is truely a local connection
+            bool isLocal = (machineName.ToLower() == "localhost") || (argument != null && argument.ToLower() == "localmachine");
+
+            _logger.LogInformation($"Full clientMachineName={clientMachineName} | machineName={machineName} | argument={argument} | isLocal={isLocal}");
+
+            if (isLocal)
+            {
+                // Create an out of process PowerShell runspace and explictly use version 5.1
+                // This is needed when running as a service, which is how the orchestrator extension operates
+                // Interestingly this is not needd when running as a console application
+                // TODO: Consider refactoring this so that we properly dispose of these objects instead of waiting on the GC
+
+                PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+                Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
+
+                return rs;
+            }
+            else
             {
                 var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{winRmPort}/wsman"));
                 connInfo.IncludePortInSPN = includePortInSpn;
@@ -48,16 +75,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
                 return RunspaceFactory.CreateRunspace(connInfo);
             }
-
-            // Create an out of process PowerShell runspace and explictly use version 5.1
-            // This is needed when running as a service, which is how the orchestrator extension operates
-            // Interestingly this is not needd when running as a console application
-            // TODO: Consider refactoring this so that we properly dispose of these objects instead of waiting on the GC
-
-            PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
-            
-            return rs;
         }
 
         public static IEnumerable<string> GetCSPList(Runspace myRunspace)
