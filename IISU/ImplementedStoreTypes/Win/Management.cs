@@ -23,6 +23,7 @@ using System.Management.Automation.Runspaces;
 using System.Management.Automation;
 using System.Net;
 using Keyfactor.Logging;
+using System.IO;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
@@ -114,26 +115,46 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         {
             try
             {
+#nullable enable
                 string certificateContents = config.JobCertificate.Contents;
                 string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
                 string storePath = config.CertificateStoreDetails.StorePath;
                 long jobNumber = config.JobHistoryId;
+                string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
+#nullable disable
+
+                // If a crypto provider was provided, check to see if it exists
+                if (cryptoProvider !=  null)
+                {
+                    _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
+                    if (!PsHelper.IsCSPFound(PsHelper.GetCSPList(myRunspace), cryptoProvider))
+                        { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
+                }
 
                 if (storePath != null)
                 {
-                    _logger.LogInformation($"Attempting to add certificate to cert store: {storePath}");
-                    
+                    _logger.LogInformation($"Attempting to add WinCert certificate to cert store: {storePath}");
+
                     ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
-                    return manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
+
+                    // Write the certificate contents to a temporary file on the remote computer, returning the filename.
+                    string filePath = manager.CreatePFXFile(certificateContents, privateKeyPassword);
+                    _logger.LogTrace($"{filePath} was created.");
+
+                    // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
+                    JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider);
+
+                    // Delete the temporary file
+                    manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
+
+                    return result;
+
+                    // This method is retired
+                    // return manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
                 }
                 else
                 {
-                    return new JobResult
-                    {
-                        Result = OrchestratorJobStatusJobResult.Failure,
-                        JobHistoryId = config.JobHistoryId,
-                        FailureMessage = "Store Path is empty or null."
-                    };
+                    throw new Exception($"The store pathis empty or null.");
                 }
             }
             catch (Exception e)

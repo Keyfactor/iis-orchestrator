@@ -305,7 +305,7 @@
                 "HasPrivateKey": false,
                 "OnAdd": false,
                 "OnRemove": false,
-                "OnReenrollment": false
+                "OnReenrollment": true
               },
               "DependsOn": "",
               "DefaultValue": "",
@@ -397,6 +397,34 @@
                 "OnRemove": false,
                 "OnReenrollment": false
               }
+            },
+            {
+              "Name": "ProviderName",
+              "DisplayName": "Crypto Provider Name",
+              "Type": "String",
+              "RequiredWhen": {
+                "HasPrivateKey": false,
+                "OnAdd": false,
+                "OnRemove": false,
+                "OnReenrollment": false
+              },
+              "DependsOn": "",
+              "DefaultValue": "",
+              "Options": ""
+            },
+            {
+              "Name": "SAN",
+              "DisplayName": "SAN",
+              "Type": "String",
+              "RequiredWhen": {
+                "HasPrivateKey": false,
+                "OnAdd": false,
+                "OnRemove": false,
+                "OnReenrollment": true
+              },
+              "DependsOn": "",
+              "DefaultValue": "",
+              "Options": ""
             }
           ],
           "PasswordOptions": {
