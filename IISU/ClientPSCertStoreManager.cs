@@ -17,7 +17,6 @@ using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
-using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Security.Cryptography.X509Certificates;
@@ -185,101 +184,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
-        [Obsolete("This method is no longer used.  Certificates are added by creating and importing PFX files.", false)]
-        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string storePath)
-        {
-            try
-            {
-                using var ps = PowerShell.Create();
-
-                _logger.MethodEntry();
-
-                ps.Runspace = _runspace;
-
-                _logger.LogTrace($"Creating X509 Cert from: {certificateContents}");
-                x509Cert = new X509Certificate2
-                    (
-                        Convert.FromBase64String(certificateContents),
-                        privateKeyPassword,
-                        X509KeyStorageFlags.MachineKeySet | 
-                        X509KeyStorageFlags.PersistKeySet | 
-                        X509KeyStorageFlags.Exportable
-                    );
-
-                // Add Certificate 
-                var funcScript = @"
-                        $ErrorActionPreference = ""Stop""
-
-                        function InstallPfxToMachineStore([byte[]]$bytes, [string]$password, [string]$storeName) {
-                            $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, ""LocalMachine""
-                            $certStore.Open('MaxAllowed')
-                            $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $password, 18 <# Persist, Machine #>
-                            $certStore.Add($cert)
-
-                            $certStore.Close();
-                        }";
-
-                ps.AddScript(funcScript).AddStatement();
-                _logger.LogDebug("InstallPfxToMachineStore Statement Added...");
-
-                ps.AddCommand("InstallPfxToMachineStore")
-                    .AddParameter("bytes", Convert.FromBase64String(certificateContents))
-                    .AddParameter("password", privateKeyPassword)
-                    .AddParameter("storeName", $@"\\{_runspace.ConnectionInfo.ComputerName}\{storePath}");
-                
-                _logger.LogTrace("InstallPfxToMachineStore Command Added...");
-
-                foreach (var cmd in ps.Commands.Commands)
-                {
-                    _logger.LogTrace("Logging PowerShell Command");
-                    _logger.LogTrace(cmd.CommandText);
-                }
-
-                _logger.LogTrace("Invoking ps...");
-                ps.Invoke();
-                _logger.LogTrace("ps Invoked...");
-
-                if (ps.HadErrors)
-                {
-                    _logger.LogTrace("ps Has Errors");
-                    var psError = ps.Streams.Error.ReadAll()
-                        .Aggregate(string.Empty, (current, error) => current + error?.ErrorDetails.Message);
-                    {
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = _jobNumber,
-                            FailureMessage =
-                                $"Site {storePath} on server {_runspace.ConnectionInfo.ComputerName}: {psError}"
-                        };
-                    }
-                }
-
-                _logger.LogTrace("Clearing Commands...");
-                ps.Commands.Clear();
-                _logger.LogTrace("Commands Cleared..");
-                _logger.LogInformation($"Certificate was successfully added to cert store: {storePath}");
-                
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = _jobNumber,
-                    FailureMessage = ""
-                };
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"Error Occurred in ClientPSCertStoreManager.AddCertificate(): {e.Message}");
-
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = _jobNumber,
-                    FailureMessage = $"Error Occurred in InstallCertificate {LogHandler.FlattenException(e)}"
-                };
-            }
-        }
-
         public void RemoveCertificate(string thumbprint, string storePath)
         {
             using var ps = PowerShell.Create();
@@ -288,10 +192,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             ps.Runspace = _runspace;
 
+            // Open with value of 5 means:  Open existing only (4) + Open ReadWrite (1)
             var removeScript = $@"
                         $ErrorActionPreference = 'Stop'
                         $certStore = New-Object System.Security.Cryptography.X509Certificates.X509Store('{storePath}','LocalMachine')
-                        $certStore.Open('MaxAllowed')
+                        $certStore.Open(5)
                         $certToRemove = $certStore.Certificates.Find(0,'{thumbprint}',$false)
                         if($certToRemove.Count -gt 0) {{
                             $certStore.Remove($certToRemove[0])
