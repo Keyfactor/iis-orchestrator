@@ -46,8 +46,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                 $certs = $certStore.Certificates
                                 $certStore.Close()
                                 $certStore.Dispose()
-                                foreach ( $cert in $certs){{ 
-                                    $cert | Select-Object -Property Thumbprint, RawData, HasPrivateKey
+                                    $certs | ForEach-Object {{
+                                        $certDetails = @{{
+                                            Subject = $_.Subject
+                                            Thumbprint = $_.Thumbprint
+                                            HasPrivateKey = $_.HasPrivateKey
+                                            RawData = $_.RawData
+                                            san = $_.Extensions | Where-Object {{ $_.Oid.FriendlyName -eq ""Subject Alternative Name"" }} | ForEach-Object {{ $_.Format($false) }}
+                                        }}
+
+                                        if ($_.HasPrivateKey) {{
+                                            $certDetails.CSP = $_.PrivateKey.CspKeyContainerInfo.ProviderName
+                                        }}
+
+                                        New-Object PSObject -Property $certDetails
                                 }}";
 
                 ps.AddScript(certStoreScript);
@@ -55,12 +67,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 var certs = ps.Invoke();
 
                 foreach (var c in certs)
+                {
                     myCertificates.Add(new Certificate
                     {
                         Thumbprint = $"{c.Properties["Thumbprint"]?.Value}",
                         HasPrivateKey = bool.Parse($"{c.Properties["HasPrivateKey"]?.Value}"),
-                        RawData = (byte[])c.Properties["RawData"]?.Value
+                        RawData = (byte[])c.Properties["RawData"]?.Value,
+                        CryptoServiceProvider = $"{c.Properties["CSP"]?.Value }",
+                        SAN = Certificate.Utilities.FormatSAN($"{c.Properties["san"]?.Value}")  
                     });
+                }
 
                 return myCertificates;
             }
