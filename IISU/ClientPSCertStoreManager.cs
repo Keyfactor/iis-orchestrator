@@ -14,6 +14,7 @@
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
@@ -120,6 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         string script = @"
                         param($pfxFilePath, $privateKeyPassword, $cspName)
                         $output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
+                        $c = $LASTEXITCODE
                         $output
                         ";
 
@@ -132,6 +134,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         string script = @"
                         param($pfxFilePath, $privateKeyPassword, $cspName)
                         $output = certutil -importpfx -csp $cspName -p $privateKeyPassword $pfxFilePath 2>&1
+                        $c = $LASTEXITCODE
                         $output
                         ";
 
@@ -144,15 +147,36 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     // Invoke the script
                     var results = ps.Invoke();
 
-                    // Check for errors in the output
+                    //Get the last exist code returned from the script
+                    int lastExitCode = (int)(ps.Runspace.SessionStateProxy.PSVariable.GetValue("c"));
+
                     bool isError = false;
-                    foreach (var result in results)
+                    if (lastExitCode != 0)
                     {
-                        string outputLine = result.ToString();
-                        if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error"))
+                        isError = true;
+                        string outputMsg = "";
+
+                        foreach (var result in results)
                         {
-                            isError = true;
-                            Console.WriteLine(outputLine); // Print the error message
+                            string outputLine = result.ToString();
+                            if (!string.IsNullOrEmpty(outputLine))
+                            {
+                                outputMsg += "\n" + outputLine;
+                            }
+                        }
+                        _logger.LogError(outputMsg);
+                    }
+                    else
+                    {
+                        // Check for errors in the output
+                        foreach (var result in results)
+                        {
+                            string outputLine = result.ToString();
+                            if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error"))
+                            {
+                                isError = true;
+                                _logger.LogError(outputLine);
+                            }
                         }
                     }
 

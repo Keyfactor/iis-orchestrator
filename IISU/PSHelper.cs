@@ -50,15 +50,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             if (isLocal)
             {
-                // Create an out of process PowerShell runspace and explictly use version 5.1
-                // This is needed when running as a service, which is how the orchestrator extension operates
-                // Interestingly this is not needd when running as a console application
-                // TODO: Consider refactoring this so that we properly dispose of these objects instead of waiting on the GC
-
-                PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-                Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
-
-                return rs;
+                return RunspaceFactory.CreateRunspace();
             }
             else
             {
