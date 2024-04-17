@@ -147,8 +147,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     // Invoke the script
                     var results = ps.Invoke();
 
-                    //Get the last exist code returned from the script
-                    int lastExitCode = (int)(ps.Runspace.SessionStateProxy.PSVariable.GetValue("c"));
+                    // Get the last exist code returned from the script
+                    // This statement is in a try/catch block because PSVariable.GetValue() is not a valid method on a remote PS Session and throws an exception.
+                    // Due to security reasons and Windows architecture, retreiving values from a remote system is not supported.
+                    int lastExitCode = 0;
+                    try
+                    {
+                        lastExitCode = (int)ps.Runspace.SessionStateProxy.PSVariable.GetValue("c");
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    
 
                     bool isError = false;
                     if (lastExitCode != 0)
