@@ -20,4 +20,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
     {
         public IPAMSecretResolver _resolver;
     }
+
+    public enum CertStoreBindingTypeENUM
+    {
+        None,
+        WinIIS,
+        WinSQL
+    }
 }

@@ -33,6 +33,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 
             foreach (Certificate cert in base.GetCertificatesFromStore(runSpace, storePath))
             {
+                var entryParms = new Dictionary<string, object>
+                        {
+                            { "ProviderName", cert.CryptoServiceProvider },
+                            { "SAN", cert.SAN }
+                        };
+
                 inventoryItems.Add(new CurrentInventoryItem
                 {
                     Certificates = new[] { cert.CertificateData },
@@ -40,7 +46,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     PrivateKeyEntry = cert.HasPrivateKey,
                     UseChainLevel = false,
                     ItemStatus = OrchestratorInventoryItemStatus.Unknown,
-                    Parameters = null
+                    Parameters = entryParms
                 });
             }
 
