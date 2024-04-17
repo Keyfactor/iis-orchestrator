@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.using Keyfactor.Logging;
 
+// Ignore Spelling: Keyfactor
+
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
@@ -128,7 +130,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 {
                     _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
                     if (!PsHelper.IsCSPFound(PsHelper.GetCSPList(myRunspace), cryptoProvider))
-                        { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
+                        { throw new Exception($"The Crypto Provider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
                 }
 
                 if (storePath != null)
@@ -138,23 +140,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
 
                     // Write the certificate contents to a temporary file on the remote computer, returning the filename.
+                    _logger.LogTrace($"Creating temporary pfx file.");
                     string filePath = manager.CreatePFXFile(certificateContents, privateKeyPassword);
-                    _logger.LogTrace($"{filePath} was created.");
 
                     // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
+                    _logger.LogTrace($"Importing temporary PFX File: {filePath}.");
                     JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider);
 
                     // Delete the temporary file
+                    _logger.LogTrace($"Deleting temporary PFX File: {filePath}.");
                     manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
 
                     return result;
-
-                    // This method is retired
-                    // return manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
                 }
                 else
                 {
-                    throw new Exception($"The store pathis empty or null.");
+                    throw new Exception($"The store path is empty or null.");
                 }
             }
             catch (Exception e)
