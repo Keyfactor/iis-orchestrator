@@ -104,7 +104,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                  { "IPAddress", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
                                  { "HostName", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
                                  { "SniFlag", sniValue },
-                                 { "Protocol", binding.Properties["Protocol"]?.Value }
+                                 { "Protocol", binding.Properties["Protocol"]?.Value },
+                                 { "ProviderName", foundCert.CryptoServiceProvider },
+                                 { "SAN", foundCert.SAN }
                              };
 
                     myBoundCerts.Add(

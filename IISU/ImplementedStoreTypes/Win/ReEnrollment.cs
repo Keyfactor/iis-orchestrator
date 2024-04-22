@@ -34,7 +34,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
             _logger = LogHandler.GetClassLogger(typeof(ReEnrollment));
 
             ClientPSCertStoreReEnrollment myReEnrollment = new ClientPSCertStoreReEnrollment(_logger, _resolver);
-            return myReEnrollment.PerformReEnrollment(config, submitReenrollmentUpdate, false);
+            return myReEnrollment.PerformReEnrollment(config, submitReenrollmentUpdate, CertStoreBindingTypeENUM.None);
 
         }
     }
