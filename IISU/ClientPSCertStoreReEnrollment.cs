@@ -44,7 +44,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _resolver = resolver;
         }
 
-        public JobResult PerformReEnrollment(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReenrollment, bool bindCertificate)
+        public JobResult PerformReEnrollment(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReenrollment, CertStoreBindingTypeENUM bindingType)
         {
             bool hasError = false;
 
@@ -218,21 +218,37 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     ps.Commands.Clear();
                     runSpace.Close();
 
-                    JobResult result;
+                    // Default results
+                    JobResult result = new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Success,
+                        JobHistoryId = config.JobHistoryId,
+                        FailureMessage = ""
+                    };
 
-                    if (bindCertificate)
+                    // Do specific bindings
+                    switch (bindingType)
                     {
-                        // Bind the certificate to IIS
-                        ClientPSIIManager iisManager = new ClientPSIIManager(config, serverUserName, serverPassword);
-                        result = iisManager.BindCertificate(myCert);
-                    }else
-                    {
-                        result = new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Success,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage = ""
-                        };
+                        case CertStoreBindingTypeENUM.WinIIS:
+                            // Bind the certificate to IIS
+                            ClientPSIIManager iisManager = new ClientPSIIManager(config, serverUserName, serverPassword);
+                            result = iisManager.BindCertificate(myCert);
+                            // Provide logging information
+                            if (result.Result == OrchestratorJobStatusJobResult.Success) { _logger.LogInformation("Certificate was successfully bound to the IIS Server."); }
+                            else { _logger.LogInformation("There was an issue while attempting to bind the certificate to the IIS Server.  Check the logs for more information."); }
+                            break;
+
+                        case CertStoreBindingTypeENUM.WinSQL:
+
+                            // Bind to SQL Server
+                            ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUserName, serverPassword);
+                            result = sqlManager.BindCertificates("", myCert);
+
+                            // Provide logging information
+                            if (result.Result == OrchestratorJobStatusJobResult.Success) { _logger.LogInformation("Certificate was successfully bound to the SQL Server."); }
+                            else { _logger.LogInformation("There was an issue while attempting to bind the certificate to the SQL Server.  Check the logs for more information."); }
+                            break;
+
                     }
 
                     ps.Commands.Clear();
