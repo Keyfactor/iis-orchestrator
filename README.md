@@ -38,7 +38,7 @@ The Keyfactor Universal Orchestrator may be installed on either Windows or Linux
 |Supports Management Remove|&check; |  |
 |Supports Create Store|  |  |
 |Supports Discovery|  |  |
-|Supports Renrollment|&check; |  |
+|Supports Reenrollment|&check; |  |
 |Supports Inventory|&check; |  |
 
 
@@ -485,4 +485,7 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 9	|Inventory Against Machine Without SQL Server|N/A|Will fail with error saying it can't find SQL Server|True|![](images/SQLTestCase9.gif)
 	
 </details>
+
+When creating cert store type manually, that store property names and entry parameter names are case sensitive
+
 
