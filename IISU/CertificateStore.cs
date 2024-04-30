@@ -41,10 +41,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             using var ps = PowerShell.Create();
             ps.Runspace = RunSpace;
+
+            // Open with value of 5 means:  Open existing only (4) + Open ReadWrite (1)
             var removeScript = $@"
                         $ErrorActionPreference = 'Stop'
                         $certStore = New-Object System.Security.Cryptography.X509Certificates.X509Store('{StorePath}','LocalMachine')
-                        $certStore.Open('MaxAllowed')
+                        $certStore.Open(5)
                         $certToRemove = $certStore.Certificates.Find(0,'{thumbprint}',$false)
                         if($certToRemove.Count -gt 0) {{
                             $certStore.Remove($certToRemove[0])

@@ -12,6 +12,11 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Remove="ImplementedStoreTypes\WinExch\**" />
     <EmbeddedResource Remove="ImplementedStoreTypes\WinExch\**" />
@@ -26,7 +31,7 @@
   <ItemGroup>
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.11" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.12" />
 
   </ItemGroup>
 

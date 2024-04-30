@@ -22,7 +22,9 @@ using System;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Web.Services.Description;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -35,6 +37,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private string RenewalThumbprint { get; set; } = "";
         private string ClientMachineName { get; set; }
         private long JobHistoryID { get; set; }
+
         private readonly ILogger _logger;
         private readonly Runspace _runSpace;
 
@@ -91,7 +94,38 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             catch (Exception e)
             {
-                throw new Exception($"Error when initiating a SQL Management Job: {e.Message}", e.InnerException);
+                throw new Exception($"Error when initiating a SQL Inventory Job: {e.Message}", e.InnerException);
+            }
+        }
+
+        public ClientPsSqlManager(ReenrollmentJobConfiguration config, string serverUsername, string serverPassword)
+        {
+            _logger = LogHandler.GetClassLogger<ClientPsSqlManager>();
+
+            try
+            {
+                ClientMachineName = config.CertificateStoreDetails.ClientMachine;
+                JobHistoryID = config.JobHistoryId;
+
+                if (config.JobProperties.ContainsKey("InstanceName"))
+                {
+                    var instanceRef = config.JobProperties["InstanceName"]?.ToString();
+                    SqlInstanceName = string.IsNullOrEmpty(instanceRef) ? "MSSQLSERVER" : instanceRef;
+                }
+
+                // Establish PowerShell Runspace
+                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                string winRmProtocol = jobProperties.WinRmProtocol;
+                string winRmPort = jobProperties.WinRmPort;
+                bool includePortInSPN = jobProperties.SpnPortFlag;
+                RestartService = jobProperties.RestartService;
+
+                _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
+                _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Error when initiating a SQL ReEnrollment Job: {e.Message}", e.InnerException);
             }
         }
 
@@ -181,6 +215,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     return SqlInstanceValue;
                 }
                 return null;
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                throw new Exception($"There were no SQL instances with the name: {instanceName}.  Please check the spelling of the SQL instance.");
             }
             catch (Exception e)
             {

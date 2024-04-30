@@ -14,9 +14,10 @@
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Linq;
+using System.IO;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Security.Cryptography.X509Certificates;
@@ -45,99 +46,174 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _jobNumber = jobNumber;
         }
 
-        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string storePath)
+        public string CreatePFXFile(string certificateContents, string privateKeyPassword)
         {
             try
             {
-                using var ps = PowerShell.Create();
-
-                _logger.MethodEntry();
-
-                ps.Runspace = _runspace;
-
-                _logger.LogTrace($"Creating X509 Cert from: {certificateContents}");
+                // Create the x509 certificate
                 x509Cert = new X509Certificate2
                     (
                         Convert.FromBase64String(certificateContents),
                         privateKeyPassword,
-                        X509KeyStorageFlags.MachineKeySet | 
-                        X509KeyStorageFlags.PersistKeySet | 
+                        X509KeyStorageFlags.MachineKeySet |
+                        X509KeyStorageFlags.PersistKeySet |
                         X509KeyStorageFlags.Exportable
                     );
 
-                _logger.LogDebug($"X509 Cert Created With Subject: {x509Cert.SubjectName}");
-                _logger.LogDebug($"Begin Add for Cert Store {$@"\\{_runspace.ConnectionInfo.ComputerName}\{storePath}"}");
-
-                // Add Certificate 
-                var funcScript = @"
-                        $ErrorActionPreference = ""Stop""
-
-                        function InstallPfxToMachineStore([byte[]]$bytes, [string]$password, [string]$storeName) {
-                            $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, ""LocalMachine""
-                            $certStore.Open(5)
-                            $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $password, 18 <# Persist, Machine #>
-                            $certStore.Add($cert)
-
-                            $certStore.Close();
-                        }";
-
-                ps.AddScript(funcScript).AddStatement();
-                _logger.LogDebug("InstallPfxToMachineStore Statement Added...");
-
-                ps.AddCommand("InstallPfxToMachineStore")
-                    .AddParameter("bytes", Convert.FromBase64String(certificateContents))
-                    .AddParameter("password", privateKeyPassword)
-                    .AddParameter("storeName", $@"\\{_runspace.ConnectionInfo.ComputerName}\{storePath}");
-                
-                _logger.LogTrace("InstallPfxToMachineStore Command Added...");
-
-                foreach (var cmd in ps.Commands.Commands)
+                using (PowerShell ps = PowerShell.Create())
                 {
-                    _logger.LogTrace("Logging PowerShell Command");
-                    _logger.LogTrace(cmd.CommandText);
+                    ps.Runspace = _runspace;
+
+                    // Add script to write certificate contents to a temporary file
+                    string script = @"
+                            param($certificateContents)
+                            $filePath = [System.IO.Path]::GetTempFileName() + '.pfx'
+                            [System.IO.File]::WriteAllBytes($filePath, [System.Convert]::FromBase64String($certificateContents))
+                            $filePath
+                            ";
+
+                    ps.AddScript(script);
+                    ps.AddParameter("certificateContents", certificateContents); // Convert.ToBase64String(x509Cert.Export(X509ContentType.Pkcs12)));
+
+                    // Invoke the script on the remote computer
+                    var results = ps.Invoke();
+
+                    // Get the result (temporary file path) returned by the script
+                    return results[0].ToString();
                 }
+            }
+            catch (Exception)
+            {
+                throw new Exception("An error occurred while attempting to create and write the X509 contents.");
+            }
+        }
 
-                _logger.LogTrace("Invoking ps...");
-                ps.Invoke();
-                _logger.LogTrace("ps Invoked...");
+        public void DeletePFXFile(string filePath, string fileName)
+        {
+            using (PowerShell ps = PowerShell.Create())
+            {
+                ps.Runspace = _runspace;
 
-                if (ps.HadErrors)
+                // Add script to delete the temporary file
+                string deleteScript = @"
+                        param($filePath)
+                        Remove-Item -Path $filePath -Force
+                        ";
+
+                ps.AddScript(deleteScript);
+                ps.AddParameter("filePath", Path.Combine(filePath, fileName) + "*");
+
+                // Invoke the script to delete the file
+                var results = ps.Invoke();
+            }
+        }
+
+        public JobResult ImportPFXFile(string filePath, string privateKeyPassword, string cryptoProviderName)
+        {
+            try
+            {
+                using (PowerShell ps = PowerShell.Create())
                 {
-                    _logger.LogTrace("ps Has Errors");
-                    var psError = ps.Streams.Error.ReadAll()
-                        .Aggregate(string.Empty, (current, error) => current + error?.ErrorDetails.Message);
+                    ps.Runspace = _runspace;
+
+                    if (cryptoProviderName == null)
+                    {
+                        string script = @"
+                        param($pfxFilePath, $privateKeyPassword, $cspName)
+                        $output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
+                        $c = $LASTEXITCODE
+                        $output
+                        ";
+
+                        ps.AddScript(script);
+                        ps.AddParameter("pfxFilePath", filePath);
+                        ps.AddParameter("privateKeyPassword", privateKeyPassword);
+                    }
+                    else
+                    {
+                        string script = @"
+                        param($pfxFilePath, $privateKeyPassword, $cspName)
+                        $output = certutil -importpfx -csp $cspName -p $privateKeyPassword $pfxFilePath 2>&1
+                        $c = $LASTEXITCODE
+                        $output
+                        ";
+
+                        ps.AddScript(script);
+                        ps.AddParameter("pfxFilePath", filePath);
+                        ps.AddParameter("privateKeyPassword", privateKeyPassword);
+                        ps.AddParameter("cspName", cryptoProviderName);
+                    }
+
+                    // Invoke the script
+                    var results = ps.Invoke();
+
+                    // Get the last exist code returned from the script
+                    // This statement is in a try/catch block because PSVariable.GetValue() is not a valid method on a remote PS Session and throws an exception.
+                    // Due to security reasons and Windows architecture, retreiving values from a remote system is not supported.
+                    int lastExitCode = 0;
+                    try
+                    {
+                        lastExitCode = (int)ps.Runspace.SessionStateProxy.PSVariable.GetValue("c");
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    
+
+                    bool isError = false;
+                    if (lastExitCode != 0)
+                    {
+                        isError = true;
+                        string outputMsg = "";
+
+                        foreach (var result in results)
+                        {
+                            string outputLine = result.ToString();
+                            if (!string.IsNullOrEmpty(outputLine))
+                            {
+                                outputMsg += "\n" + outputLine;
+                            }
+                        }
+                        _logger.LogError(outputMsg);
+                    }
+                    else
+                    {
+                        // Check for errors in the output
+                        foreach (var result in results)
+                        {
+                            string outputLine = result.ToString();
+                            if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error"))
+                            {
+                                isError = true;
+                                _logger.LogError(outputLine);
+                            }
+                        }
+                    }
+
+                    if (isError)
+                    {
+                        throw new Exception("Error occurred while attempting to import the pfx file.");
+                    }
+                    else
                     {
                         return new JobResult
                         {
-                            Result = OrchestratorJobStatusJobResult.Failure,
+                            Result = OrchestratorJobStatusJobResult.Success,
                             JobHistoryId = _jobNumber,
-                            FailureMessage =
-                                $"Site {storePath} on server {_runspace.ConnectionInfo.ComputerName}: {psError}"
+                            FailureMessage = ""
                         };
                     }
                 }
-
-                _logger.LogTrace("Clearing Commands...");
-                ps.Commands.Clear();
-                _logger.LogTrace("Commands Cleared..");
-                _logger.LogInformation($"Certificate was successfully added to cert store: {storePath}");
-                
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = _jobNumber,
-                    FailureMessage = ""
-                };
             }
             catch (Exception e)
             {
-                _logger.LogError($"Error Occurred in ClientPSCertStoreManager.AddCertificate(): {e.Message}");
+                _logger.LogError($"Error Occurred in ClientPSCertStoreManager.ImportPFXFile(): {e.Message}");
 
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
                     JobHistoryId = _jobNumber,
-                    FailureMessage = $"Error Occurred in InstallCertificate {LogHandler.FlattenException(e)}"
+                    FailureMessage = $"Error Occurred in ImportPFXFile {LogHandler.FlattenException(e)}"
                 };
             }
         }
@@ -150,10 +226,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             ps.Runspace = _runspace;
 
+            // Open with value of 5 means:  Open existing only (4) + Open ReadWrite (1)
             var removeScript = $@"
                         $ErrorActionPreference = 'Stop'
                         $certStore = New-Object System.Security.Cryptography.X509Certificates.X509Store('{storePath}','LocalMachine')
-                        $certStore.Open('MaxAllowed')
+                        $certStore.Open(5)
                         $certToRemove = $certStore.Certificates.Find(0,'{thumbprint}',$false)
                         if($certToRemove.Count -gt 0) {{
                             $certStore.Remove($certToRemove[0])
