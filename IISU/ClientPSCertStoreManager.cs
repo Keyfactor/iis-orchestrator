@@ -112,6 +112,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             try
             {
+                _logger.LogTrace("Entering ImportPFX");
+
                 using (PowerShell ps = PowerShell.Create())
                 {
                     ps.Runspace = _runspace;
@@ -119,7 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     if (cryptoProviderName == null)
                     {
                         string script = @"
-                        param($pfxFilePath, $privateKeyPassword, $cspName)
+                        param($pfxFilePath, $privateKeyPassword)
                         $output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
                         $c = $LASTEXITCODE
                         $output
@@ -154,9 +156,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     try
                     {
                         lastExitCode = (int)ps.Runspace.SessionStateProxy.PSVariable.GetValue("c");
+                        _logger.LogTrace($"Last exit code: {lastExitCode}");
                     }
                     catch (Exception)
                     {
+                        _logger.LogTrace("Unable to get the last exit code.");
                     }
                     
 
@@ -182,7 +186,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         foreach (var result in results)
                         {
                             string outputLine = result.ToString();
-                            if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error"))
+
+                            _logger.LogTrace(outputLine);
+
+                            if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error") || outputLine.Contains("permissions are needed"))
                             {
                                 isError = true;
                                 _logger.LogError(outputLine);
