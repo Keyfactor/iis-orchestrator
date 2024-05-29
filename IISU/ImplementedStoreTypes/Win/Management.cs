@@ -145,7 +145,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 
                     // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
                     _logger.LogTrace($"Importing temporary PFX File: {filePath}.");
-                    JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider);
+                    JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider, storePath);
 
                     // Delete the temporary file
                     _logger.LogTrace($"Deleting temporary PFX File: {filePath}.");

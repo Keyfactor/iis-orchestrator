@@ -148,7 +148,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 _logger.LogTrace($"{filePath} was created.");
 
                 // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
-                JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider);
+                JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider, storePath);
 
                 // Delete the temporary file
                 manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));

@@ -15,6 +15,7 @@ using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
@@ -115,7 +116,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
-        public JobResult ImportPFXFile(string filePath, string privateKeyPassword, string cryptoProviderName)
+        public JobResult ImportPFXFile(string filePath, string privateKeyPassword, string cryptoProviderName, string storePath)
         {
             try
             {
@@ -127,61 +128,92 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                     if (cryptoProviderName == null)
                     {
-                        //string script = @"
-                        //param($pfxFilePath, $privateKeyPassword)
-                        //$output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
-                        //$c = $LASTEXITCODE 2>&1
-                        //$output
-                        //";
-
-                        string script = @"
-                        param($pfxFilePath, $privateKeyPassword)
-                        $output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
-                        $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
-                        $stuff = certutil -dump
-
-                        if ($stuff.GetType().Name -eq ""String"")
+                        if (privateKeyPassword == null)
                         {
-                            $stuff = @($stuff, $exit_message)
+                            // If no private key password is provided, import the pfx file directory to the store using addstore argument
+                            string script = @"
+                            param($pfxFilePath, $storePath)
+                            $output = certutil -addstore Cert:\LocalMachine\$storePath $pfxFilePath 2>&1
+                            $c = $LASTEXITCODE
+                            $output
+                            ";
+
+                            ps.AddScript(script);
+                            ps.AddParameter("pfxFilePath", filePath);
+                            ps.AddParameter("storePath", storePath);
                         }
                         else
                         {
-                            $stuff += $exit_message
+                            // Use ImportPFX to import the pfx file with private key password to the appropriate cert store
+
+                            string script = @"
+                            param($pfxFilePath, $privateKeyPassword)
+                            $output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
+                            $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
+                            $stuff = certutil -dump
+
+                            if ($stuff.GetType().Name -eq ""String"")
+                            {
+                                $stuff = @($stuff, $exit_message)
+                            }
+                            else
+                            {
+                                $stuff += $exit_message
+                            }
+
+                            $output
+                            $stuff
+                            ";
+
+                            ps.AddScript(script);
+                            ps.AddParameter("pfxFilePath", filePath);
+                            ps.AddParameter("privateKeyPassword", privateKeyPassword);
+                            ps.AddParameter("storePath", storePath);
                         }
-
-                        $output
-                        $stuff
-                        ";
-
-                        ps.AddScript(script);
-                        ps.AddParameter("pfxFilePath", filePath);
-                        ps.AddParameter("privateKeyPassword", privateKeyPassword);
                     }
                     else
                     {
-                        string script = @"
-                        param($pfxFilePath, $privateKeyPassword, $cspName)
-                        $output = certutil -importpfx -csp $cspName -p $privateKeyPassword $pfxFilePath 2>&1
-                        $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
-                        $stuff = certutil -dump
-
-                        if ($stuff.GetType().Name -eq ""String"")
+                        if (privateKeyPassword == null)
                         {
-                            $stuff = @($stuff, $exit_message)
+                            string script = @"
+                            param($pfxFilePath, $cspName, $storePath)
+                            $output = certutil -csp $cspName -addstore LocalMachine\$storePath $pfxFilePath 2>&1
+                            $c = $LASTEXITCODE
+                            $output
+                            ";
+
+                            ps.AddScript(script);
+                            ps.AddParameter("pfxFilePath", filePath);
+                            ps.AddParameter("cspName", cryptoProviderName);
+                            ps.AddParameter("storePath", storePath);
                         }
                         else
                         {
-                            $stuff += $exit_message
+                            string script = @"
+                            param($pfxFilePath, $privateKeyPassword, $cspName)
+                            $output = certutil -importpfx -csp $cspName -p $privateKeyPassword LocalMachine\$storePath $pfxFilePath 2>&1
+                            $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
+                            $stuff = certutil -dump
+
+                            if ($stuff.GetType().Name -eq ""String"")
+                            {
+                                $stuff = @($stuff, $exit_message)
+                            }
+                            else
+                            {
+                                $stuff += $exit_message
+                            }
+
+                            $output
+                            $stuff
+                            ";
+
+                            ps.AddScript(script);
+                            ps.AddParameter("pfxFilePath", filePath);
+                            ps.AddParameter("privateKeyPassword", privateKeyPassword);
+                            ps.AddParameter("cspName", cryptoProviderName);
+                            ps.AddParameter("storePath", storePath);
                         }
-
-                        $output
-                        $stuff
-                        ";
-
-                        ps.AddScript(script);
-                        ps.AddParameter("pfxFilePath", filePath);
-                        ps.AddParameter("privateKeyPassword", privateKeyPassword);
-                        ps.AddParameter("cspName", cryptoProviderName);
                     }
 
                     // Invoke the script
