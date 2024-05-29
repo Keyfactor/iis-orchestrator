@@ -19,6 +19,7 @@ using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
+using System.Linq.Expressions;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Security.Cryptography.X509Certificates;
@@ -49,6 +50,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public string CreatePFXFile(string certificateContents, string privateKeyPassword)
         {
+            _logger.LogTrace("Entering CreatePFXFile");
+            if (!string.IsNullOrEmpty(privateKeyPassword)) { _logger.LogTrace("privateKeyPassword was present"); } 
+            else _logger.LogTrace("No privateKeyPassword Presented");
+
             try
             {
                 // Create the x509 certificate
@@ -80,11 +85,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     var results = ps.Invoke();
 
                     // Get the result (temporary file path) returned by the script
+                    _logger.LogTrace($"Results after creating PFX File: {results[0].ToString()}");
                     return results[0].ToString();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex.ToString());
                 throw new Exception("An error occurred while attempting to create and write the X509 contents.");
             }
         }
@@ -113,6 +120,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             try
             {
+                _logger.LogTrace("Entering ImportPFX");
+
                 using (PowerShell ps = PowerShell.Create())
                 {
                     ps.Runspace = _runspace;
@@ -136,11 +145,24 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         else
                         {
                             // Use ImportPFX to import the pfx file with private key password to the appropriate cert store
+
                             string script = @"
-                            param($pfxFilePath, $privateKeyPassword, $storePath)
-                            $output = certutil -p $privateKeyPassword -importpfx Cert:\LocalMachine\$storePath $pfxFilePath 2>&1
-                            $c = $LASTEXITCODE
+                            param($pfxFilePath, $privateKeyPassword)
+                            $output = certutil -importpfx -p $privateKeyPassword $pfxFilePath 2>&1
+                            $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
+                            $stuff = certutil -dump
+
+                            if ($stuff.GetType().Name -eq ""String"")
+                            {
+                                $stuff = @($stuff, $exit_message)
+                            }
+                            else
+                            {
+                                $stuff += $exit_message
+                            }
+
                             $output
+                            $stuff
                             ";
 
                             ps.AddScript(script);
@@ -168,10 +190,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         else
                         {
                             string script = @"
-                            param($pfxFilePath, $privateKeyPassword, $cspName, $storePath)
+                            param($pfxFilePath, $privateKeyPassword, $cspName)
                             $output = certutil -importpfx -csp $cspName -p $privateKeyPassword LocalMachine\$storePath $pfxFilePath 2>&1
-                            $c = $LASTEXITCODE
+                            $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
+                            $stuff = certutil -dump
+
+                            if ($stuff.GetType().Name -eq ""String"")
+                            {
+                                $stuff = @($stuff, $exit_message)
+                            }
+                            else
+                            {
+                                $stuff += $exit_message
+                            }
+
                             $output
+                            $stuff
                             ";
 
                             ps.AddScript(script);
@@ -183,6 +217,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     }
 
                     // Invoke the script
+                    _logger.LogTrace("Attempting to import the PFX");
                     var results = ps.Invoke();
 
                     // Get the last exist code returned from the script
@@ -191,10 +226,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     int lastExitCode = 0;
                     try
                     {
-                        lastExitCode = (int)ps.Runspace.SessionStateProxy.PSVariable.GetValue("c");
+                        lastExitCode = GetLastExitCode(results[^1].ToString());
+                        _logger.LogTrace($"Last exit code: {lastExitCode}");
                     }
                     catch (Exception)
                     {
+                        _logger.LogTrace("Unable to get the last exit code.");
                     }
                     
 
@@ -220,7 +257,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         foreach (var result in results)
                         {
                             string outputLine = result.ToString();
-                            if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error"))
+
+                            _logger.LogTrace(outputLine);
+
+                            if (!string.IsNullOrEmpty(outputLine) && outputLine.Contains("Error") || outputLine.Contains("permissions are needed"))
                             {
                                 isError = true;
                                 _logger.LogError(outputLine);
@@ -253,6 +293,30 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     JobHistoryId = _jobNumber,
                     FailureMessage = $"Error Occurred in ImportPFXFile {LogHandler.FlattenException(e)}"
                 };
+            }
+        }
+
+        private int GetLastExitCode(string result)
+        {
+            // Split the string by colon
+            string[] parts = result.Split(':');
+
+            // Ensure the split result has the expected parts
+            if (parts.Length == 2 && parts[0] == "LASTEXITCODE")
+            {
+                // Parse the second part into an integer
+                if (int.TryParse(parts[1], out int lastExitCode))
+                {
+                    return lastExitCode;
+                }
+                else
+                {
+                    throw new Exception("Failed to parse the LASTEXITCODE value.");
+                }
+            }
+            else
+            {
+                throw new Exception("The last element does not contain the expected format.");
             }
         }
 
