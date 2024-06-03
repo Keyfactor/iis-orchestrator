@@ -1,3 +1,7 @@
+2.4.1
+* Modified the CertUtil logic to use the -addstore argument when no password is sent with the certificate information.
+* Added additional error trapping and trace logs
+
 2.4.0
 * Changed the way certificates are added to cert stores.  CertUtil is now used to import the PFX certificate into the associated store.  The CSP is now considered when maintaining certificates, empty CSP values will result in using the machines default CSP.
 * Added the Crypto Service Provider and SAN Entry Parameters to be used on Inventory queries, Adding and ReEnrollments for the WinCert, WinSQL and IISU extensions.
