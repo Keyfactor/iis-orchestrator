@@ -27,12 +27,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     internal class WinIISInventory : ClientPSCertStoreInventory
     {
+        private ILogger _logger;
         public WinIISInventory(ILogger logger) : base(logger)
         {
+            _logger = logger;
         }
 
         public List<CurrentInventoryItem> GetInventoryItems(Runspace runSpace, string storePath)
         {
+            _logger.LogTrace("Entering IISU GetInventoryItems");
             // Get the raw certificate inventory from cert store
             List<Certificate> certificates = base.GetCertificatesFromStore(runSpace, storePath);
 
@@ -51,22 +54,36 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 }
                 else
                 {
-                    ps2.AddScript("Set-ExecutionPolicy RemoteSigned");
+                    ps2.AddScript("Set-ExecutionPolicy RemoteSigned -Scope Process -Force");
                     ps2.AddScript("Import-Module WebAdministration");
-                    //var result = ps.Invoke();
                 }
 
                 var searchScript = "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash;sniFlg=$Bind.sslFlags}}}";
                 ps2.AddScript(searchScript);
-                var iisBindings = ps2.Invoke();  // Responsible for getting all bound certificates for each website
+
+                _logger.LogTrace($"Attempting to initiate the following script:\n{searchScript}");
+
+                var iisBindings = ps2.Invoke();
 
                 if (ps2.HadErrors)
                 {
-                    var psError = ps2.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
+                    _logger.LogTrace("The previous script encountered errors.  See below for more info.");
+                    string psError = string.Empty;
+                    try
+                    {
+                        psError = ps2.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + (error.ErrorDetails?.Message ?? error.Exception.ToString()));
+                    }
+                    catch
+                    {
+                    }
+
+                    if (psError != null) { throw new Exception(psError); }
+
                 }
 
                 if (iisBindings.Count == 0)
                 {
+                    _logger.LogTrace("No binding certificates were found.  Exiting IISU GetInventoryItems.");
                     return myBoundCerts;
                 }
 
@@ -123,6 +140,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 }
             }
 
+            _logger.LogTrace($"Found {myBoundCerts.Count} bound certificates.  Exiting IISU GetInventoryItems.");
             return myBoundCerts;
         }
     }

@@ -1,3 +1,7 @@
+2.4.2
+* Identified an error that was not being trapped correctly and indicating a false positive when completing an IIS inventory job.
+* Had to go back to specifying the version of PowerShell to use when establishing a local PowerShell Runspace.
+
 2.4.1
 * Modified the CertUtil logic to use the -addstore argument when no password is sent with the certificate information.
 * Added additional error trapping and trace logs
