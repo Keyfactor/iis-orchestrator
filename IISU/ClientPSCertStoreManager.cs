@@ -133,7 +133,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             // If no private key password is provided, import the pfx file directory to the store using addstore argument
                             string script = @"
                             param($pfxFilePath, $storePath)
-                            $output = certutil -addstore $storePath $pfxFilePath 2>&1
+                            $output = certutil -f -addstore $storePath $pfxFilePath 2>&1
                             $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
 
                             if ($output.GetType().Name -eq ""String"")
@@ -156,20 +156,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             // Use ImportPFX to import the pfx file with private key password to the appropriate cert store
 
                             string script = @"
-                            param($pfxFilePath, $privateKeyPassword)
-                            $output = certutil -importpfx -p $privateKeyPassword $storePath $pfxFilePath 2>&1
+                            param($pfxFilePath, $privateKeyPassword, $storePath)
+                            $output = certutil -f -importpfx -p $privateKeyPassword $storePath $pfxFilePath 2>&1
                             $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
-                            $stuff = certutil -dump
-                            if ($stuff.GetType().Name -eq ""String"")
+
+                            if ($output.GetType().Name -eq ""String"")
                             {
-                                $stuff = @($stuff, $exit_message)
+                                $output = @($output, $exit_message)
                             }
                             else
                             {
-                                $stuff += $exit_message
+                                $output += $exit_message
                             }
                             $output
-                            $stuff
                             ";
 
                             ps.AddScript(script);
@@ -184,20 +183,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         {
                             string script = @"
                             param($pfxFilePath, $cspName, $storePath)
-                            $output = certutil -csp $cspName -addstore $storePath $pfxFilePath 2>&1
+                            $output = certutil -f -csp $cspName -addstore $storePath $pfxFilePath 2>&1
                             $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
 
-                            $stuff = certutil -dump
-                            if ($stuff.GetType().Name -eq ""String"")
+                            if ($output.GetType().Name -eq ""String"")
                             {
-                                $stuff = @($stuff, $exit_message)
+                                $output = @($output, $exit_message)
                             }
                             else
                             {
-                                $stuff += $exit_message
+                                $output += $exit_message
                             }
                             $output
-                            $stuff
                             ";
 
                             ps.AddScript(script);
@@ -208,21 +205,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         else
                         {
                             string script = @"
-                            param($pfxFilePath, $privateKeyPassword, $cspName)
-                            $output = certutil -importpfx -csp $cspName -p $privateKeyPassword $storePath $pfxFilePath 2>&1
+                            param($pfxFilePath, $privateKeyPassword, $cspName, $storePath)
+                            $output = certutil -f -importpfx -csp $cspName -p $privateKeyPassword $storePath $pfxFilePath 2>&1
                             $exit_message = ""LASTEXITCODE:$($LASTEXITCODE)""
 
-                            $stuff = certutil -dump
-                            if ($stuff.GetType().Name -eq ""String"")
+                            if ($output.GetType().Name -eq ""String"")
                             {
-                                $stuff = @($stuff, $exit_message)
+                                $output = @($output, $exit_message)
                             }
                             else
                             {
-                                $stuff += $exit_message
+                                $output += $exit_message
                             }
                             $output
-                            $stuff
                             ";
 
                             ps.AddScript(script);
@@ -244,9 +239,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         lastExitCode = GetLastExitCode(results[^1].ToString());
                         _logger.LogTrace($"Last exit code: {lastExitCode}");
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        _logger.LogTrace("Unable to get the last exit code.");
+                        _logger.LogTrace(ex.Message);
                     }
                     
 
