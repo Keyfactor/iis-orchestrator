@@ -32,6 +32,10 @@
       "CertStores.WinSql.Management": {
         "assemblypath": "WindowsCertStore.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql.Management"
+      },
+      "CertStores.WinSql.ReEnrollment": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql.ReEnrollment"
       }
     }
   }

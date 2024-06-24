@@ -86,9 +86,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                         if (foundCert == null) continue;
 
                         var sqlSettingsDict = new Dictionary<string, object>
-                                         {
-                                             { "InstanceName", kp.Value.ToString() }
-                                         };
+                                {
+                                    { "InstanceName", kp.Value.ToString() },
+                                    { "ProviderName", foundCert.CryptoServiceProvider }
+                                };
 
                         myBoundCerts.Add(
                         new CurrentInventoryItem

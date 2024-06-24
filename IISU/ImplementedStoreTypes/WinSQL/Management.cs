@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System;
+using System.IO;
 using System.Management.Automation.Runspaces;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
@@ -111,31 +112,75 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
         {
             _logger.LogTrace("Before PerformAddition...");
 
-            string certificateContents = config.JobCertificate.Contents;
-            string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
-            string storePath = config.CertificateStoreDetails.StorePath;
-            long jobNumber = config.JobHistoryId;
-
-            ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
-            JobResult result = manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
-
-            if (result.Result == OrchestratorJobStatusJobResult.Success)
+            try
             {
+#nullable enable
+                string certificateContents = config.JobCertificate.Contents;
+                string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+                string storePath = config.CertificateStoreDetails.StorePath;
+                long jobNumber = config.JobHistoryId;
+                string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
+#nullable disable
 
-                if (config.JobProperties.ContainsKey("RenewalThumbprint"))
+                // If a crypto provider was provided, check to see if it exists
+                if (cryptoProvider != null)
                 {
-                    RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
-                    _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
+                    _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
+                    if (!PsHelper.IsCSPFound(PsHelper.GetCSPList(myRunspace), cryptoProvider))
+                    { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
                 }
 
-                // Bind to SQL Server
-                ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
-                result = sqlManager.BindCertificates(RenewalThumbprint,manager.X509Cert);
-                return result;
+                if (storePath != null)
+                {
+                    _logger.LogInformation($"Attempting to add WinSql certificate to cert store: {storePath}");
+                }
 
+                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
 
+                // This method is retired
+                //JobResult result = manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
 
-            } else return result;
+                // Write the certificate contents to a temporary file on the remote computer, returning the filename.
+                string filePath = manager.CreatePFXFile(certificateContents, privateKeyPassword);
+                _logger.LogTrace($"{filePath} was created.");
+
+                // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
+                JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider, storePath);
+
+                // Delete the temporary file
+                manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
+
+                if (result.Result == OrchestratorJobStatusJobResult.Success)
+                {
+
+                    if (config.JobProperties.ContainsKey("RenewalThumbprint"))
+                    {
+                        RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
+                        _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
+                    }
+
+                    // Bind to SQL Server
+                    ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
+                    result = sqlManager.BindCertificates(RenewalThumbprint, manager.X509Cert);
+
+                    // Provide logging information
+                    if (result.Result == OrchestratorJobStatusJobResult.Success) { _logger.LogInformation("Certificate was successfully bound to the SQL Server."); }
+                    else { _logger.LogInformation("There was an issue while attempting to bind the certificate to the SQL Server.  Check the logs for more information."); }
+                    
+                    return result;
+                }
+                else return result;
+            }
+            catch (Exception e)
+            {
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage =
+                        $"Management/Add {e.Message}"
+                };
+            }
         }
 
         private JobResult PerformRemoveCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)

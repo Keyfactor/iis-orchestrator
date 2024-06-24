@@ -38,7 +38,7 @@ The Keyfactor Universal Orchestrator may be installed on either Windows or Linux
 |Supports Management Remove|&check; |  |
 |Supports Create Store|  |  |
 |Supports Discovery|  |  |
-|Supports Renrollment|&check; |  |
+|Supports Reenrollment|&check; |  |
 |Supports Inventory|&check; |  |
 
 
@@ -109,7 +109,7 @@ The returned list will contain the actual certificate store name to be used when
 
 By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
 
-This extension implements four job types:  Inventory, Management Add/Remove, and ReEnrollment.
+This extension implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
 
 WinRM is used to remotely manage the certificate stores and IIS bindings.  WinRM must be properly configured to allow the orchestrator on the server to manage the certificates.  Setting up WinRM is not in the scope of this document.
 
@@ -121,7 +121,7 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note: There is an additional (and deprecated) certificate store type of “IIS” that ships with the Keyfactor platform. Migration of certificate stores from the “IIS” type to either the “IISBin” or “IISU” types is not currently supported.**
 
-**Note: If Looking to use GMSA Accounts to run the Service Kefyactor Command 10.2 or greater is required for No Value checkbox to work**
+**Note: If Looking to use GMSA Accounts to run the Service Keyfactor Command 10.2 or greater is required for No Value checkbox to work**
 
 ## Security and Permission Considerations
 From an official support point of view, Local Administrator permissions are required on the target server. Some customers have been successful with using other accounts and granting rights to the underlying certificate and private key stores. Due to complexities with the interactions between Group Policy, WinRM, User Account Control, and other unpredictable customer environmental factors, Keyfactor cannot provide assistance with using accounts other than the local administrator account.
@@ -134,7 +134,7 @@ For customers wishing to use something other than the local administrator accoun
  
 *	WinRM needs to be properly set up between the server hosting the UO and the target server. This means that a WinRM client running on the UO server when running in the context of the UO service account needs to be able to create a session on the target server using the configured credentials of the target server and any PowerShell commands running on the remote session need to have appropriate permissions. 
  
-*	Even though a given account may be in the administrators group or have administrative privledges on the target system and may be able to execute certificate and binding operations when running locally, the same account may not work when being used via WinRM. User Account Control (UAC) can get in the way and filter out administrative privledges. UAC / WinRM configuration has a LocalAccountTokenFilterPolicy setting that can be adjusted to not filter out administrative privledges for remote users, but enabling this may have other security ramifications. 
+*	Even though a given account may be in the administrators group or have administrative privileges on the target system and may be able to execute certificate and binding operations when running locally, the same account may not work when being used via WinRM. User Account Control (UAC) can get in the way and filter out administrative privledges. UAC / WinRM configuration has a LocalAccountTokenFilterPolicy setting that can be adjusted to not filter out administrative privledges for remote users, but enabling this may have other security ramifications. 
  
 *	The following list may not be exhaustive, but in general the account (when running under a remote WinRM session) needs permissions to:
     -	Instantiate and open a .NET X509Certificates.X509Store object for the target certificate store and be able to read and write both the certificates and related private keys. Note that ACL permissions on the stores and private keys are separate.
@@ -145,7 +145,7 @@ For customers wishing to use something other than the local administrator accoun
     -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
 
 ## Creating New Certificate Store Types
-Currently this orchestrator handles two extensions: IISU for IIS servers with bound certificates and WinCert for general Windows Certificates.
+Currently this orchestrator handles three types of extensions: IISU for IIS servers with bound certificates, WinCert for general Windows Certificates and WinSql for managing certificates for SQL Server.
 Below describes how each of these certificate store types are created and configured.
 <details>
 	<summary>IISU Extension</summary>
@@ -234,9 +234,9 @@ CONFIG ELEMENT | VALUE | DESCRIPTION
 Name | Windows SQL Server Certificate| Display name for the store type (may be customized)
 Short Name| WinSql | Short display name for the store type
 Custom Capability | Leave Unchecked | Store type name orchestrator will register with. Check the box to allow entry of value
-Supported Job Types | Inventory, Add, Remove | Job types the extension supports
+Supported Job Types | Inventory, Add, Remove, Reenrollment | Job types the extension supports
 Needs Server | Checked | Determines if a target server name is required when creating store
-Blueprint Allowed | Unchecked | Determines if store type may be included in an Orchestrator blueprint
+Blueprint Allowed | Checked | Determines if store type may be included in an Orchestrator blueprint
 Uses PowerShell | Unchecked | Determines if underlying implementation is PowerShell
 Requires Store Password	| Unchecked | Determines if a store password is required when configuring an individual store.
 Supports Entry Password	| Unchecked | Determines if an individual entry within a store can have a password.
@@ -284,6 +284,8 @@ They are typically used to support binding of a certificate to a resource.
 Name|Display Name| Type|Default Value|Required When|Description
 ---|---|---|---|---|---
 InstanceName | Instance Name|String||Not required | When enrolling leave blank or use MSSQLServer for the Default Instance, Instance Name for an Instance or MSSQLServer,Instance Name if enrolling to multiple instances plus the default instance.
+ProviderName | Crypto Provider Name | String ||| Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server.
+SAN | SAN | String || Reenrolling | Specifies Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Certificate templates generally require a SAN that matches the subject of the certificate (per RFC 2818). Format is a list of <san_type>=<san_value> entries separated by ampersands. Examples: 'dns=www.mysite.com' for a single SAN or 'dns=www.mysite.com&dns=www.mysite2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA.
 
 ![](images/SQLServerEntryParams.png)
 
@@ -361,6 +363,8 @@ Click Save to save the Certificate Store Type.
 
 ## Creating New Certificate Stores
 Once the Certificate Store Types have been created, you need to create the Certificate Stores prior to using the extension.
+
+**Note:**  A new naming convention for the Client Machine allows for multiple stores on the same server with different cert store path and cert store types. This convention is \{MachineName\}\|\{[optional]localmachine\}. If the optional value is 'localmachine' (legacy 'localhost' is still supported) is supplied, a local PowerShell runspace executing in the context of the Orchestrator service account will be used to access the certificate store.
 Here are the settings required for each Store Type previously configured.
 
 <details>
@@ -373,7 +377,7 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category | Select IIS Bound Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
-Client Machine | Hostname of the Windows Server containing the certificate store to be managed. If this value is 'localhost', a local PowerShell runspace executing in the context of the Orchestrator service account will be used to access the certificate store and perform IIS binding operations. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
+Client Machine | Contains the Hostname of the Windows Server containing the certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
 Store Path | Windows certificate store to manage. Choose "My" for the Personal Store or "WebHosting" for the Web Hosting Store. 
 Orchestrator | Select an approved orchestrator capable of managing IIS Bound Certificates (one that has declared the IISU capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
@@ -425,7 +429,7 @@ CONFIG ELEMENT	|DESCRIPTION
 ----------------|---------------
 Category | Select Windows Certificate or the customized certificate store display name from above.
 Container | Optional container to associate certificate store with.
-Client Machine | Hostname of the Windows Server containing the certificate store to be managed. If this value is 'localhost', a local PowerShell runspace executing in the context of the Orchestrator service account will be used to access the certificate store. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
+Client Machine | Hostname of the Windows Server containing the certificate store to be managed.  If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.
 Store Path | Windows certificate store to manage. Store must exist in the Local Machine store on the target server. 
 Orchestrator | Select an approved orchestrator capable of managing Windows Certificates (one that has declared the WinCert capability)
 WinRm Protocol | Protocol to use when establishing the WinRM session. (Listener on Client Machine must be configured for selected protocol.)
@@ -470,15 +474,18 @@ Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 
 Case Number|Case Name|Enrollment Params|Expected Results|Passed|Screenshot
 ----|------------------------|------------------------------------|--------------|----------------|-------------------------
-1	|New Cert Enrollment To Default Instance Leave Blank|**Intance Name:** |Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase1.gif)
-2	|New Cert Enrollment To Default Instance MSSQLServer|**Intance Name:** MSSQLServer|Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase2.gif)
-3	|New Cert Enrollment To Instance1|**Intance Name:** Instance1|Cert will be Installed to Instance1, Service will be restarted for Instance1|True|![](images/SQLTestCase3.gif)
-4	|New Cert Enrollment To Instance1 and Default Instance|**Intance Name:** MSSQLServer,Instance1|Cert will be Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase4.gif)
+1	|New Cert Enrollment To Default Instance Leave Blank|**Instance Name:** |Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase1.gif)
+2	|New Cert Enrollment To Default Instance MSSQLServer|**Instance Name:** MSSQLServer|Cert will be Installed to default Instance, Service will be restarted for default instance|True|![](images/SQLTestCase2.gif)
+3	|New Cert Enrollment To Instance1|**Instance Name:** Instance1|Cert will be Installed to Instance1, Service will be restarted for Instance1|True|![](images/SQLTestCase3.gif)
+4	|New Cert Enrollment To Instance1 and Default Instance|**Instance Name:** MSSQLServer,Instance1|Cert will be Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase4.gif)
 5	|One Click Renew Cert Enrollment To Instance1 and Default Instance|N/A|Cert will be Renewed/Installed to Default Instance and Instance1, Service will be restarted for Default Instance and Instance1|True|![](images/SQLTestCase5.gif)
-6	|Remove Cert From Instance1 and Default Instance|**Intance Name:** |Cert from TC5 will be Removed From Default Instance and Instance1|True|![](images/SQLTestCase6.gif)
+6	|Remove Cert From Instance1 and Default Instance|**Instance Name:** |Cert from TC5 will be Removed From Default Instance and Instance1|True|![](images/SQLTestCase6.gif)
 7	|Inventory Different Certs Different Instance|N/A|2 Certs will be inventoried and each tied to its Instance|True|![](images/SQLTestCase7.gif)
 8	|Inventory Same Cert Different Instance|N/A|2 Certs will be inventoried the cert will have a comma separated list of Instances|True|![](images/SQLTestCase8.gif)
 9	|Inventory Against Machine Without SQL Server|N/A|Will fail with error saying it can't find SQL Server|True|![](images/SQLTestCase9.gif)
 	
 </details>
+
+When creating cert store type manually, that store property names and entry parameter names are case sensitive
+
 
