@@ -364,7 +364,9 @@ Click Save to save the Certificate Store Type.
 ## Creating New Certificate Stores
 Once the Certificate Store Types have been created, you need to create the Certificate Stores prior to using the extension.
 
-**Note:**  A new naming convention for the Client Machine allows for multiple stores on the same server with different cert store path and cert store types. This convention is \{MachineName\}\|\{[optional]localmachine\}. If the optional value is 'localmachine' (legacy 'localhost' is still supported) is supplied, a local PowerShell runspace executing in the context of the Orchestrator service account will be used to access the certificate store.
+### Note Regarding Client Machine
+If running as an agent (accessing stores on the server where the Universal Orchestrator Services is installed ONLY), the Client Machine can be entered, OR you can bypass a WinRM connection and access the local file system directly by adding "|LocalMachine" to the end of your value for Client Machine, for example "1.1.1.1|LocalMachine".  In this instance the value to the left of the pipe (|) is ignored.  It is important to make sure the values for Client Machine and Store Path together are unique for each certificate store created, as Keyfactor Command requires the Store Type you select, along with Client Machine, and Store Path together must be unique.  To ensure this, it is good practice to put the full DNS or IP Address to the left of the | character when setting up a certificate store that will be accessed without a WinRM connection.  
+
 Here are the settings required for each Store Type previously configured.
 
 <details>
