@@ -1,3 +1,8 @@
+2.4.2
+* Identified an error that was not being trapped correctly and indicating a false positive when completing an IIS inventory job.
+* Had to go back to specifying the version of PowerShell to use when establishing a local PowerShell Runspace.
+* Fixed misspelled word in error message.
+
 2.4.1
 * Modified the CertUtil logic to use the -addstore argument when no password is sent with the certificate information.
 * Added additional error trapping and trace logs
@@ -5,7 +10,7 @@
 2.4.0
 * Changed the way certificates are added to cert stores.  CertUtil is now used to import the PFX certificate into the associated store.  The CSP is now considered when maintaining certificates, empty CSP values will result in using the machines default CSP.
 * Added the Crypto Service Provider and SAN Entry Parameters to be used on Inventory queries, Adding and ReEnrollments for the WinCert, WinSQL and IISU extensions.
-* Changed how Client Machine Names are handled when a 'localhost' connection is desiered.  The new naming convention is:  {machineName}|localmachine.  This will eliminate the issue of unqiue naming conflicts.
+* Changed how Client Machine Names are handled when a 'localhost' connection is desired.  The new naming convention is:  {machineName}|localmachine.  This will eliminate the issue of unique naming conflicts.
 * Updated the manifest.json to now include WinSQL ReEnrollment.
 * Updated the integration-manifest.json file for new fields in cert store types.
 
@@ -49,7 +54,7 @@
 2.0.0
 * Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
 * Local PAM Support added (requires Universal Orchestrator Framework version 10.1)
-* Certificate store type changed from IISBin to IISU. See readme for migration notes.
+* Certificate store type changed from IISBin to IISU. See README for migration notes.
 
 
 1.1.3

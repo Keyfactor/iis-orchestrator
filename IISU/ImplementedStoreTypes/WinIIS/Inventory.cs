@@ -75,13 +75,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     WinIISInventory IISInventory = new WinIISInventory(_logger);
                     inventoryItems = IISInventory.GetInventoryItems(myRunspace, storePath);
 
-                    _logger.LogTrace($"A total of {inventoryItems.Count} were found");
+                    _logger.LogTrace($"A total of {inventoryItems.Count} bound certificate(s) were found");
                     _logger.LogTrace("Closing runspace...");
                     myRunspace.Close();
 
-                    _logger.LogTrace("Invoking Inventory..");
+                    _logger.LogTrace("Invoking submitInventory..");
                     submitInventory.Invoke(inventoryItems);
-                    _logger.LogTrace($"Inventory Invoked... {inventoryItems.Count} Items");
+                    _logger.LogTrace($"submitInventory Invoked... {inventoryItems.Count} Items");
 
                     return new JobResult
                     {
