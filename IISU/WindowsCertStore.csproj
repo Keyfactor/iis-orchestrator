@@ -31,7 +31,7 @@
   <ItemGroup>
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.12" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.19" />
 
   </ItemGroup>
 

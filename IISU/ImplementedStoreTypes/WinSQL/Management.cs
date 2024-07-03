@@ -96,7 +96,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             {
                 _logger.LogTrace(LogHandler.FlattenException(ex));
 
-                var failureMessage = $"Managemenmt job {config.OperationType} failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
+                var failureMessage = $"Management job {config.OperationType} failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult
