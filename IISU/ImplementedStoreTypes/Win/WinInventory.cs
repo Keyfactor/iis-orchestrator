@@ -23,12 +23,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     internal class WinInventory : ClientPSCertStoreInventory
     {
+        private ILogger _logger;
         public WinInventory(ILogger logger) : base(logger)
         {
+            _logger = logger;
         }
 
         public List<CurrentInventoryItem> GetInventoryItems(Runspace runSpace, string storePath)
         {
+            _logger.LogTrace("Entering WinCert GetInventoryItems.");
             List<CurrentInventoryItem> inventoryItems = new List<CurrentInventoryItem>();
 
             foreach (Certificate cert in base.GetCertificatesFromStore(runSpace, storePath))
@@ -50,6 +53,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 });
             }
 
+            _logger.LogTrace($"Found {inventoryItems.Count} certificates.  Exiting WinCert GetInventoryItems.");
             return inventoryItems;
         }
     }

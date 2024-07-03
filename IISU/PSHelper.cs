@@ -33,7 +33,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.MethodEntry();
 
             // 2.4 - Client Machine Name now follows the naming conventions of {clientMachineName}|{localMachine}
-            // If the clientMachineName is just 'localhost', it will maintain that as locally only (as previosuly)
+            // If the clientMachineName is just 'localhost', it will maintain that as locally only (as previously)
             // If there is no 2nd part to the clientMachineName, a remote PowerShell session will be created
 
             // Break the clientMachineName into parts
@@ -43,14 +43,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             string machineName = parts.Length > 1 ? parts[0] : clientMachineName;
             string argument = parts.Length > 1 ? parts[1] : null;
 
-            // Determine if this is truely a local connection
+            // Determine if this is truly a local connection
             bool isLocal = (machineName.ToLower() == "localhost") || (argument != null && argument.ToLower() == "localmachine");
 
             _logger.LogInformation($"Full clientMachineName={clientMachineName} | machineName={machineName} | argument={argument} | isLocal={isLocal}");
 
             if (isLocal)
             {
-                return RunspaceFactory.CreateRunspace();
+                //return RunspaceFactory.CreateRunspace();
+                PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+                Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
+
+                return rs;
             }
             else
             {
