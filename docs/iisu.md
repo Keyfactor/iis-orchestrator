@@ -434,8 +434,8 @@ The following table describes the required and optional fields for the `IISU` ce
 | --------- | ----------- | ------------------------- |
 | Category | Select "IIS Bound Certificate" or the customized certificate store name from the previous step. | |
 | Container | Optional container to associate certificate store with. | |
-| Client Machine | Enter the hostname of the Windows Server containing the IIS certificate store to be managed. If this value is a hostname, a WinRM session will be established using the specified credentials. | |
-| Store Path | Enter the name of the Windows certificate store to manage, either 'My' for the Personal store or 'WebHosting' for the Web Hosting store. This will determine the location used for certificate store management and inventory. | |
+| Client Machine | The hostname of the Windows Server containing the certificate store to be managed. Example: 'iis-server.example.com'. | |
+| Store Path | The Windows certificate store to manage, either 'My' for the Personal store or 'WebHosting' for the Web Hosting store. Example: 'My'. | |
 | Orchestrator | Select an approved orchestrator capable of managing `IISU` certificates. Specifically, one with the `IISU` capability. | |
 
 * **Using kfutil**

@@ -424,8 +424,8 @@ The following table describes the required and optional fields for the `WinCert`
 | --------- | ----------- | ------------------------- |
 | Category | Select "Windows Certificate" or the customized certificate store name from the previous step. | |
 | Container | Optional container to associate certificate store with. | |
-| Client Machine | Enter the hostname or IP address of the Windows Server containing the certificate store to be managed. If accessing the server locally, append '|LocalMachine' to the end of the value (e.g., '1.1.1.1|LocalMachine'). | |
-| Store Path | Enter the name of the Windows certificate store to be managed from the Local Machine store on the target server. Examples include 'My' for the Personal store or 'WebHosting' for the Web Hosting store. | |
+| Client Machine | The hostname or IP address of the Windows Server containing the certificate store to be managed. Example: '192.168.1.1' or 'server.example.com'. | |
+| Store Path | The path to the Windows certificate store to manage, which must exist in the Local Machine store on the target server. Example: 'Cert:\LocalMachine\My' for the Personal store. | |
 | Orchestrator | Select an approved orchestrator capable of managing `WinCert` certificates. Specifically, one with the `WinCert` capability. | |
 
 * **Using kfutil**

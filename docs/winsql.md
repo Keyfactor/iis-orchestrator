@@ -436,8 +436,8 @@ The following table describes the required and optional fields for the `WinSql` 
 | --------- | ----------- | ------------------------- |
 | Category | Select "WinSql" or the customized certificate store name from the previous step. | |
 | Container | Optional container to associate certificate store with. | |
-| Client Machine | Enter the hostname of the Windows Server containing the SQL Server certificate store to be managed. If this value is a hostname, a WinRM session will be established using the specified credentials. | |
-| Store Path | Enter 'My' as the store path, as the WinSql Certificate Store Type uses the Personal store on the Local Machine. This path is fixed for SQL Server certificate management. | |
+| Client Machine | The hostname of the Windows Server containing the SQL Server instance to be managed. Example: 'sql-server.example.com'. | |
+| Store Path | The path to the Windows certificate store, fixed to 'My' for the Personal store within the Local Machine store. Example: 'My'. | |
 | Orchestrator | Select an approved orchestrator capable of managing `WinSql` certificates. Specifically, one with the `WinSql` capability. | |
 
 * **Using kfutil**
