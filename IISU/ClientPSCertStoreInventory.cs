@@ -64,6 +64,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 ps.AddScript(certStoreScript);
 
+                _logger.LogTrace($"Executing the following script:\n{certStoreScript}");
+
                 var certs = ps.Invoke();
 
                 foreach (var c in certs)
@@ -77,11 +79,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         SAN = Certificate.Utilities.FormatSAN($"{c.Properties["san"]?.Value}")  
                     });
                 }
-
+                _logger.LogTrace($"found: {myCertificates.Count} certificate(s), exiting GetCertificatesFromStore()");
                 return myCertificates;
             }
             catch (Exception ex)
             {
+                _logger.LogTrace($"An error occurred in the WinCert GetCertificatesFromStore method:\n{ex.Message}");
+
                 throw new CertificateStoreException(
                     $"Error listing certificate in {storePath} store on {runSpace.ConnectionInfo.ComputerName}: {ex.Message}");
             }
