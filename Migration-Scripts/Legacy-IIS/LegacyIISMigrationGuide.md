@@ -1,9 +1,12 @@
 # Built-in IIS Certificate Store Type Migration Guide
 
-As of Keyfactor Command v11, the built-in IIS certificate store types (IIS Personal, IIS Roots, and IIS Revoked) have been deprecated. This guide will instruct you on how to migrate the built-in IIS certificate store types to the open source iis-orchestrator certificate store types (IISU and WinCert) that can be found on the [Keyfactor GitHub page](https://github.com/Keyfactor/iis-orchestrator).
+As of Keyfactor Command v11, the built-in IIS certificate store types (IIS Personal, IIS Roots, and IIS Revoked) have been deprecated.
+Before upgrading to v11, if you have existing built-in IIS certificate stores they should be migrated to one of the new IIS store types.
+This guide will instruct you on how to migrate the built-in IIS certificate store types to the open source iis-orchestrator certificate store types: IISU and WinCert.
 
 # Prerequisites
 
+- Upgrade to Keyfactor Command >=10.4 (and < 11). This version or later is required to allow for the legacy IIS stores to be upgraded to both IISU and WinCert.
 - All orchestrators that are currently being used to orchestrate the built-in IIS store types must support the certificate store type that the built-in stores are being migrated to (IISU, WinCert, or both).
 - Ensure that you have a restorable database backup created before you begin the upgrade.
 
@@ -15,12 +18,17 @@ There are six SQL scripts that are needed for this migration:
 
 <summary>Creation Scripts</summary>
 
+<b>These scripts can be used to create the Store Type definitions, if they do not already exist.</b>
+They may have already been created using `kfutil` or the Command portal.
+
 ## CreateIISUCertStoreType
 
+[CreateIISUCertStoreType.sql](./CreateIISUCertStoreType.sql)
 This script creates the IISU certificate store type.
 
 ## CreateWinCertStoreType
 
+[CreateWinCertStoreType.sql](./CreateWinCertStoreType.sql)
 This script creates the WinCert certificate store type.
 
 </details>
@@ -31,6 +39,7 @@ This script creates the WinCert certificate store type.
 
 ## UpgradeIISRevokedAndRootsToWinCert
 
+[UpgradeIISRevokedAndRootsToWinCert.sql](./UpgradeIISRevokedAndRootsToWinCert.sql)
 This script creates a 'WinCert' certificate store copy for every 'IIS Revoked' and 'IIS Roots' certificate store. It will also create a 'WinCert' version of every 'IIS Revoked' and 'IIS Roots' certificate store container.
 
 **Notes**
@@ -48,6 +57,7 @@ This script accepts three parameters that allow configuration of WinRM:
 
 ## UpgradeIISPersonalToIISU
 
+[UpgradeIISPersonalToIISU.sql](./UpgradeIISPersonalToIISU.sql)
 This script creates an 'IISU' certificate store copy for a provided list of 'IIS Personal' certificate stores. It will also create an 'IISU' version of every 'IIS Personal' certificate store container.  
 
 **Notes**
@@ -68,6 +78,7 @@ This script accepts four parameters:
 
 ## UpgradeIISPersonalToWinCert
 
+[UpgradeIISPersonalToWinCert.sql](./UpgradeIISPersonalToWinCert.sql)
 This script creates a 'WinCert' certificate store copy for a provided list of 'IIS Personal' certificate stores. It will also create a 'WinCert' version of every 'IIS Personal' certificate store container.
 
 **Notes**
@@ -92,6 +103,7 @@ This script accepts four parameters:
 
 ## DeleteIISStores
 
+[DeleteIISStores.sql](./DeleteIISStores.sql)
 This script will delete all IIS Personal, IIS Roots, and IIS Revoked certificate store types, certificate stores, and certificate store containers.
 
 </details>
