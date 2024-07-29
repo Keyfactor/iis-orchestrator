@@ -1,5 +1,5 @@
 {
-    "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
+    "$schema": "https://keyfactor.github.io/v2/integration-manifest-schema.json",
     "integration_type": "orchestrator",
     "name": "WinCertStore Orchestrator",
     "status": "production",
