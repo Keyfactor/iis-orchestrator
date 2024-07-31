@@ -198,25 +198,29 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             {
                                 _logger.LogTrace($"Thumbprint Match {RenewalThumbprint}={bindingThumbprint}");
                                 var funcScript = string.Format(@"
-                                            $ErrorActionPreference = ""Stop""
+                                $ErrorActionPreference = 'Stop'
 
-                                            $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
-                                            if($IISInstalled) {{
-                                                Import-Module WebAdministration
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" |
-                                                    ForEach-Object {{ Remove-WebBinding -BindingInformation  $_.bindingInformation }}
-
-                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" | 
-                                                    ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", bindingSiteName, //{0} 
-                                    bindingIpAddress, //{1}
-                                    bindingPort, //{2}
-                                    bindingProtocol, //{3}
-                                    bindingHostName, //{4}
-                                    x509Cert.Thumbprint, //{5} 
-                                    StorePath, //{6}
-                                    bindingSniFlg); //{7}
+                                $IISInstalled = Get-Module -ListAvailable | where {{ $_.Name -eq 'WebAdministration' }}
+                                if ($IISInstalled) {{
+                                    Import-Module WebAdministration
+    
+                                    $binding = Get-WebBinding -Name '{0}' -Protocol '{3}' | where {{ $_.bindingInformation -eq '{1}:{2}:{4}' }}
+                                    if ($binding) {{
+                                        $binding.AddSslCertificate('{5}', '{6}')
+                                    }} else {{
+                                        New-WebBinding -Name '{0}' -IPAddress '{1}' -HostHeader '{4}' -Port {2} -Protocol '{3}' -SslFlags '{7}'
+                                        $newBinding = Get-WebBinding -Name '{0}' -Protocol '{3}' | where {{ $_.bindingInformation -eq '{1}:{2}:{4}' }}
+                                        $newBinding.AddSslCertificate('{5}', '{6}')
+                                    }}
+                                }}",
+                                                SiteName,    // {0}
+                                                IPAddress,   // {1}
+                                                Port,        // {2}
+                                                Protocol,    // {3}
+                                                HostName,    // {4}
+                                                x509Cert.Thumbprint,  // {5}
+                                                StorePath,// {6}
+                                                bindingSniFlg); // {7} 
 
                                 _logger.LogTrace($"funcScript {funcScript}");
                                 ps.AddScript(funcScript);
@@ -231,6 +235,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                                 ps.Commands.Clear();
                                 _logger.LogTrace("Commands Cleared..");
+
+
                             }
                         }
                     }
@@ -238,25 +244,31 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 else
                 {
                     var funcScript = string.Format(@"
-                                            $ErrorActionPreference = ""Stop""
+                    $ErrorActionPreference = 'Stop'
 
-                                            $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
-                                            if($IISInstalled) {{
-                                                Import-Module WebAdministration
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -Port ""{2}"" -Protocol ""{3}"" -HostHeader ""{4}"" |
-                                                    ForEach-Object {{ Remove-WebBinding -BindingInformation  $_.bindingInformation }}
+                    $IISInstalled = Get-Module -ListAvailable | where {{ $_.Name -eq 'WebAdministration' }}
+                    if ($IISInstalled) {{
+                        Import-Module WebAdministration
+    
+                        $binding = Get-WebBinding -Name '{0}' -Protocol '{3}' | where {{ $_.bindingInformation -eq '{1}:{2}:{4}' }}
+                        if ($binding) {{
+                            $binding.AddSslCertificate('{5}', '{6}')
+                        }} else {{
+                            New-WebBinding -Name '{0}' -IPAddress '{1}' -HostHeader '{4}' -Port {2} -Protocol '{3}'  -SslFlags '{7}'
+                            $newBinding = Get-WebBinding -Name '{0}' -Protocol '{3}' | where {{ $_.bindingInformation -eq '{1}:{2}:{4}' }}
+                            $newBinding.AddSslCertificate('{5}', '{6}')
+                        }}
+                    }}",
+                        SiteName,    // {0}
+                        IPAddress,   // {1}
+                        Port,        // {2}
+                        Protocol,    // {3}
+                        HostName,    // {4}
+                        x509Cert.Thumbprint,  // {5}
+                        StorePath, // {6}
+                        Convert.ToInt16(SniFlag));  // {7}
 
-                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" | 
-                                                    ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", SiteName, //{0} 
-                        IPAddress, //{1}
-                        Port, //{2}
-                        Protocol, //{3}
-                        HostName, //{4}
-                        x509Cert.Thumbprint, //{5} 
-                        StorePath, //{6}
-                        Convert.ToInt16(SniFlag)); //{7}
+
                     foreach (var cmd in ps.Commands.Commands)
                     {
                         _logger.LogTrace("Logging PowerShell Command");
@@ -268,6 +280,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     _logger.LogTrace("funcScript added...");
                     ps.Invoke();
                     _logger.LogTrace("funcScript Invoked...");
+
                 }
 
                 if (ps.HadErrors)
