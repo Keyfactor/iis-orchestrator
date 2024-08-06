@@ -1,3 +1,6 @@
+2.4.3
+* Adding Legacy IIS Migration scripting and Readme guide
+
 2.4.2
 * Correct false positive error when completing an IIS inventory job.
 * Revert to specifying the version of PowerShell to use when establishing a local PowerShell Runspace.
