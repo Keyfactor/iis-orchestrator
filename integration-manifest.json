@@ -59,7 +59,7 @@
                             "DisplayName": "Server Username",
                             "Type": "Secret",
                             "DependsOn": "",
-                            "DefaultValue": null,
+                            "DefaultValue": "",
                             "Required": false,
                             "IsPAMEligible": true,
                             "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
@@ -69,7 +69,7 @@
                             "DisplayName": "Server Password",
                             "Type": "Secret",
                             "DependsOn": "",
-                            "DefaultValue": null,
+                            "DefaultValue": "",
                             "Required": false,
                             "IsPAMEligible": true,
                             "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
@@ -175,7 +175,7 @@
                             "DisplayName": "Server Username",
                             "Type": "Secret",
                             "DependsOn": "",
-                            "DefaultValue": null,
+                            "DefaultValue": "",
                             "Required": false,
                             "IsPAMEligible": true,
                             "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
@@ -185,7 +185,7 @@
                             "DisplayName": "Server Password",
                             "Type": "Secret",
                             "DependsOn": "",
-                            "DefaultValue": null,
+                            "DefaultValue": "",
                             "Required": false,
                             "IsPAMEligible": true,
                             "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
@@ -371,8 +371,8 @@
                             "Name": "ServerUsername",
                             "DisplayName": "Server Username",
                             "Type": "Secret",
-                            "DependsOn": null,
-                            "DefaultValue": null,
+                            "DependsOn": "",
+                            "DefaultValue": "",
                             "Required": false,
                             "IsPAMEligible": true,
                             "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
@@ -381,8 +381,8 @@
                             "Name": "ServerPassword",
                             "DisplayName": "Server Password",
                             "Type": "Secret",
-                            "DependsOn": null,
-                            "DefaultValue": null,
+                            "DependsOn": "",
+                            "DefaultValue": "",
                             "Required": false,
                             "IsPAMEligible": true,
                             "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
@@ -391,7 +391,7 @@
                             "Name": "ServerUseSsl",
                             "DisplayName": "Use SSL",
                             "Type": "Bool",
-                            "DependsOn": null,
+                            "DependsOn": "",
                             "DefaultValue": "true",
                             "Required": true,
                             "Description": "Boolean value (true or false) indicating whether the server uses SSL for the WinRM session. Example: 'true' for SSL-enabled connections."
@@ -400,7 +400,7 @@
                             "Name": "RestartService",
                             "DisplayName": "Restart SQL Service After Cert Installed",
                             "Type": "Bool",
-                            "DependsOn": null,
+                            "DependsOn": "",
                             "DefaultValue": "false",
                             "Required": true,
                             "Description": "Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation."

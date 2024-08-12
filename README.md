@@ -104,8 +104,6 @@ The WinCertStore Universal Orchestrator extension implements 3 Certificate Store
         -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
         -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
 
-
-
     </details>
 
 2. Create Certificate Store Types for the WinCertStore Orchestrator extension. 
@@ -175,8 +173,6 @@ The WinCertStore Universal Orchestrator extension implements 3 Certificate Store
         -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
         -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
 
-
-
     </details>
 
 2. Create Certificate Store Types for the WinCertStore Orchestrator extension. 
@@ -245,8 +241,6 @@ The WinCertStore Universal Orchestrator extension implements 3 Certificate Store
         -	Execute certreq commands.
         -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
         -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
-
-
 
     </details>
 
