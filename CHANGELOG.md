@@ -1,3 +1,6 @@
+2.4.4
+* Fix an issue with WinRM parameters when migrating Legacy IIS Stores to the WinCert type
+
 2.4.3
 * Adding Legacy IIS Migration scripting and Readme guide
 
