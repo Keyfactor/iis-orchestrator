@@ -159,7 +159,7 @@ BEGIN TRY
 		@win_cert_store_type_id,
 		[psd].[StoreApproved],
 		0,
-		''{"WinRm Protocol":"''+@winrm_protocol+''","WinRm Port":"''+CONVERT(NVARCHAR(10),@winrm_port)+''","spnwithport":"''+@spnwithport+''","ServerUsername":"''+CONVERT(NVARCHAR(36),NEWID())+''","ServerPassword":"''+CONVERT(NVARCHAR(36),NEWID())+''","ServerUseSsl":"true"}'',
+		''{"WinRM Protocol":"''+@winrm_protocol+''","WinRM Port":"''+CONVERT(NVARCHAR(10),@winrm_port)+''","spnwithport":"''+@spnwithport+''","ServerUsername":"''+CONVERT(NVARCHAR(36),NEWID())+''","ServerPassword":"''+CONVERT(NVARCHAR(36),NEWID())+''","ServerUseSsl":"true"}'',
 		[psd].[AgentId]
 	FROM @iis_store_data [psd];'
 
