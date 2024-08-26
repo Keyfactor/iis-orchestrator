@@ -1,3 +1,7 @@
+2.4.4
+* Fix an issue with WinRM parameters when migrating Legacy IIS Stores to the WinCert type
+* Fix an issue with "Delete" script in the Legacy IIS Migration that did not remove some records from dependent tables
+
 2.4.3
 * Adding Legacy IIS Migration scripting and Readme guide
 
