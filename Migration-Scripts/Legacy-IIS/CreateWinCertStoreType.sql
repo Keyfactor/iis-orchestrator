@@ -139,8 +139,8 @@ BEGIN TRY
 		VALUES	
 		(
 			@current_storetype_id, -- StoreTypeId
-			'WinRm Protocol',	-- Name
-			'WinRm Protocol',	-- DisplayName
+			'WinRM Protocol',	-- Name
+			'WinRM Protocol',	-- DisplayName
 			2,					-- Type
 			1,					-- Required
 			NULL,				-- DependsOn
@@ -160,8 +160,8 @@ BEGIN TRY
 		VALUES	
 		(
 			@current_storetype_id, -- StoreTypeId
-			'WinRm Port',	-- Name
-			'WinRm Port',	-- DisplayName
+			'WinRM Port',	-- Name
+			'WinRM Port',	-- DisplayName
 			0,				-- Type
 			1,				-- Required
 			NULL,			-- DependsOn
