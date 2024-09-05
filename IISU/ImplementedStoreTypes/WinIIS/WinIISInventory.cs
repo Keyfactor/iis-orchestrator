@@ -40,6 +40,97 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             _logger = logger;
         }
 
+        public List<CurrentInventoryItem> GetInventoryItems(RemoteSettings settings, string storePath)
+        {
+            _logger.LogTrace("Entering IISU GetInventoryItems");
+
+            // Get the raw certificate inventory from cert store
+            List<Certificate> certificates = base.GetCertificatesFromStore(settings, storePath);
+
+            // Contains the inventory items to be sent back to KF
+            List<CurrentInventoryItem> myBoundCerts = new List<CurrentInventoryItem>();
+
+            _logger.LogTrace("Attempting to establish PowerShell connection.");
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            {
+                _logger.LogTrace("Initializing connection");
+                ps.Initialize();
+
+                var scriptParameters = new Dictionary<string, object>
+                    {
+                        { "isRemote", false}
+                    };
+                try
+                {
+                    var iisBindings = ps.ExecuteCommand(PSHelper.LoadScript("ReadBoundCertificates.ps1"), scriptParameters);
+                    if (iisBindings.Count == 0)
+                    {
+                        _logger.LogTrace("No binding certificates were found.  Exiting IISU GetInventoryItems.");
+                        return myBoundCerts;
+                    }
+
+                    foreach (var binding in iisBindings)
+                    {
+                        var thumbPrint = $"{(binding.Properties["thumbprint"]?.Value)}";
+                        if (string.IsNullOrEmpty(thumbPrint)) continue;
+
+                        Certificate foundCert = certificates.Find(m => m.Thumbprint.Equals(thumbPrint));
+
+                        if (foundCert == null) continue;
+
+                        var sniValue = "";
+                        switch (Convert.ToInt16(binding.Properties["sniFlg"]?.Value))
+                        {
+                            case 0:
+                                sniValue = "0 - No SNI";
+                                break;
+                            case 1:
+                                sniValue = "1 - SNI Enabled";
+                                break;
+                            case 2:
+                                sniValue = "2 - Non SNI Binding";
+                                break;
+                            case 3:
+                                sniValue = "3 - SNI Binding";
+                                break;
+                        }
+
+                        var siteSettingsDict = new Dictionary<string, object>
+                             {
+                                 { "SiteName", binding.Properties["Name"]?.Value },
+                                 { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
+                                 { "IPAddress", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
+                                 { "HostName", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
+                                 { "SniFlag", sniValue },
+                                 { "Protocol", binding.Properties["Protocol"]?.Value },
+                                 { "ProviderName", foundCert.CryptoServiceProvider },
+                                 { "SAN", foundCert.SAN }
+                             };
+
+                        myBoundCerts.Add(
+                            new CurrentInventoryItem
+                            {
+                                Certificates = new[] { foundCert.CertificateData },
+                                Alias = thumbPrint,
+                                PrivateKeyEntry = foundCert.HasPrivateKey,
+                                UseChainLevel = false,
+                                ItemStatus = OrchestratorInventoryItemStatus.Unknown,
+                                Parameters = siteSettingsDict
+                            }
+                        );
+                    }
+
+                    _logger.LogTrace($"Found {myBoundCerts.Count} bound certificates.  Exiting IISU GetInventoryItems.");
+                    return myBoundCerts;
+                }
+                catch (Exception)
+                {
+                    _logger.LogError($"An error occurred while attempting to execute script: ReadBoundCertificates.ps1");
+                    return myBoundCerts;
+                }
+            }
+        }
+
         public List<CurrentInventoryItem> GetInventoryItems(Runspace runSpace, string storePath)
         {
             _logger.LogTrace("Entering IISU GetInventoryItems");

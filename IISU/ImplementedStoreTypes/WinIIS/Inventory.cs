@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -66,18 +67,25 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                 if (storePath != null)
                 {
-                    _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                    using var myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
-                    myRunspace.Open();
+                    _logger.LogTrace($"Getting settings to connect to: {clientMachineName}");
 
-                    _logger.LogTrace("Runspace is now open");
+                    // Create the remote connection class to pass to Inventory Class
+                    RemoteSettings settings = new();
+                    settings.ClientMachineName = config.CertificateStoreDetails.ClientMachine;
+                    settings.Protocol = jobProperties.WinRmProtocol;
+                    settings.Port = jobProperties.WinRmPort;
+                    settings.IncludePortInSPN = jobProperties.SpnPortFlag;
+                    settings.ServerUserName = serverUserName;
+                    settings.ServerPassword = serverPassword;
+
                     _logger.LogTrace($"Attempting to read bound IIS certificates from cert store: {storePath}");
-                    WinIISInventory IISInventory = new WinIISInventory(_logger);
-                    inventoryItems = IISInventory.GetInventoryItems(myRunspace, storePath);
-
+                    WinIISInventory winIISInventory = new(_logger);
+                    inventoryItems = winIISInventory.GetInventoryItems(settings, storePath);
                     _logger.LogTrace($"A total of {inventoryItems.Count} bound certificate(s) were found");
-                    _logger.LogTrace("Closing runspace...");
-                    myRunspace.Close();
+
+                    _logger.LogTrace("Invoking Inventory...");
+                    submitInventory.Invoke(inventoryItems);
+                    _logger.LogTrace($"Inventory Invoked ... {inventoryItems.Count} Items");
 
                     _logger.LogTrace("Invoking submitInventory..");
                     submitInventory.Invoke(inventoryItems);
