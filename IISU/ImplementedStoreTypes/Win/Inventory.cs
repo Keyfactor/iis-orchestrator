@@ -14,6 +14,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Net;
@@ -31,7 +33,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
     {
         private ILogger _logger;
         public string ExtensionName => string.Empty;
-
         public Inventory(IPAMSecretResolver resolver)
         {
             _resolver = resolver;
@@ -49,6 +50,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         {
             try
             {
+
                 var inventoryItems = new List<CurrentInventoryItem>();
 
                 _logger.LogTrace(JobConfigurationParser.ParseInventoryJobConfiguration(config));
@@ -66,20 +68,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 
                 if (storePath != null)
                 {
-                    _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                    using var myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
-                    myRunspace.Open();
+                    // Create the remote connection class to pass to Inventory Class
+                    RemoteSettings settings = new();
+                    settings.ClientMachineName = config.CertificateStoreDetails.ClientMachine;
+                    settings.Protocol = jobProperties.WinRmProtocol;
+                    settings.Port = jobProperties.WinRmPort;
+                    settings.IncludePortInSPN = jobProperties.SpnPortFlag;
+                    settings.ServerUserName = serverUserName;
+                    settings.ServerPassword = serverPassword;
 
-                    _logger.LogTrace("Runspace is now open");
-                    _logger.LogTrace($"Attempting to read certificates from cert store: {storePath}");
-
-                    //foreach (Certificate cert in PowerShellUtilities.CertificateStore.GetCertificatesFromStore(myRunspace, storePath))
-                    WinInventory winInv = new WinInventory(_logger);
-                    inventoryItems = winInv.GetInventoryItems(myRunspace, storePath);
-
-                    _logger.LogTrace($"A total of {inventoryItems.Count} were found");
-                    _logger.LogTrace("Closing runspace");
-                    myRunspace.Close();
+                    WinInventory winInventory = new(_logger);
+                    inventoryItems = winInventory.GetInventoryItems(settings, storePath);
 
                     _logger.LogTrace("Invoking Inventory...");
                     submitInventory.Invoke(inventoryItems);

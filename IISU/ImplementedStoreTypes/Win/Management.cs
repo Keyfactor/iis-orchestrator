@@ -65,7 +65,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 long JobHistoryID = config.JobHistoryId;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                myRunspace = PSHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
 
                 var complete = new JobResult
                 {
@@ -129,7 +129,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 if (cryptoProvider !=  null)
                 {
                     _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
-                    if (!PsHelper.IsCSPFound(PsHelper.GetCSPList(myRunspace), cryptoProvider))
+                    if (!PSHelper.IsCSPFound(PSHelper.GetCSPList(myRunspace), cryptoProvider))
                         { throw new Exception($"The Crypto Provider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
                 }
 

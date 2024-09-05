@@ -15,8 +15,10 @@ using Keyfactor.Logging;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using System.Runtime.ConstrainedExecution;
 using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -29,8 +31,55 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = logger;
         }
 
+        public List<Certificate> GetCertificatesFromStore(RemoteSettings settings, string storePath)
+        {
+            try
+            {
+                ILogger _logger = LogHandler.GetClassLogger(this.GetType());
+
+                List<Certificate> myCertificates = new();
+
+                _logger.LogTrace("Attempting to establish PowerShell connection.");
+                using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+                {
+                    _logger.LogTrace("Initializing connection");
+                    ps.Initialize();
+
+                    var scriptParameters = new Dictionary<string, object>
+                    {
+                        { "StoreName", storePath }
+                    };
+
+                    var results = ps.ExecuteCommand(PSHelper.LoadScript("WinCertInventory.ps1"), scriptParameters);
+
+                    foreach (var c in results)
+                    {
+                        myCertificates.Add(new Certificate
+                        {
+                            Thumbprint = $"{c.Properties["Thumbprint"]?.Value}",
+                            HasPrivateKey = bool.Parse($"{c.Properties["HasPrivateKey"]?.Value}"),
+                            RawData = (byte[])c.Properties["RawData"]?.Value,
+                            CryptoServiceProvider = $"{c.Properties["CSP"]?.Value}",
+                            SAN = Certificate.Utilities.FormatSAN($"{c.Properties["san"]?.Value}")
+                        });
+                    }
+                }
+
+                _logger.LogTrace($"found: {myCertificates.Count} certificate(s), exiting GetCertificatesFromStore()");
+                return myCertificates;
+
+            }
+            catch (Exception ex)
+            {
+                throw new Exception ("An error occurred while attempting to read the certificates from the store.\n" + ex.Message.ToString());
+            }
+        }
+
+        // ORIG
         public List<Certificate> GetCertificatesFromStore(Runspace runSpace, string storePath)
         {
+            ILogger _logger = LogHandler.GetClassLogger(this.GetType());
+
             List<Certificate> myCertificates = new List<Certificate>();
             try
             {

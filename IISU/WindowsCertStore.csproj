@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Keyfactor.Extensions.Orchestrator.WindowsCertStore</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
@@ -31,13 +31,35 @@
   <ItemGroup>
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.19" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.3" />
+    <PackageReference Include="System.Management.Automation" Version="7.4.3" />
 
   </ItemGroup>
 
   <ItemGroup>
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShellScripts\GetSQLInstances.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShellScripts\ReadBoundCertificates.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShellScripts\ReadCertificates.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShellScripts\ReadSQLCertificates.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShellScripts\ReadSQLInstances.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShellScripts\WinCertAddCert.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShellScripts\WinCertInventory.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

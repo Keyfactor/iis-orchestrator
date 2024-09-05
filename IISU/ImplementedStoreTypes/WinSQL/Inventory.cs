@@ -67,8 +67,23 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
                 if (storePath != null)
                 {
+                    // Create the remote connection class to pass to Inventory Class
+                    RemoteSettings settings = new();
+                    settings.ClientMachineName = config.CertificateStoreDetails.ClientMachine;
+                    settings.Protocol = jobProperties.WinRmProtocol;
+                    settings.Port = jobProperties.WinRmPort;
+                    settings.IncludePortInSPN = jobProperties.SpnPortFlag;
+                    settings.ServerUserName = serverUserName;
+                    settings.ServerPassword = serverPassword;
+
+                    //SQLServerInventory sqlInventory = new SQLServerInventory(_logger);
+                    //inventoryItems = sqlInventory.GetInventoryItems(myRunspace, config);
+
+
+
+                    //
                     _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                    using var myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                    using var myRunspace = PSHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
                     myRunspace.Open();
 
                     _logger.LogTrace("Runspace is now open");

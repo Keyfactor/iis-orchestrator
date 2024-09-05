@@ -101,7 +101,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 bool includePortInSPN = jobProperties.SpnPortFlag;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
-                _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
+                _runSpace = PSHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
             }
             catch (Exception e)
             {
@@ -144,7 +144,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 bool includePortInSPN = jobProperties.SpnPortFlag;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
-                _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
+                _runSpace = PSHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
             }
             catch (Exception e)
             {
