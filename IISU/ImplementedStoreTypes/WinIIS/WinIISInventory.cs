@@ -97,30 +97,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                     if (foundCert == null) continue;
 
-                    var sniValue = "";
-                    switch (Convert.ToInt16(binding.Properties["sniFlg"]?.Value))
-                    {
-                        case 0:
-                            sniValue = "0 - No SNI";
-                            break;
-                        case 1:
-                            sniValue = "1 - SNI Enabled";
-                            break;
-                        case 2:
-                            sniValue = "2 - Non SNI Binding";
-                            break;
-                        case 3:
-                            sniValue = "3 - SNI Binding";
-                            break;
-                    }
-
                     var siteSettingsDict = new Dictionary<string, object>
                              {
                                  { "SiteName", binding.Properties["Name"]?.Value },
                                  { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
                                  { "IPAddress", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
                                  { "HostName", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
-                                 { "SniFlag", sniValue },
+                                 { "SniFlag", binding.Properties["sniFlg"]?.Value },
                                  { "Protocol", binding.Properties["Protocol"]?.Value },
                                  { "ProviderName", foundCert.CryptoServiceProvider },
                                  { "SAN", foundCert.SAN }
@@ -130,7 +113,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                         new CurrentInventoryItem
                         {
                             Certificates = new[] { foundCert.CertificateData },
-                            Alias = thumbPrint,
+                            Alias = thumbPrint + ":" + binding.Properties["Bindings"]?.Value.ToString(),
                             PrivateKeyEntry = foundCert.HasPrivateKey,
                             UseChainLevel = false,
                             ItemStatus = OrchestratorInventoryItemStatus.Unknown,

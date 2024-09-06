@@ -27,6 +27,7 @@ using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -82,7 +83,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"]?.ToString()[..1];
+                SniFlag = MigrateSNIFlag(config.JobProperties["SniFlag"]?.ToString());
                 IPAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
@@ -119,7 +120,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
+                SniFlag = MigrateSNIFlag(config.JobProperties["SniFlag"]?.ToString());
                 IPAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
@@ -407,7 +408,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             catch (Exception ex)
             {
-                var failureMessage = $"Unbinging for Site '{StorePath}' on server '{_runSpace.ConnectionInfo.ComputerName}' with error: '{LogHandler.FlattenException(ex)}'";
+                var failureMessage = $"Unbinding for Site '{StorePath}' on server '{_runSpace.ConnectionInfo.ComputerName}' with error: '{LogHandler.FlattenException(ex)}'";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult
@@ -422,6 +423,23 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _runSpace.Close();
                 ps.Runspace.Close();
                 ps.Dispose();
+            }
+        }
+
+        private string MigrateSNIFlag(string SNIValue)
+        {
+            // Regex to match the numeric part at the start of the string
+            var match = Regex.Match(SNIValue, @"^\d+");
+
+            if (match.Success)
+            {
+                // If a numeric value is found, return it as an integer
+                return match.Value;
+            }
+            else
+            {
+                _logger.LogError($"Invalid SNI/SSL flag value: {SNIValue}");
+                return SNIValue;
             }
         }
     }
