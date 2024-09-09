@@ -32,7 +32,8 @@ You can find the guide and migration scripts in this repository, located here:
 
 ## Keyfactor Version Supported
 
-The minimum version of the Keyfactor Universal Orchestrator Framework needed to run this version of the extension is 10.1
+This extension is compiled against Microsoft's .NET6 Framework and must be installed with the Keyfactor v11.5.1 Universal Orchestrator Framework or earlier. This is not compatible with v11.6+ or v12.x of the Keyfactor Universal Orchestrator Framework.
+
 ## Platform Specific Notes
 
 The Keyfactor Universal Orchestrator may be installed on either Windows or Linux based platforms. The certificate operations supported by a capability may vary based what platform the capability is installed on. The table below indicates what capabilities are supported based on which platform the encompassing Universal Orchestrator is running.
