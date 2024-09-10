@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
@@ -25,9 +26,15 @@ using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
-    internal class WinIISInventory : ClientPSCertStoreInventory
+    public class WinIISInventory : ClientPSCertStoreInventory
     {
         private ILogger _logger;
+
+        public WinIISInventory()
+        {
+            _logger = LogHandler.GetClassLogger<WinIISInventory>();
+        }
+
         public WinIISInventory(ILogger logger) : base(logger)
         {
             _logger = logger;
