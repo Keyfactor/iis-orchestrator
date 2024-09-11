@@ -110,7 +110,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                  { "Port", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[1] },
                                  { "IPAddress", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[0] },
                                  { "HostName", binding.Properties["Bindings"]?.Value.ToString()?.Split(':')[2] },
-                                 { "SniFlag", binding.Properties["sniFlg"]?.Value },
+                                 { "SniFlag", binding.Properties["sniFlg"]?.Value.ToString() },
                                  { "Protocol", binding.Properties["Protocol"]?.Value },
                                  { "ProviderName", foundCert.CryptoServiceProvider },
                                  { "SAN", foundCert.SAN }

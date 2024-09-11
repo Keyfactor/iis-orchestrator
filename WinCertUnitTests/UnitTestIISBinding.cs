@@ -37,7 +37,7 @@ namespace WinCertUnitTests
 
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
 
-            ClientPSIIManager IIS = new ClientPSIIManager(rs, "Default Web Site", "https", "*", "443", "", "", "My", "32");
+            ClientPSIIManager IIS = new ClientPSIIManager(rs, "Default Web Site", "https", "*", "443", "", "", "My", "3");
             JobResult result = IIS.BindCertificate(cert);
 
             Assert.AreEqual("Success", result.Result.ToString());
