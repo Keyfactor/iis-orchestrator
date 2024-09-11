@@ -82,5 +82,13 @@ namespace WinCertUnitTests
             Assert.AreEqual(expectedResult, result);
         }
 
+        [TestMethod]
+        public void InvalidSNIFlagZeroThrowException()
+        {
+            string expectedResult = "32";
+            string result = ClientPSIIManager.MigrateSNIFlag("32");
+            Assert.AreEqual(expectedResult, result);
+        }
+
     }
 }

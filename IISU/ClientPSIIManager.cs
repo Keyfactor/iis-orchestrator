@@ -298,7 +298,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     }
                     catch (Exception e)
                     {
-                        errorMessage = $"Application Exception on Site {SiteName} on server {_runSpace.ConnectionInfo.ComputerName}: {e.Message}";
+                        errorMessage = $"Binding attempt failed on Site {SiteName} on server {_runSpace.ConnectionInfo.ComputerName}, Application error: {e.Message}";
                         hadError = true;
                         _logger.LogTrace(errorMessage);
                     }
@@ -309,7 +309,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         {
                             Result = OrchestratorJobStatusJobResult.Failure,
                             JobHistoryId = JobHistoryID,
-                            FailureMessage = errorMessage
+                            FailureMessage = $"Binding attempt failed on Site {SiteName} on server {_runSpace.ConnectionInfo.ComputerName}: {errorMessage}"
                         };
                     }
                     else
@@ -569,7 +569,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 case "3 - sni binding":
                     return "3";
                 default:
-                    return "0";
+                    throw new Exception($"Received an invalid value '{input}' for sni/ssl Flag value");
             }
         }
     }
