@@ -488,9 +488,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 # Check if the IISAdministration module is available
                 $module = Get-Module -Name IISAdministration -ListAvailable
 
-                if (-not $module) {
-                    throw ""The IISAdministration module is not installed on this system.""
-                }
+                #if (-not $module) {
+                    #throw ""The IISAdministration module is not installed on this system.""
+                #}
 
                 # Check if the IISAdministration module is already loaded
                 if (-not (Get-Module -Name IISAdministration)) {
@@ -522,14 +522,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 # Create the new binding with modified properties
                 $newBindingInfo = ""${IPAddress}:${Port}:${Hostname}""
         
-                New-IISSiteBinding -Name $SiteName `
-                    -BindingInformation $newBindingInfo `
-                    -Protocol $Protocol `
-                    -CertificateThumbprint $Thumbprint `
-                    -CertStoreLocation $StoreName `
-                    -SslFlag $SslFlags
+                try
+                {
+                    New-IISSiteBinding -Name $SiteName `
+                        -BindingInformation $newBindingInfo `
+                        -Protocol $Protocol `
+                        -CertificateThumbprint $Thumbprint `
+                        -CertStoreLocation $StoreName `
+                        -SslFlag $SslFlags
 
-                Write-Host ""New binding added: $newBindingInfo""
+                    Write-Host ""New binding added: $newBindingInfo""
+                }
+                catch {
+                    throw $_
+                }
             ";
 
             ps.AddScript(funcScript);
@@ -569,7 +575,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 case "3 - sni binding":
                     return "3";
                 default:
-                    throw new Exception($"Received an invalid value '{input}' for sni/ssl Flag value");
+                    throw new ArgumentOutOfRangeException($"Received an invalid value '{input}' for sni/ssl Flag value");
             }
         }
     }

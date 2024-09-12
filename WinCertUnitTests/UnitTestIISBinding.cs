@@ -6,20 +6,39 @@ using System.Management.Automation.Runspaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using System.Net;
-using System.Web.Services.Description;
+//using System.Web.Services.Description;
 using System.Management.Automation;
 using Keyfactor.Orchestrators.Common.Enums;
+using System.Security.Policy;
+using Microsoft.Web.Administration;
 namespace WinCertUnitTests
 {
     [TestClass]
     public class UnitTestIISBinding
     {
+        private string certName = "";
+        private string certPassword = "";
+        private string pfxPath = "";
+
+        public UnitTestIISBinding() 
+        {
+            certName = "UnitTestCertificate";
+            certPassword = "lkjglj655asd";
+            pfxPath = Path.Combine(Directory.GetCurrentDirectory(), "TestCertificate.pfx");
+
+            if (!File.Exists(pfxPath))
+            {
+                CertificateHelper.CreateSelfSignedCertificate(certName, certPassword, pfxPath);
+            }
+        }
+
+
         [TestMethod]
         public void RenewBindingCertificate()
         {
             string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
             string password = "8zWwF36N6cNu";
-            X509Certificate2 cert = new X509Certificate2(certPath, password);
+            X509Certificate2 cert = new X509Certificate2(pfxPath, certPassword);
 
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
 
@@ -33,11 +52,13 @@ namespace WinCertUnitTests
         {
             string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
             string password = "8zWwF36N6cNu";
-            X509Certificate2 cert = new X509Certificate2(certPath, password);
+            X509Certificate2 cert = new X509Certificate2(pfxPath, certPassword);
 
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
 
-            ClientPSIIManager IIS = new ClientPSIIManager(rs, "Default Web Site", "https", "*", "443", "", "", "My", "3");
+            string sslFlag = "32";
+
+            ClientPSIIManager IIS = new ClientPSIIManager(rs, "Default Web Site", "https", "*", "443", "", "", "My", sslFlag);
             JobResult result = IIS.BindCertificate(cert);
 
             Assert.AreEqual("Success", result.Result.ToString());
@@ -47,14 +68,14 @@ namespace WinCertUnitTests
         public void AddCertificate()
         {
 
-            string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
-            string password = "8zWwF36N6cNu";
+            //string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
+            //string password = "8zWwF36N6cNu";
 
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
             rs.Open();
 
             ClientPSCertStoreManager certStoreManager = new ClientPSCertStoreManager(rs);
-            JobResult result = certStoreManager.ImportPFXFile(certPath, password, "", "My");
+            JobResult result = certStoreManager.ImportPFXFile(pfxPath, certPassword, "", "My");
             rs.Close();
 
             Assert.AreEqual("Success", result.Result.ToString());
@@ -83,12 +104,46 @@ namespace WinCertUnitTests
         }
 
         [TestMethod]
-        public void InvalidSNIFlagZeroThrowException()
+        [ExpectedException(typeof(ArgumentOutOfRangeException))]
+        public void InvalidSNIFlagThrowException()
         {
-            string expectedResult = "32";
-            string result = ClientPSIIManager.MigrateSNIFlag("32");
-            Assert.AreEqual(expectedResult, result);
+            string result = ClientPSIIManager.MigrateSNIFlag("Bad value");
         }
 
+        static bool TestValidSslFlag(int sslFlag)
+        {
+            try
+            {
+                using (ServerManager serverManager = new ServerManager())
+                {
+                    // Loop through all sites in IIS
+                    foreach (Microsoft.Web.Administration.Site site in serverManager.Sites)
+                    {
+                        // Loop through all bindings for each site
+                        foreach (Binding binding in site.Bindings)
+                        {
+                            // Check if the binding uses the HTTPS protocol
+                            if (binding.Protocol == "https")
+                            {
+                                // Get the SslFlags value (stored in binding.Attributes)
+                                int currentSslFlags = (int)binding.Attributes["sslFlags"].Value;
+
+                                // Check if the SslFlag value matches the provided one
+                                if (currentSslFlags == sslFlag)
+                                {
+                                    return true;  // Valid SslFlag found
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex.Message);
+            }
+
+            return false;  // No matching SslFlag found
+        }
     }
 }
