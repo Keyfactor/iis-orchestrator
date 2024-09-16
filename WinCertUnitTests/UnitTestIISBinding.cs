@@ -48,6 +48,21 @@ namespace WinCertUnitTests
         }
 
         [TestMethod]
+        public void UnBindCertificate()
+        {
+            X509Certificate2 cert = new X509Certificate2(pfxPath, certPassword);
+
+            Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
+            BindingNewCertificate();
+
+            string sslFlag = "0";
+            ClientPSIIManager IIS = new ClientPSIIManager(rs, "Default Web Site", "https", "*", "443", "", "", "My", sslFlag);
+            JobResult result = IIS.UnBindCertificate();
+
+            Assert.AreEqual("Success", result.Result.ToString());
+        }
+
+        [TestMethod]
         public void BindingNewCertificate()
         {
             string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
@@ -56,7 +71,7 @@ namespace WinCertUnitTests
 
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
 
-            string sslFlag = "32";
+            string sslFlag = "0";
 
             ClientPSIIManager IIS = new ClientPSIIManager(rs, "Default Web Site", "https", "*", "443", "", "", "My", sslFlag);
             JobResult result = IIS.BindCertificate(cert);
@@ -65,12 +80,23 @@ namespace WinCertUnitTests
         }
 
         [TestMethod]
+        public void BindingNewCertificateBadSslFlag()
+        {
+            X509Certificate2 cert = new X509Certificate2(pfxPath, certPassword);
+
+            Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
+
+            string sslFlag = "909"; // known bad value
+
+            ClientPSIIManager IIS = new ClientPSIIManager(rs, "Default Web Site", "https", "*", "443", "", "", "My", sslFlag);
+            JobResult result = IIS.BindCertificate(cert);
+
+            Assert.AreEqual("Failure", result.Result.ToString());
+        }
+
+        [TestMethod]
         public void AddCertificate()
         {
-
-            //string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
-            //string password = "8zWwF36N6cNu";
-
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
             rs.Open();
 
@@ -79,6 +105,25 @@ namespace WinCertUnitTests
             rs.Close();
 
             Assert.AreEqual("Success", result.Result.ToString());
+        }
+
+        [TestMethod]
+        public void RemoveCertificate()
+        {
+            Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
+            rs.Open();
+
+            ClientPSCertStoreManager certStoreManager = new ClientPSCertStoreManager(rs);
+            try
+            {
+                certStoreManager.RemoveCertificate("0a3f880aa17c03ef2c75493497d89756cfafa165", "My");
+                Assert.IsTrue(true, "Certificate was successfully removed.");
+            }
+            catch (Exception e)
+            {
+                Assert.IsFalse(false, e.Message);
+            }
+            rs.Close();
         }
 
 
