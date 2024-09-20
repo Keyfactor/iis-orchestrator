@@ -1,3 +1,4 @@
+
 2.5.0
 * Added the Bindings to the end of the thumbprint to make the alias unique.
 * Using new IISWebBindings commandlet to use additional SSL flags when binding certificate to website.
