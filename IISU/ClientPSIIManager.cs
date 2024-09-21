@@ -130,7 +130,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 IPAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
-                RenewalThumbprint = ""; // A reenrollment will always be empty
+                RenewalThumbprint = ""; // This property will not be used for renewals starting in version 2.5
                 CertContents = ""; // Not needed for a reenrollment
 
                 _logger.LogTrace("Certificate details");
@@ -144,7 +144,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
                     _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
                 }
-
+                else
+                {
+                    _logger.LogTrace("No renewal Thumbprint was provided.");
+                }
 
                 // Establish PowerShell Runspace
                 var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
@@ -173,182 +176,66 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 ps = PowerShell.Create();
                 ps.Runspace = _runSpace;
 
-                //if thumbprint is there it is a renewal so we have to search all the sites for that thumbprint and renew them all
-                if (RenewalThumbprint?.Length > 0)
+                bool hadError = false;
+                string errorMessage = string.Empty;
+
+                try
                 {
-                    _logger.LogTrace($"Thumbprint Length > 0 {RenewalThumbprint}");
+                    Collection<PSObject> results = (Collection<PSObject>)PerformIISBinding(SiteName, Protocol, IPAddress, Port, HostName, SniFlag, x509Cert.Thumbprint, StorePath);
 
-                    // Get the bindings for all the websites
-                    ps.AddCommand("Import-Module")
-                        .AddParameter("Name", "WebAdministration")
-                        .AddStatement();
-
-                    _logger.LogTrace("WebAdministration Imported");
-                    var searchScript =
-                        "Foreach($Site in get-website) { Foreach ($Bind in $Site.bindings.collection) {[pscustomobject]@{name=$Site.name;Protocol=$Bind.Protocol;Bindings=$Bind.BindingInformation;thumbprint=$Bind.certificateHash;sniFlg=$Bind.sslFlags}}}";
-                    ps.AddScript(searchScript).AddStatement();
-                    _logger.LogTrace($"Search Script: {searchScript}");
-                    var bindings = ps.Invoke();
-
-                    bool hadPSError = false;        // Flag to indicate if any website had problem with binding
-                    List<string> bindingSiteErrorMessage = new List<string>();
-
-                    foreach (var binding in bindings)
+                    if (ps.HadErrors)
                     {
-                        if (binding.Properties["Protocol"].Value.ToString().Contains("https"))
-                        {
-                            _logger.LogTrace("Looping Bindings....");
-                            var bindingSiteName = binding.Properties["name"].Value.ToString();
-                            var bindingBindings = binding.Properties["Bindings"].Value.ToString()?.Split(':');
-                            var bindingIpAddress = bindingBindings?.Length > 0 ? bindingBindings[0] : null;
-                            var bindingPort = bindingBindings?.Length > 1 ? bindingBindings[1] : null;
-                            var bindingHostName = bindingBindings?.Length > 2 ? bindingBindings[2] : null;
-                            var bindingProtocol = binding.Properties["Protocol"]?.Value?.ToString();
-                            var bindingThumbprint = binding.Properties["thumbprint"]?.Value?.ToString();
-                            var bindingSniFlg = binding.Properties["sniFlg"]?.Value?.ToString();
+                        var psError = ps.Streams.Error.ReadAll()
+                            .Aggregate(string.Empty, (current, error) =>
+                                current + (error.ErrorDetails != null && !string.IsNullOrEmpty(error.ErrorDetails.Message)
+                                    ? error.ErrorDetails.Message
+                                    : error.Exception != null
+                                        ? error.Exception.Message
+                                        : error.ToString()) + Environment.NewLine);
 
-                            _logger.LogTrace(
-                                $"bindingSiteName: {bindingSiteName}, bindingIpAddress: {bindingIpAddress}, bindingPort: {bindingPort}, bindingHostName: {bindingHostName}, bindingProtocol: {bindingProtocol}, bindingThumbprint: {x509Cert.Thumbprint}, bindingSniFlg: {bindingSniFlg}");
+                        errorMessage = psError;
+                        hadError = true;
 
-                            //if the thumbprint of the renewal request matches the thumbprint of the cert in IIS, then renew it
-                            if (RenewalThumbprint == bindingThumbprint)
-                            {
-                                _logger.LogTrace($"Thumbprint Match {RenewalThumbprint}={bindingThumbprint}");
-                                try
-                                {
-                                    Collection<PSObject> results = (Collection<PSObject>)PerformIISBinding(bindingSiteName, bindingProtocol, bindingIpAddress, bindingPort, bindingHostName, bindingSniFlg, x509Cert.Thumbprint, StorePath);
-
-                                    // Check if PowerShell had any errors for this binding
-                                    if (ps.HadErrors)
-                                    {
-                                        var psError = ps.Streams.Error.ReadAll()
-                                            .Aggregate(string.Empty, (current, error) =>
-                                                current + (error.ErrorDetails != null && !string.IsNullOrEmpty(error.ErrorDetails.Message)
-                                                    ? error.ErrorDetails.Message
-                                                    : error.Exception != null
-                                                        ? error.Exception.Message
-                                                        : error.ToString()) + Environment.NewLine);
-
-                                        string computerName = string.Empty;
-                                        if (_runSpace.ConnectionInfo is null)
-                                        {
-                                            computerName = "localMachine";
-                                        }
-                                        else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
-
-                                        string oops = $"PowerShell Error on Site {bindingSiteName} on {computerName}: {psError}";
-                                        bindingSiteErrorMessage.Add(oops);
-                                        hadPSError = true;
-
-                                        _logger.LogTrace(oops);
-                                    }
-
-                                    // Clear the commands and go to the next website
-                                    ps.Commands.Clear();
-                                    _logger.LogTrace("Commands Cleared..");
-                                }
-                                catch (Exception e)
-                                {
-                                    string computerName = string.Empty;
-                                    if (_runSpace.ConnectionInfo is null)
-                                    {
-                                        computerName = "localMachine";
-                                    }
-                                    else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
-
-                                    string oops = $"Application Exception on Site {bindingSiteName} on {computerName}: {e.Message}";
-                                    bindingSiteErrorMessage.Add(oops);
-                                    hadPSError = true;
-
-                                    _logger.LogTrace(oops);
-                                }
-                            }
-                        }
                     }
-
-                    if (hadPSError)
+                }
+                catch (Exception e)
+                {
+                    string computerName = string.Empty;
+                    if (_runSpace.ConnectionInfo is null)
                     {
-                        // Report errors and job results
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = JobHistoryID,
-                            FailureMessage = string.Join(Environment.NewLine, bindingSiteErrorMessage)
-                        };
+                        computerName = "localMachine";
                     }
-                    else
+                    else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                    errorMessage = $"Binding attempt failed on Site {SiteName} on {computerName}, Application error: {e.Message}";
+                    hadError = true;
+                    _logger.LogTrace(errorMessage);
+                }
+
+                if (hadError)
+                {
+                    string computerName = string.Empty;
+                    if (_runSpace.ConnectionInfo is null)
                     {
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Success,
-                            JobHistoryId = JobHistoryID,
-                            FailureMessage = ""
-                        };
+                        computerName = "localMachine";
                     }
+                    else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = JobHistoryID,
+                        FailureMessage = $"Binding attempt failed on Site {SiteName} on {computerName}: {errorMessage}"
+                    };
                 }
                 else
                 {
-                    bool hadError = false;
-                    string errorMessage = string.Empty;
-
-                    try
+                    return new JobResult
                     {
-                        Collection<PSObject> results = (Collection<PSObject>)PerformIISBinding(SiteName, Protocol, IPAddress, Port, HostName, SniFlag, x509Cert.Thumbprint, StorePath);
-
-                        if (ps.HadErrors)
-                        {
-                            var psError = ps.Streams.Error.ReadAll()
-                                .Aggregate(string.Empty, (current, error) =>
-                                    current + (error.ErrorDetails != null && !string.IsNullOrEmpty(error.ErrorDetails.Message)
-                                        ? error.ErrorDetails.Message
-                                        : error.Exception != null
-                                            ? error.Exception.Message
-                                            : error.ToString()) + Environment.NewLine);
-
-                            errorMessage = psError;
-                            hadError = true;
-
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        string computerName = string.Empty;
-                        if (_runSpace.ConnectionInfo is null)
-                        {
-                            computerName = "localMachine";
-                        }
-                        else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
-
-                        errorMessage = $"Binding attempt failed on Site {SiteName} on {computerName}, Application error: {e.Message}";
-                        hadError = true;
-                        _logger.LogTrace(errorMessage);
-                    }
-
-                    if (hadError)
-                    {
-                        string computerName = string.Empty;
-                        if (_runSpace.ConnectionInfo is null)
-                        {
-                            computerName = "localMachine";
-                        }
-                        else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
-
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = JobHistoryID,
-                            FailureMessage = $"Binding attempt failed on Site {SiteName} on {computerName}: {errorMessage}"
-                        };
-                    }
-                    else
-                    {
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Success,
-                            JobHistoryId = JobHistoryID,
-                            FailureMessage = ""
-                        };
-                    }
+                        Result = OrchestratorJobStatusJobResult.Success,
+                        JobHistoryId = JobHistoryID,
+                        FailureMessage = ""
+                    };
                 }
             }
             catch (Exception e)
