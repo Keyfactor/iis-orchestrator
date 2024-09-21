@@ -36,8 +36,6 @@ namespace WinCertUnitTests
         [TestMethod]
         public void RenewBindingCertificate()
         {
-            string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
-            string password = "8zWwF36N6cNu";
             X509Certificate2 cert = new X509Certificate2(pfxPath, certPassword);
 
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");
@@ -65,8 +63,6 @@ namespace WinCertUnitTests
         [TestMethod]
         public void BindingNewCertificate()
         {
-            string certPath = @"Assets\ManualCert_8zWwF36N6cNu.pfx";
-            string password = "8zWwF36N6cNu";
             X509Certificate2 cert = new X509Certificate2(pfxPath, certPassword);
 
             Runspace rs = PsHelper.GetClientPsRunspace("", "localhost", "", false, "", "");

@@ -47,7 +47,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                 _logger = LogHandler.GetClassLogger<Management>();
                 _logger.MethodEntry();
 
-                _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
+                try
+                {
+                    _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
+                }
+                catch (Exception e)
+                {
+                    _logger.LogTrace(e.Message);
+                }
 
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);

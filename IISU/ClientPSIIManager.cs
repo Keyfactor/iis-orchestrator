@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Scripts;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -120,6 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             try
             {
+                _logger.LogTrace("Setting Job Properties");
                 SiteName = config.JobProperties["SiteName"].ToString();
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
@@ -131,6 +133,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 RenewalThumbprint = ""; // A reenrollment will always be empty
                 CertContents = ""; // Not needed for a reenrollment
 
+                _logger.LogTrace("Certificate details");
                 ClientMachineName = config.CertificateStoreDetails.ClientMachine;
                 StorePath = config.CertificateStoreDetails.StorePath;
 
@@ -142,8 +145,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
                 }
 
+
                 // Establish PowerShell Runspace
                 var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                _logger.LogTrace($"Job properties value: {jobProperties}");
+
                 string winRmProtocol = jobProperties.WinRmProtocol;
                 string winRmPort = jobProperties.WinRmPort;
                 bool includePortInSPN = jobProperties.SpnPortFlag;
@@ -153,7 +159,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             catch (Exception e)
             {
-                throw new Exception($"Error when initiating an IIS ReEnrollment Job: {e.Message}", e.InnerException);
+                throw new Exception($"Error when initiating an IIS Management Job: {e.Message}", e.InnerException);
             }
         }
 
@@ -202,7 +208,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             var bindingSniFlg = binding.Properties["sniFlg"]?.Value?.ToString();
 
                             _logger.LogTrace(
-                                $"bindingSiteName: {bindingSiteName}, bindingIpAddress: {bindingIpAddress}, bindingPort: {bindingPort}, bindingHostName: {bindingHostName}, bindingProtocol: {bindingProtocol}, bindingThumbprint: {bindingThumbprint}, bindingSniFlg: {bindingSniFlg}");
+                                $"bindingSiteName: {bindingSiteName}, bindingIpAddress: {bindingIpAddress}, bindingPort: {bindingPort}, bindingHostName: {bindingHostName}, bindingProtocol: {bindingProtocol}, bindingThumbprint: {x509Cert.Thumbprint}, bindingSniFlg: {bindingSniFlg}");
 
                             //if the thumbprint of the renewal request matches the thumbprint of the cert in IIS, then renew it
                             if (RenewalThumbprint == bindingThumbprint)
@@ -210,7 +216,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                 _logger.LogTrace($"Thumbprint Match {RenewalThumbprint}={bindingThumbprint}");
                                 try
                                 {
-                                    Collection<PSObject> results = (Collection<PSObject>)PerformIISBinding(bindingSiteName, bindingProtocol, bindingIpAddress, bindingPort, bindingHostName, bindingSniFlg, bindingThumbprint, StorePath);
+                                    Collection<PSObject> results = (Collection<PSObject>)PerformIISBinding(bindingSiteName, bindingProtocol, bindingIpAddress, bindingPort, bindingHostName, bindingSniFlg, x509Cert.Thumbprint, StorePath);
 
                                     // Check if PowerShell had any errors for this binding
                                     if (ps.HadErrors)
@@ -478,10 +484,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                     return new JobResult
                     {
-                        Result = OrchestratorJobStatusJobResult.Failure,
+                        Result = OrchestratorJobStatusJobResult.Success,
                         JobHistoryId = JobHistoryID,
                         FailureMessage =
-                            $"Site {Protocol} binding for Site {SiteName} on {computerName} not found."
+                            $"No bindings we found for Site {SiteName} on {computerName}."
                     };
                 }
 
@@ -492,17 +498,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     _logger.LogTrace(cmd.CommandText);
                 }
 
-                ps.Commands.Clear();
-                _logger.LogTrace("Cleared Commands");
-
-                ps.AddCommand("Import-Module")
-                    .AddParameter("Name", "WebAdministration")
-                    .AddStatement();
-
-                _logger.LogTrace("Imported WebAdministration Module");
 
                 foreach (var binding in foundBindings)
                 {
+                    ps.AddCommand("Import-Module")
+                        .AddParameter("Name", "WebAdministration")
+                        .AddStatement();
+
+                    _logger.LogTrace("Imported WebAdministration Module");
+
                     ps.AddCommand("Remove-WebBinding")
                         .AddParameter("Name", SiteName)
                         .AddParameter("BindingInformation",
@@ -523,6 +527,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     {
                         _logger.LogTrace("PowerShell Had Errors");
                         var psError = ps.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
+                        //var psError = ps.Streams.Error.ReadAll()
+                        //    .Aggregate(string.Empty, (current, error) =>
+                        //        current + (error.ErrorDetails != null && !string.IsNullOrEmpty(error.ErrorDetails.Message)
+                        //            ? error.ErrorDetails.Message
+                        //            : error.Exception != null
+                        //                ? error.Exception.Message
+                        //                : error.ToString()) + Environment.NewLine);
 
                         string computerName = string.Empty;
                         if (_runSpace.ConnectionInfo is null)
@@ -539,6 +550,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                 $"Failed to remove {Protocol} binding for Site {SiteName} on {computerName} not found, error {psError}"
                         };
                     }
+                    ps.Commands.Clear();
                 }
 
                 return new JobResult
@@ -668,73 +680,78 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         /// <returns></returns>
         private object PerformIISBinding(string webSiteName, string protocol, string ipAddress, string port, string hostName, string sslFlags, string thumbprint, string storeName)
         {
-            string funcScript = @"
-                param (
-                    $SiteName,        # The name of the IIS site
-                    $IPAddress,       # The IP Address for the binding
-                    $Port,            # The port number for the binding
-                    $Hostname,        # Hostname for the binding (if any)
-                    $Protocol,        # Protocol (e.g., HTTP, HTTPS)
-                    $Thumbprint,      # Certificate thumbprint for HTTPS bindings
-                    $StoreName,       # Certificate store location (e.g., ""My"" for personal certs)
-                    $SslFlags         # SSL flags (if any)
-                )
+            //string funcScript = @"
+            //    param (
+            //        $SiteName,        # The name of the IIS site
+            //        $IPAddress,       # The IP Address for the binding
+            //        $Port,            # The port number for the binding
+            //        $Hostname,        # Hostname for the binding (if any)
+            //        $Protocol,        # Protocol (e.g., HTTP, HTTPS)
+            //        $Thumbprint,      # Certificate thumbprint for HTTPS bindings
+            //        $StoreName,       # Certificate store location (e.g., ""My"" for personal certs)
+            //        $SslFlags         # SSL flags (if any)
+            //    )
 
-                # Set Execution Policy (optional, depending on your environment)
-                Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+            //    # Set Execution Policy (optional, depending on your environment)
+            //    Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 
-                # Check if the IISAdministration module is available
-                #$module = Get-Module -Name IISAdministration -ListAvailable
+            //    ##  Check if the IISAdministration module is available
+            //    #$module = Get-Module -Name IISAdministration -ListAvailable
 
-                #if (-not $module) {
-                    #throw ""The IISAdministration module is not installed on this system.""
-                #}
+            //    #if (-not $module) {
+            //    # throw ""The IISAdministration module is not installed on this system.""
+            //    #}
 
-                # Check if the IISAdministration module is already loaded
-                if (-not (Get-Module -Name IISAdministration)) {
-                    try {
-                        # Attempt to import the IISAdministration module
-                        Import-Module IISAdministration -ErrorAction Stop
-                    }
-                    catch {
-                        throw ""Failed to load the IISAdministration module. Ensure it is installed and available.""
-                    }
-                }
+            //    # Check if the IISAdministration module is already loaded
+            //    if (-not (Get-Module -Name IISAdministration)) {
+            //        try {
+            //            # Attempt to import the IISAdministration module
+            //            Import-Module IISAdministration -ErrorAction Stop
+            //        }
+            //        catch {
+            //            throw ""Failed to load the IISAdministration module. Ensure it is installed and available.""
+            //        }
+            //    }
 
-                # Retrieve the existing binding information
-                $myBinding = ""${IPAddress}:${Port}:${Hostname}""
-                Write-Host ""myBinding: "" $myBinding
+            //    # Retrieve the existing binding information
+            //    $myBinding = ""${IPAddress}:${Port}:${Hostname}""
+            //    Write-Host ""myBinding: "" $myBinding
 
-                $siteBindings = Get-IISSiteBinding -Name $SiteName
-                $existingBinding = $siteBindings | Where-Object { $_.bindingInformation -eq $myBinding -and $_.protocol -eq $Protocol }
-    
-                Write-Host ""Binding:"" $existingBinding
+            //    $siteBindings = Get-IISSiteBinding -Name $SiteName
+            //    $existingBinding = $siteBindings | Where-Object { $_.bindingInformation -eq $myBinding -and $_.protocol -eq $Protocol }
 
-                if ($null -ne $existingBinding) {
-                    # Remove the existing binding
-                    Remove-IISSiteBinding -Name $SiteName -BindingInformation $existingBinding.BindingInformation -Protocol $existingBinding.Protocol -Confirm:$false
-        
-                    Write-Host ""Removed existing binding: $($existingBinding.BindingInformation)""
-                }
-        
-                # Create the new binding with modified properties
-                $newBindingInfo = ""${IPAddress}:${Port}:${Hostname}""
-        
-                try
-                {
-                    New-IISSiteBinding -Name $SiteName `
-                        -BindingInformation $newBindingInfo `
-                        -Protocol $Protocol `
-                        -CertificateThumbprint $Thumbprint `
-                        -CertStoreLocation $StoreName `
-                        -SslFlag $SslFlags
+            //    Write-Host ""Binding:"" $existingBinding
 
-                    Write-Host ""New binding added: $newBindingInfo""
-                }
-                catch {
-                    throw $_
-                }
-            ";
+            //    if ($null -ne $existingBinding) {
+            //        # Remove the existing binding
+            //        Remove-IISSiteBinding -Name $SiteName -BindingInformation $existingBinding.BindingInformation -Protocol $existingBinding.Protocol -Confirm:$false
+
+            //        Write-Host ""Removed existing binding: $($existingBinding.BindingInformation)""
+            //    }
+
+            //    # Create the new binding with modified properties
+            //    $newBindingInfo = ""${IPAddress}:${Port}:${Hostname}""
+
+            //    try
+            //    {
+            //        New-IISSiteBinding -Name $SiteName `
+            //            -BindingInformation $newBindingInfo `
+            //            -Protocol $Protocol `
+            //            -CertificateThumbprint $Thumbprint `
+            //            -CertStoreLocation $StoreName `
+            //            -SslFlag $SslFlags
+
+            //        Write-Host ""New binding added: $newBindingInfo""
+            //    }
+            //    catch {
+            //        throw $_
+            //    }
+            //";
+#if NET6_0
+            string funcScript = PowerShellScripts.UpdateIISBindingsV6;
+#elif NET8_0_OR_GREATER
+            string funcScript = PowerShellScripts.UpdateIISBindingsV8;
+#endif
 
             ps.AddScript(funcScript);
             ps.AddParameter("SiteName", webSiteName);
@@ -760,6 +777,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             {
                 return numericValue.ToString();
             }
+
+            if (string.IsNullOrEmpty(input)) { throw new ArgumentNullException("SNI/SSL Flag", "The SNI or SSL Flag flag must not be empty or null."); }
 
             // Handle the string cases
             switch (input.ToLower())
