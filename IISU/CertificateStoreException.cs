@@ -18,7 +18,7 @@ using System.Runtime.Serialization;
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
     [Serializable]
-    internal class CertificateStoreException : Exception
+    public class CertificateStoreException : Exception
     {
         public CertificateStoreException()
         {

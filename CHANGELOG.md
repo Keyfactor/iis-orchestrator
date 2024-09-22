@@ -1,3 +1,9 @@
+
+2.5.0
+* Added the Bindings to the end of the thumbprint to make the alias unique.
+* Using new IISWebBindings commandlet to use additional SSL flags when binding certificate to website.
+* Added multi-platform support for .Net6 and .Net8.
+
 2.4.4
 * Fix an issue with WinRM parameters when migrating Legacy IIS Stores to the WinCert type
 * Fix an issue with "Delete" script in the Legacy IIS Migration that did not remove some records from dependent tables
