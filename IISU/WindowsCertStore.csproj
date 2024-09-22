@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Keyfactor.Extensions.Orchestrator.WindowsCertStore</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-	<TargetFrameworks>NET6.0,NET8.0</TargetFrameworks>
+	<TargetFrameworks>NET6.0;NET8.0</TargetFrameworks>
     <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
