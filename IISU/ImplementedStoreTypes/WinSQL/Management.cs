@@ -29,7 +29,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
     {
         private ILogger _logger;
 
-        public string ExtensionName => string.Empty;
+        public string ExtensionName => "WinSqlManagement";
 
         private Runspace myRunspace;
 
