@@ -33,7 +33,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
     {
         private ILogger _logger;
 
-        public string ExtensionName => string.Empty;
+        public string ExtensionName => "WinCertManagement";
 
         private Runspace myRunspace;
 
@@ -51,7 +51,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 _logger = LogHandler.GetClassLogger<Management>();
                 _logger.MethodEntry();
 
-                _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
+                try
+                {
+                    _logger.LogTrace(JobConfigurationParser.ParseManagementJobConfiguration(config));
+                }
+                catch (Exception e)
+                {
+                    _logger.LogTrace(e.Message);
+                }
 
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
@@ -65,7 +72,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 long JobHistoryID = config.JobHistoryId;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                myRunspace = PSHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
 
                 var complete = new JobResult
                 {
@@ -129,7 +136,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 if (cryptoProvider !=  null)
                 {
                     _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
-                    if (!PsHelper.IsCSPFound(PsHelper.GetCSPList(myRunspace), cryptoProvider))
+                    if (!PSHelper.IsCSPFound(PSHelper.GetCSPList(myRunspace), cryptoProvider))
                         { throw new Exception($"The Crypto Provider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
                 }
 

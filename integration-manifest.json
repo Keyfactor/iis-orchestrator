@@ -258,7 +258,7 @@
             {
               "Name": "SniFlag",
               "DisplayName": "SNI Support",
-              "Type": "MultipleChoice",
+              "Type": "String",
               "RequiredWhen": {
                 "HasPrivateKey": false,
                 "OnAdd": false,
@@ -266,8 +266,8 @@
                 "OnReenrollment": false
               },
               "DependsOn": "",
-              "DefaultValue": "0 - No SNI",
-              "Options": "0 - No SNI,1 - SNI Enabled,2 - Non SNI Binding,3 - SNI Binding"
+              "DefaultValue": "0",
+              "Options": ""
             },
             {
               "Name": "Protocol",
