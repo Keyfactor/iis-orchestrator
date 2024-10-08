@@ -1,3 +1,18 @@
+2.5.0
+* Added the Bindings to the end of the thumbprint to make the alias unique.
+* Using new IISWebBindings commandlet to use additional SSL flags when binding certificate to website.
+* Added multi-platform support for .Net6 and .Net8.
+* Updated various PowerShell scripts to handle both .Net6 and .Net8 differences (specifically the absense of the WebAdministration module in PS SDK 7.4.x+)
+* Fixed issue to update multiple websites when using the same cert.
+* Removed renewal thumbprint logic to update multiple website; each job now updates its own specific certificate.
+
+2.4.4
+* Fix an issue with WinRM parameters when migrating Legacy IIS Stores to the WinCert type
+* Fix an issue with "Delete" script in the Legacy IIS Migration that did not remove some records from dependent tables
+
+2.4.3
+* Adding Legacy IIS Migration scripting and Readme guide
+
 2.4.2
 * Correct false positive error when completing an IIS inventory job.
 * Revert to specifying the version of PowerShell to use when establishing a local PowerShell Runspace.

@@ -28,7 +28,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
     {
         private ILogger _logger;
 
-        public string ExtensionName => string.Empty;
+        public string ExtensionName => "WinIISUInventory";
 
         public Inventory(IPAMSecretResolver resolver)
         {
