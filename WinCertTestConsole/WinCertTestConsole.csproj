@@ -18,7 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Inventory.json">
+    <None Update="WinCertInventory.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="WinIISInventory.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Management.json">
