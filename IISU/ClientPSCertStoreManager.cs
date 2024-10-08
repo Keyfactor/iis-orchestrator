@@ -27,7 +27,7 @@ using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    internal class ClientPSCertStoreManager
+    public class ClientPSCertStoreManager
     {
         private ILogger _logger;
         private Runspace _runspace;
@@ -40,6 +40,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             get { return x509Cert; }
         }
 
+        public ClientPSCertStoreManager(Runspace runSpace)
+        {
+            _logger = LogHandler.GetClassLogger<ClientPSCertStoreManager>();
+            _runspace = runSpace;
+        }
 
         public ClientPSCertStoreManager(ILogger logger, Runspace runSpace, long jobNumber)
         {
@@ -126,9 +131,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 {
                     ps.Runspace = _runspace;
 
-                    if (cryptoProviderName == null)
+                    if (string.IsNullOrEmpty(cryptoProviderName))
                     {
-                        if (privateKeyPassword == null)
+                        if (string.IsNullOrEmpty(privateKeyPassword))
                         {
                             // If no private key password is provided, import the pfx file directory to the store using addstore argument
                             string script = @"
@@ -179,7 +184,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     }
                     else
                     {
-                        if (privateKeyPassword == null)
+                        if (string.IsNullOrEmpty(privateKeyPassword))
                         {
                             string script = @"
                             param($pfxFilePath, $cspName, $storePath)

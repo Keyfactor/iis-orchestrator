@@ -65,7 +65,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string storePath = config.CertificateStoreDetails.StorePath;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                using var runSpace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                using var runSpace = PSHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
                 
                 _logger.LogTrace("Runspace created");
                 runSpace.Open();

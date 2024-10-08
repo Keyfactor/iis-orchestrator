@@ -1,0 +1,29 @@
+﻿{
+	"LastInventory": [
+		{
+			"Alias": "479D92068614E33B3CB84123AF76F1C40DF4B6F6",
+			"PrivateKeyEntry": true,
+			"Thumbprints": [
+				"479D92068614E33B3CB84123AF76F1C40DF4B6F6"
+			]
+		}
+	],
+	"CertificateStoreDetails": {
+		"ClientMachine": "vmlabsvr1",
+		"StorePath": "My",
+		"StorePassword": "",
+		"Properties": "{\"spnwithport\":\"false\",\"WinRm Protocol\":\"ssh\",\"WinRm Port\":\"5985\",\"ServerUsername\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
+		"Type": 104
+	},
+	"JobCancelled": false,
+	"ServerError": null,
+	"JobHistoryId": 26010,
+	"RequestStatus": 1,
+	"ServerUsername": "UserNameGoesHere",
+	"ServerPassword": "PasswordGoesHere",
+	"UseSSL": true,
+	"JobProperties": null,
+	"JobTypeId": "00000000-0000-0000-0000-000000000000",
+	"JobId": "e92f7350-251c-4c0a-9e5d-9b3fdb745ca9",
+	"Capability": "CertStores.WinCert.Inventory"
+}
