@@ -1,448 +1,494 @@
 {
-  "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
-  "integration_type": "orchestrator",
-  "name": "WinCertStore Orchestrator",
-  "status": "production",
-  "link_github": true,
-  "release_dir": "IISU/bin/Release/net6.0",
-  "update_catalog": true,
-  "support_level": "kf-supported",
-  "description": "The Windows Certificate Store Orchestrator Extension implements two certificate store types. 1) “WinCert” which manages certificates in a Windows local machine store, and 2) “IISU” which manages certificates and their bindings in a Windows local machine store that are bound to Internet Information Server (IIS) websites. These extensions replace the now deprecated “IIS” cert store type that ships with Keyfactor Command. The “IISU” extension also replaces the “IISBin” certificate store type from prior versions of this repository. This orchestrator extension is in the process of being renamed from “IIS Orchestrator” as it now supports certificates that are not in use by IIS.",
-  "about": {
-    "orchestrator": {
-      "UOFramework": "10.1",
-      "pam_support": true,
-      "keyfactor_platform_version": "9.10",
-      "win": {
-        "supportsCreateStore": false,
-        "supportsDiscovery": false,
-        "supportsManagementAdd": true,
-        "supportsManagementRemove": true,
-        "supportsReenrollment": true,
-        "supportsInventory": true,
-        "platformSupport": "Unused"
-      },
-      "linux": {
-        "supportsCreateStore": false,
-        "supportsDiscovery": false,
-        "supportsManagementAdd": false,
-        "supportsManagementRemove": false,
-        "supportsReenrollment": false,
-        "supportsInventory": false,
-        "platformSupport": "Unused"
-      },
-      "store_types": [
-        {
-          "Name": "Windows Certificate",
-          "ShortName": "WinCert",
-          "Capability": "WinCert",
-          "LocalStore": false,
-          "SupportedOperations": {
-            "Add": true,
-            "Create": false,
-            "Discovery": false,
-            "Enrollment": true,
-            "Remove": true
-          },
-          "Properties": [
-            {
-              "Name": "spnwithport",
-              "DisplayName": "SPN With Port",
-              "Type": "Bool",
-              "DependsOn": "",
-              "DefaultValue": "false",
-              "Required": false
+    "$schema": "https://keyfactor.github.io/v2/integration-manifest-schema.json",
+    "integration_type": "orchestrator",
+    "name": "Windows Certificate Orchestrator",
+    "status": "production",
+    "link_github": true,
+    "release_dir": "IISU/bin/Release/net6.0",
+    "update_catalog": true,
+    "support_level": "kf-supported",
+    "description": "The Windows Certificate Store Orchestrator Extension implements two certificate store types. 1) “WinCert” which manages certificates in a Windows local machine store, and 2) “IISU” which manages certificates and their bindings in a Windows local machine store that are bound to Internet Information Server (IIS) websites. These extensions replace the now deprecated “IIS” cert store type that ships with Keyfactor Command. The “IISU” extension also replaces the “IISBin” certificate store type from prior versions of this repository. This orchestrator extension is in the process of being renamed from “IIS Orchestrator” as it now supports certificates that are not in use by IIS.",
+    "about": {
+        "orchestrator": {
+            "UOFramework": "10.1",
+            "pam_support": true,
+            "keyfactor_platform_version": "9.10",
+            "win": {
+                "supportsCreateStore": false,
+                "supportsDiscovery": false,
+                "supportsManagementAdd": true,
+                "supportsManagementRemove": true,
+                "supportsReenrollment": true,
+                "supportsInventory": true,
+                "platformSupport": "Unused"
             },
-            {
-              "Name": "WinRM Protocol",
-              "DisplayName": "WinRM Protocol",
-              "Type": "MultipleChoice",
-              "DependsOn": "",
-              "DefaultValue": "https,http",
-              "Required": true
+            "linux": {
+                "supportsCreateStore": false,
+                "supportsDiscovery": false,
+                "supportsManagementAdd": false,
+                "supportsManagementRemove": false,
+                "supportsReenrollment": false,
+                "supportsInventory": false,
+                "platformSupport": "Unused"
             },
-            {
-              "Name": "WinRM Port",
-              "DisplayName": "WinRM Port",
-              "Type": "String",
-              "DependsOn": "",
-              "DefaultValue": "5986",
-              "Required": true
-            },
-            {
-              "Name": "ServerUsername",
-              "DisplayName": "Server Username",
-              "Type": "Secret",
-              "DependsOn": "",
-              "DefaultValue": null,
-              "Required": false
-            },
-            {
-              "Name": "ServerPassword",
-              "DisplayName": "Server Password",
-              "Type": "Secret",
-              "DependsOn": "",
-              "DefaultValue": null,
-              "Required": false
-            },
-            {
-              "Name": "ServerUseSsl",
-              "DisplayName": "Use SSL",
-              "Type": "Bool",
-              "DependsOn": "",
-              "DefaultValue": "true",
-              "Required": true
-            }
-          ],
-          "EntryParameters": [
-            {
-              "Name": "ProviderName",
-              "DisplayName": "Crypto Provider Name",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": false
-              },
-              "DependsOn": "",
-              "DefaultValue": "",
-              "Options": ""
-            },
-            {
-              "Name": "SAN",
-              "DisplayName": "SAN",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": true
-              },
-              "DependsOn": "",
-              "DefaultValue": "",
-              "Options": ""
-            }
-          ],
-          "PasswordOptions": {
-            "EntrySupported": false,
-            "StoreRequired": false,
-            "Style": "Default"
-          },
-          "StorePathValue": "",
-          "PrivateKeyAllowed": "Optional",
-          "ServerRequired": true,
-          "PowerShell": false,
-          "BlueprintAllowed": false,
-          "CustomAliasAllowed": "Forbidden"
-        },
-        {
-          "Name": "IIS Bound Certificate",
-          "ShortName": "IISU",
-          "Capability": "IISU",
-          "LocalStore": false,
-          "SupportedOperations": {
-            "Add": true,
-            "Create": false,
-            "Discovery": false,
-            "Enrollment": true,
-            "Remove": true
-          },
-          "Properties": [
-            {
-              "Name": "spnwithport",
-              "DisplayName": "SPN With Port",
-              "Type": "Bool",
-              "DependsOn": "",
-              "DefaultValue": "false",
-              "Required": false
-            },
-            {
-              "Name": "WinRm Protocol",
-              "DisplayName": "WinRm Protocol",
-              "Type": "MultipleChoice",
-              "DependsOn": "",
-              "DefaultValue": "https,http",
-              "Required": true
-            },
-            {
-              "Name": "WinRm Port",
-              "DisplayName": "WinRm Port",
-              "Type": "String",
-              "DependsOn": "",
-              "DefaultValue": "5986",
-              "Required": true
-            },
-            {
-              "Name": "ServerUsername",
-              "DisplayName": "Server Username",
-              "Type": "Secret",
-              "DependsOn": "",
-              "DefaultValue": null,
-              "Required": false
-            },
-            {
-              "Name": "ServerPassword",
-              "DisplayName": "Server Password",
-              "Type": "Secret",
-              "DependsOn": "",
-              "DefaultValue": null,
-              "Required": false
-            },
-            {
-              "Name": "ServerUseSsl",
-              "DisplayName": "Use SSL",
-              "Type": "Bool",
-              "DependsOn": "",
-              "DefaultValue": "true",
-              "Required": true
-            }
-          ],
-          "EntryParameters": [
-            {
-              "Name": "Port",
-              "DisplayName": "Port",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": false
-              },
-              "DependsOn": "",
-              "DefaultValue": "443",
-              "Options": ""
-            },
-            {
-              "Name": "IPAddress",
-              "DisplayName": "IP Address",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": true,
-                "OnRemove": true,
-                "OnReenrollment": true
-              },
-              "DependsOn": "",
-              "DefaultValue": "*",
-              "Options": ""
-            },
-            {
-              "Name": "HostName",
-              "DisplayName": "Host Name",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": false
-              },
-              "DependsOn": "",
-              "DefaultValue": "",
-              "Options": ""
-            },
-            {
-              "Name": "SiteName",
-              "DisplayName": "IIS Site Name",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": true,
-                "OnRemove": true,
-                "OnReenrollment": true
-              },
-              "DependsOn": "",
-              "DefaultValue": "Default Web Site",
-              "Options": ""
-            },
-            {
-              "Name": "SniFlag",
-              "DisplayName": "SNI Support",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": false
-              },
-              "DependsOn": "",
-              "DefaultValue": "0",
-              "Options": ""
-            },
-            {
-              "Name": "Protocol",
-              "DisplayName": "Protocol",
-              "Type": "MultipleChoice",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": true,
-                "OnRemove": true,
-                "OnReenrollment": true
-              },
-              "DependsOn": "",
-              "DefaultValue": "https",
-              "Options": "https,http"
-            },
-            {
-              "Name": "ProviderName",
-              "DisplayName": "Crypto Provider Name",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": false
-              },
-              "DependsOn": "",
-              "DefaultValue": "",
-              "Options": ""
-            },
-            {
-              "Name": "SAN",
-              "DisplayName": "SAN",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": true
-              },
-              "DependsOn": "",
-              "DefaultValue": "",
-              "Options": ""
-            }
-          ],
-          "PasswordOptions": {
-            "EntrySupported": false,
-            "StoreRequired": false,
-            "Style": "Default"
-          },
-          "StorePathValue": "[\"My\",\"WebHosting\"]",
-          "PrivateKeyAllowed": "Required",
-          "ServerRequired": true,
-          "PowerShell": false,
-          "BlueprintAllowed": false,
-          "CustomAliasAllowed": "Forbidden"
-        },
-        {
-          "Name": "WinSql",
-          "ShortName": "WinSql",
-          "Capability": "WinSql",
-          "LocalStore": false,
-          "SupportedOperations": {
-            "Add": true,
-            "Create": false,
-            "Discovery": false,
-            "Enrollment": false,
-            "Remove": true
-          },
-          "Properties": [
-            {
-              "Name": "WinRm Protocol",
-              "DisplayName": "WinRm Protocol",
-              "Type": "MultipleChoice",
-              "DependsOn": null,
-              "DefaultValue": "https,http",
-              "Required": true
-            },
-            {
-              "Name": "WinRm Port",
-              "DisplayName": "WinRm Port",
-              "Type": "String",
-              "DependsOn": null,
-              "DefaultValue": "5986",
-              "Required": true
-            },
-            {
-              "Name": "ServerUsername",
-              "DisplayName": "Server Username",
-              "Type": "Secret",
-              "DependsOn": null,
-              "DefaultValue": null,
-              "Required": false
-            },
-            {
-              "Name": "ServerPassword",
-              "DisplayName": "Server Password",
-              "Type": "Secret",
-              "DependsOn": null,
-              "DefaultValue": null,
-              "Required": false
-            },
-            {
-              "Name": "ServerUseSsl",
-              "DisplayName": "Use SSL",
-              "Type": "Bool",
-              "DependsOn": null,
-              "DefaultValue": "true",
-              "Required": true
-            },
-            {
-              "Name": "RestartService",
-              "DisplayName": "Restart SQL Service After Cert Installed",
-              "Type": "Bool",
-              "DependsOn": null,
-              "DefaultValue": "false",
-              "Required": true
-            }
-          ],
-          "EntryParameters": [
-            {
-              "Name": "InstanceName",
-              "DisplayName": "Instance Name",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": false
-              }
-            },
-            {
-              "Name": "ProviderName",
-              "DisplayName": "Crypto Provider Name",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": false
-              },
-              "DependsOn": "",
-              "DefaultValue": "",
-              "Options": ""
-            },
-            {
-              "Name": "SAN",
-              "DisplayName": "SAN",
-              "Type": "String",
-              "RequiredWhen": {
-                "HasPrivateKey": false,
-                "OnAdd": false,
-                "OnRemove": false,
-                "OnReenrollment": true
-              },
-              "DependsOn": "",
-              "DefaultValue": "",
-              "Options": ""
-            }
-          ],
-          "PasswordOptions": {
-            "EntrySupported": false,
-            "StoreRequired": false,
-            "Style": "Default"
-          },
-          "StorePathValue": "My",
-          "PrivateKeyAllowed": "Optional",
-          "JobProperties": [
-            "InstanceName"
-          ],
-          "ServerRequired": true,
-          "PowerShell": false,
-          "BlueprintAllowed": true,
-          "CustomAliasAllowed": "Forbidden"
+            "store_types": [
+                {
+                    "Name": "Windows Certificate",
+                    "ShortName": "WinCert",
+                    "Capability": "WinCert",
+                    "LocalStore": false,
+                    "SupportedOperations": {
+                        "Add": true,
+                        "Create": false,
+                        "Discovery": false,
+                        "Enrollment": true,
+                        "Remove": true
+                    },
+                    "Properties": [
+                        {
+                            "Name": "spnwithport",
+                            "DisplayName": "SPN With Port",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "false",
+                            "Required": false,
+                            "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+                        },
+                        {
+                            "Name": "WinRM Protocol",
+                            "DisplayName": "WinRM Protocol",
+                            "Type": "MultipleChoice",
+                            "DependsOn": "",
+                            "DefaultValue": "https,http",
+                            "Required": true,
+                            "Description": "Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication."
+                        },
+                        {
+                            "Name": "WinRM Port",
+                            "DisplayName": "WinRM Port",
+                            "Type": "String",
+                            "DependsOn": "",
+                            "DefaultValue": "5986",
+                            "Required": true,
+                            "Description": "String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP."
+                        },
+                        {
+                            "Name": "ServerUsername",
+                            "DisplayName": "Server Username",
+                            "Type": "Secret",
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Required": false,
+                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
+                        },
+                        {
+                            "Name": "ServerPassword",
+                            "DisplayName": "Server Password",
+                            "Type": "Secret",
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Required": false,
+                            "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
+                        },
+                        {
+                            "Name": "ServerUseSsl",
+                            "DisplayName": "Use SSL",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "true",
+                            "Required": true,
+                            "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+                        }
+                    ],
+                    "EntryParameters": [
+                        {
+                            "Name": "ProviderName",
+                            "DisplayName": "Crypto Provider Name",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Options": "",
+                            "Description": "Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server."
+                        },
+                        {
+                            "Name": "SAN",
+                            "DisplayName": "SAN",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": true
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Options": "",
+                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA."
+                        }
+                    ],
+                    "PasswordOptions": {
+                        "EntrySupported": false,
+                        "StoreRequired": false,
+                        "Style": "Default"
+                    },
+                    "StorePathValue": "",
+                    "PrivateKeyAllowed": "Optional",
+                    "ServerRequired": true,
+                    "PowerShell": false,
+                    "BlueprintAllowed": false,
+                    "CustomAliasAllowed": "Forbidden",
+                    "ClientMachineDescription": "Hostname of the Windows Server containing the certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).",
+                    "StorePathDescription": "Windows certificate store path to manage. The store must exist in the Local Machine store on the target server, e.g., 'My' for the Personal Store or 'Root' for the Trusted Root Certification Authorities Store."
+                },
+                {
+                    "Name": "IIS Bound Certificate",
+                    "ShortName": "IISU",
+                    "Capability": "IISU",
+                    "LocalStore": false,
+                    "SupportedOperations": {
+                        "Add": true,
+                        "Create": false,
+                        "Discovery": false,
+                        "Enrollment": true,
+                        "Remove": true
+                    },
+                    "Properties": [
+                        {
+                            "Name": "spnwithport",
+                            "DisplayName": "SPN With Port",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "false",
+                            "Required": false,
+                            "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+                        },
+                        {
+                            "Name": "WinRM Protocol",
+                            "DisplayName": "WinRM Protocol",
+                            "Type": "MultipleChoice",
+                            "DependsOn": "",
+                            "DefaultValue": "https,http",
+                            "Required": true,
+                            "Description": "Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication."
+                        },
+                        {
+                            "Name": "WinRM Port",
+                            "DisplayName": "WinRM Port",
+                            "Type": "String",
+                            "DependsOn": "",
+                            "DefaultValue": "5986",
+                            "Required": true,
+                            "Description": "String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP."
+                        },
+                        {
+                            "Name": "ServerUsername",
+                            "DisplayName": "Server Username",
+                            "Type": "Secret",
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Required": false,
+                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
+                        },
+                        {
+                            "Name": "ServerPassword",
+                            "DisplayName": "Server Password",
+                            "Type": "Secret",
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Required": false,
+                            "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
+                        },
+                        {
+                            "Name": "ServerUseSsl",
+                            "DisplayName": "Use SSL",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "true",
+                            "Required": true,
+                            "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+                        }
+                    ],
+                    "EntryParameters": [
+                        {
+                            "Name": "Port",
+                            "DisplayName": "Port",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "443",
+                            "Options": "",
+                            "Description": "String value specifying the IP port to bind the certificate to for the IIS site. Example: '443' for HTTPS."
+                        },
+                        {
+                            "Name": "IPAddress",
+                            "DisplayName": "IP Address",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": true,
+                                "OnRemove": true,
+                                "OnReenrollment": true
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "*",
+                            "Options": "",
+                            "Description": "String value specifying the IP address to bind the certificate to for the IIS site. Example: '*' for all IP addresses or '192.168.1.1' for a specific IP address."
+                        },
+                        {
+                            "Name": "HostName",
+                            "DisplayName": "Host Name",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Options": "",
+                            "Description": "String value specifying the host name (host header) to bind the certificate to for the IIS site. Leave blank for all host names or enter a specific hostname such as 'www.example.com'."
+                        },
+                        {
+                            "Name": "SiteName",
+                            "DisplayName": "IIS Site Name",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": true,
+                                "OnRemove": true,
+                                "OnReenrollment": true
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "Default Web Site",
+                            "Options": "",
+                            "Description": "String value specifying the name of the IIS web site to bind the certificate to. Example: 'Default Web Site' or any custom site name such as 'MyWebsite'."
+                        },
+                        {
+                            "Name": "SniFlag",
+                            "DisplayName": "SNI Support",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "0",
+                            "Options": "",
+                            "Description": "A 128-Bit Flag that determines what type of SSL settings you wish to use.  The default is 0, meaning No SNI.  For more information, check IIS documentation for the appropriate bit setting.)"
+                        },
+                        {
+                            "Name": "Protocol",
+                            "DisplayName": "Protocol",
+                            "Type": "MultipleChoice",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": true,
+                                "OnRemove": true,
+                                "OnReenrollment": true
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "https",
+                            "Options": "https,http",
+                            "Description": "Multiple choice value specifying the protocol to bind to. Example: 'https' for secure communication."
+                        },
+                        {
+                            "Name": "ProviderName",
+                            "DisplayName": "Crypto Provider Name",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Options": "",
+                            "Description": "Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server."
+                        },
+                        {
+                            "Name": "SAN",
+                            "DisplayName": "SAN",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": true
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Options": "",
+                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA."
+                        }
+                    ],
+                    "PasswordOptions": {
+                        "EntrySupported": false,
+                        "StoreRequired": false,
+                        "Style": "Default"
+                    },
+                    "StorePathValue": "[\"My\",\"WebHosting\"]",
+                    "PrivateKeyAllowed": "Required",
+                    "ServerRequired": true,
+                    "PowerShell": false,
+                    "BlueprintAllowed": false,
+                    "CustomAliasAllowed": "Forbidden",
+                    "ClientMachineDescription": "Hostname of the Windows Server containing the IIS certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.  For more information, see [Client Machine](#note-regarding-client-machine).",
+                    "StorePathDescription": "Windows certificate store path to manage. Choose 'My' for the Personal store or 'WebHosting' for the Web Hosting store."
+                },
+                {
+                    "Name": "WinSql",
+                    "ShortName": "WinSql",
+                    "Capability": "WinSql",
+                    "LocalStore": false,
+                    "SupportedOperations": {
+                        "Add": true,
+                        "Create": false,
+                        "Discovery": false,
+                        "Enrollment": false,
+                        "Remove": true
+                    },
+                    "Properties": [
+                        {
+                            "Name": "spnwithport",
+                            "DisplayName": "SPN With Port",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "false",
+                            "Required": false,
+                            "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+                        },
+                        {
+                            "Name": "WinRM Protocol",
+                            "DisplayName": "WinRM Protocol",
+                            "Type": "MultipleChoice",
+                            "DependsOn": "",
+                            "DefaultValue": "https,http",
+                            "Required": true,
+                            "Description": "Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication."
+                        },
+                        {
+                            "Name": "WinRM Port",
+                            "DisplayName": "WinRM Port",
+                            "Type": "String",
+                            "DependsOn": "",
+                            "DefaultValue": "5986",
+                            "Required": true,
+                            "Description": "String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP."
+                        },
+                        {
+                            "Name": "ServerUsername",
+                            "DisplayName": "Server Username",
+                            "Type": "Secret",
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Required": false,
+                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
+                        },
+                        {
+                            "Name": "ServerPassword",
+                            "DisplayName": "Server Password",
+                            "Type": "Secret",
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Required": false,
+                            "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
+                        },
+                        {
+                            "Name": "ServerUseSsl",
+                            "DisplayName": "Use SSL",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "true",
+                            "Required": true,
+                            "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+                        },
+                        {
+                            "Name": "RestartService",
+                            "DisplayName": "Restart SQL Service After Cert Installed",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "false",
+                            "Required": true,
+                            "Description": "Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation."
+                        }
+                    ],
+                    "EntryParameters": [
+                        {
+                            "Name": "InstanceName",
+                            "DisplayName": "Instance Name",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "Description": "String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance."
+                        },
+                        {
+                            "Name": "ProviderName",
+                            "DisplayName": "Crypto Provider Name",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Options": "",
+                            "Description": "Optional string value specifying the name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing private keys. Example: 'Microsoft Strong Cryptographic Provider'."
+                        },
+                        {
+                            "Name": "SAN",
+                            "DisplayName": "SAN",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": true
+                            },
+                            "DependsOn": "",
+                            "DefaultValue": "",
+                            "Options": "",
+                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs."
+                        }
+                    ],
+                    "PasswordOptions": {
+                        "EntrySupported": false,
+                        "StoreRequired": false,
+                        "Style": "Default"
+                    },
+                    "StorePathValue": "My",
+                    "PrivateKeyAllowed": "Optional",
+                    "JobProperties": [
+                        "InstanceName"
+                    ],
+                    "ServerRequired": true,
+                    "PowerShell": false,
+                    "BlueprintAllowed": true,
+                    "CustomAliasAllowed": "Forbidden",
+                    "ClientMachineDescription": "Hostname of the Windows Server containing the SQL Server Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).",
+                    "StorePathDescription": "Fixed string value 'My' indicating the Personal store on the Local Machine. This denotes the Windows certificate store to be managed for SQL Server."
+                }
+            ]
         }
-      ]
     }
-  }
 }
