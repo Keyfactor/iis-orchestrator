@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    internal class RemoteSettings
+    public class RemoteSettings
     {
         public string ClientMachineName { get; set; }
         public string Protocol{ get; set; }
