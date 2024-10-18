@@ -26,8 +26,6 @@ using System.Management.Automation;
 using System.Management.Automation.Remoting;
 using System.Management.Automation.Runspaces;
 using System.Net;
-using System.Runtime.InteropServices.Marshalling;
-using System.ServiceModel.Security;
 using System.Text.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -71,8 +69,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 argument = parts.Length > 1 ? parts[1] : null;
 
                 // Determine if this is truly a local connection
-                isLocalMachine = (machineName.ToLower() == "localhost") || (argument != null && argument.ToLower() == "localmachine");
-                if (isLocalMachine) clientMachineName = argument; else clientMachineName = machineName;
+                isLocalMachine = (machineName != null && (machineName.ToLower() == "localhost" || machineName.ToLower() == "localmachine")) ||
+                                 (argument != null && argument.ToLower() == "localmachine");
+                clientMachineName = isLocalMachine ? argument ?? machineName : machineName;
             }
         }
 
@@ -81,7 +80,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             this.protocol = protocol.ToLower();
             this.port = port;
             this.useSPN = useSPN;
-            this.clientMachineName = clientMachineName;
+            ClientMachineName = clientMachineName;
             this.serverUserName = serverUserName;
             this.serverPassword = serverPassword;
 
@@ -131,21 +130,110 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     .AddParameter("Credential", myCreds)
                     .AddParameter("SessionOption", sessionOption);
                 }
-            }
 
-            _logger.LogTrace("Attempting to invoke PS-Session command.");
-            _PSSession = PS.Invoke();
-            if (PS.HadErrors)
-            {
-                foreach (var error in PS.Streams.Error)
+                _logger.LogTrace("Attempting to invoke PS-Session command.");
+                _PSSession = PS.Invoke();
+                if (PS.HadErrors)
                 {
-                    _logger.LogError($"Error: {error}");
+                    foreach (var error in PS.Streams.Error)
+                    {
+                        _logger.LogError($"Error: {error}");
+                    }
+                    throw new Exception($"An error occurred while attempting to connect to the client machine: {clientMachineName}");
                 }
-                throw new Exception($"An error occurred while attempting to connect to the client machine: {clientMachineName}");
+
+                PS.Commands.Clear();
+                _logger.LogTrace("PS-Session established");
+
             }
 
+            // Load KF PowerShell Scripts
+            if (!IsLocalMachine)
+            {
+                PS.AddCommand("Invoke-Command")
+                    .AddParameter("Session", _PSSession)
+                    .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript("WinCertFull.ps1")));
+
+                var results = PS.Invoke();
+            }
+        }
+
+        public void Terminate()
+        {
             PS.Commands.Clear();
-            _logger.LogTrace("PS-Session established");
+            PS.Dispose();
+        }
+
+        public Collection<PSObject>? ExecuteFunction(string functionName)
+        {
+            return ExecutePowerShell(functionName);
+        }
+
+        public Collection<PSObject>? ExecuteScriptBlock(string scriptBlock, Dictionary<string, object>? parameters = null)
+        {
+            return ExecutePowerShell(scriptBlock, parameters);
+        }
+
+        private Collection<PSObject>? ExecutePowerShell(string scriptBlock, Dictionary<string, object>? parameters = null)
+        {
+            if (isLocalMachine)
+            {
+                PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
+                PS.Invoke();  // Ensure the script is invoked and loaded
+                PS.Commands.Clear();  // Clear commands after loading functions
+
+                string scriptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PowerShellScripts", "WinCertFull.ps1");
+                PS.AddScript(". '" + scriptFilePath + "'");
+                PS.Invoke();  // Ensure the script is invoked and loaded
+                PS.Commands.Clear();  // Clear commands after loading functions
+            }
+
+            // Add parameters to the script block
+            var argList = new List<object>();
+            if (parameters != null)
+            {
+                foreach (var parameter in parameters.Values)
+                {
+                    argList.Add(parameter);
+                }
+            }
+
+            if (!isLocalMachine)
+            {
+                PS.AddCommand("Invoke-Command")
+                    .AddParameter("Session", _PSSession) // send session only when necessary (remote)
+                    .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
+                    .AddParameter("ArgumentList", argList.ToArray());
+            }
+            else
+            {
+                PS.AddCommand("Invoke-Command")
+                    .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
+                    .AddParameter("ArgumentList", argList.ToArray());
+            }
+
+            try
+            {
+                var results = PS.Invoke();
+                if (PS.HadErrors)
+                {
+                    foreach (var error in PS.Streams.Error)
+                    {
+                        Console.WriteLine($"Error: {error}");
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception: {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                PS.Commands.Clear();
+            }
         }
 
         public Collection<PSObject>? ExecuteCommand(string scriptBlock, Dictionary<string, object> parameters = null)

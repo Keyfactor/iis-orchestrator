@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinIIS;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -29,6 +33,28 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public class Utilities
         {
+            public static List<IISCertificateInfo> DeserializeCertificates(string jsonResults)
+            {
+                if (string.IsNullOrEmpty(jsonResults))
+                {
+                    // Handle no objects returned
+                    return new List<IISCertificateInfo>();
+                }
+
+                // Determine if the JSON is an array or a single object
+                if (jsonResults.TrimStart().StartsWith("["))
+                {
+                    // It's an array, deserialize as list
+                    return JsonConvert.DeserializeObject<List<IISCertificateInfo>>(jsonResults);
+                }
+                else
+                {
+                    // It's a single object, wrap it in a list
+                    var singleObject = JsonConvert.DeserializeObject<IISCertificateInfo>(jsonResults);
+                    return new List<IISCertificateInfo> { singleObject };
+                }
+            }
+
             public static string FormatSAN(string san)
             {
                 // Use regular expression to extract key-value pairs
@@ -52,7 +78,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     _ => key.ToLower() // For other types, keep them as-is
                 };
             }
-
         }
     }
 }

@@ -35,74 +35,74 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
         public List<CurrentInventoryItem> GetInventoryItems(RemoteSettings settings, InventoryJobConfiguration jobConfig)
         {
-            var jobProperties = JsonConvert.DeserializeObject<JobProperties>(jobConfig.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-            List<Certificate> certificates = base.GetCertificatesFromStore(settings, jobConfig.CertificateStoreDetails.StorePath);
+            //var jobProperties = JsonConvert.DeserializeObject<JobProperties>(jobConfig.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+            //List<Certificate> certificates = base.GetCertificatesFromStore(settings, jobConfig.CertificateStoreDetails.StorePath);
 
             List<CurrentInventoryItem> myBoundCerts = new List<CurrentInventoryItem>();
 
-            _logger.LogTrace("Attempting to establish PowerShell connection.");
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
-            {
-                // Get the list of SQL Instances on the machine
-                var instances = ps.ExecuteCommand(PSHelper.LoadScript("GetSQLInstances.ps1"));
-                if (instances != null && instances[0] != null)
-                {
-                    //var psSqlManager = new ClientPsSqlManager(jobConfig, runSpace);
-                    var commonInstances = new Dictionary<string, string>();
+            //_logger.LogTrace("Attempting to establish PowerShell connection.");
+            //using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            //{
+            //    // Get the list of SQL Instances on the machine
+            //    var instances = ps.ExecuteCommand(PSHelper.LoadScript("GetSQLInstances.ps1"));
+            //    if (instances != null && instances[0] != null)
+            //    {
+            //        //var psSqlManager = new ClientPsSqlManager(jobConfig, runSpace);
+            //        var commonInstances = new Dictionary<string, string>();
 
-                    foreach (var instance in instances)
-                    {
-                        var regLocation = psSqlManager.GetSqlCertRegistryLocation(instance.ToString(), ps2);
+            //        foreach (var instance in instances)
+            //        {
+            //            var regLocation = psSqlManager.GetSqlCertRegistryLocation(instance.ToString(), ps2);
 
-                        funcScript = string.Format(@$"Get-ItemPropertyValue ""{regLocation}"" -Name Certificate");
-                        ps2.AddScript(funcScript);
-                        //_logger.LogTrace("funcScript added...");
-                        var thumbprint = ps2.Invoke()[0].ToString();
-                        ps2.Commands.Clear();
-                        if (string.IsNullOrEmpty(thumbprint)) continue;
-                        thumbprint = thumbprint.ToUpper();
+            //            funcScript = string.Format(@$"Get-ItemPropertyValue ""{regLocation}"" -Name Certificate");
+            //            ps2.AddScript(funcScript);
+            //            //_logger.LogTrace("funcScript added...");
+            //            var thumbprint = ps2.Invoke()[0].ToString();
+            //            ps2.Commands.Clear();
+            //            if (string.IsNullOrEmpty(thumbprint)) continue;
+            //            thumbprint = thumbprint.ToUpper();
 
-                        if (!commonInstances.ContainsKey(thumbprint))
-                        {
-                            commonInstances.Add(thumbprint, instance.ToString());
-                        }
-                        else
-                        {
-                            commonInstances[thumbprint] = commonInstances[thumbprint] + "," + instance.ToString();
-                        }
-                    }
+            //            if (!commonInstances.ContainsKey(thumbprint))
+            //            {
+            //                commonInstances.Add(thumbprint, instance.ToString());
+            //            }
+            //            else
+            //            {
+            //                commonInstances[thumbprint] = commonInstances[thumbprint] + "," + instance.ToString();
+            //            }
+            //        }
 
-                    foreach (var kp in commonInstances)
-                    {
-                        Certificate foundCert = certificates.Find(m => m.Thumbprint.ToUpper().Equals(kp.Key));
+            //        foreach (var kp in commonInstances)
+            //        {
+            //            Certificate foundCert = certificates.Find(m => m.Thumbprint.ToUpper().Equals(kp.Key));
 
-                        if (foundCert == null) continue;
+            //            if (foundCert == null) continue;
 
-                        var sqlSettingsDict = new Dictionary<string, object>
-                                {
-                                    { "InstanceName", kp.Value.ToString() },
-                                    { "ProviderName", foundCert.CryptoServiceProvider }
-                                };
+            //            var sqlSettingsDict = new Dictionary<string, object>
+            //                    {
+            //                        { "InstanceName", kp.Value.ToString() },
+            //                        { "ProviderName", foundCert.CryptoServiceProvider }
+            //                    };
 
-                        myBoundCerts.Add(
-                        new CurrentInventoryItem
-                        {
-                            Certificates = new[] { foundCert.CertificateData },
-                            Alias = kp.Key,
-                            PrivateKeyEntry = foundCert.HasPrivateKey,
-                            UseChainLevel = false,
-                            ItemStatus = OrchestratorInventoryItemStatus.Unknown,
-                            Parameters = sqlSettingsDict
-                        });
-                    }
+            //            myBoundCerts.Add(
+            //            new CurrentInventoryItem
+            //            {
+            //                Certificates = new[] { foundCert.CertificateData },
+            //                Alias = kp.Key,
+            //                PrivateKeyEntry = foundCert.HasPrivateKey,
+            //                UseChainLevel = false,
+            //                ItemStatus = OrchestratorInventoryItemStatus.Unknown,
+            //                Parameters = sqlSettingsDict
+            //            });
+            //        }
                     return myBoundCerts;
-                }
-                else
-                {
-                    return null;
-                }
+            //    }
+            //    else
+            //    {
+            //        return null;
+            //    }
 
-            }
+            //}
 
         }
 
