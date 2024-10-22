@@ -33,25 +33,25 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public class Utilities
         {
-            public static List<IISCertificateInfo> DeserializeCertificates(string jsonResults)
+            public static List<T> DeserializeCertificates<T>(string jsonResults)
             {
                 if (string.IsNullOrEmpty(jsonResults))
                 {
                     // Handle no objects returned
-                    return new List<IISCertificateInfo>();
+                    return new List<T>();
                 }
 
                 // Determine if the JSON is an array or a single object
                 if (jsonResults.TrimStart().StartsWith("["))
                 {
                     // It's an array, deserialize as list
-                    return JsonConvert.DeserializeObject<List<IISCertificateInfo>>(jsonResults);
+                    return JsonConvert.DeserializeObject<List<T>>(jsonResults);
                 }
                 else
                 {
                     // It's a single object, wrap it in a list
-                    var singleObject = JsonConvert.DeserializeObject<IISCertificateInfo>(jsonResults);
-                    return new List<IISCertificateInfo> { singleObject };
+                    var singleObject = JsonConvert.DeserializeObject<T>(jsonResults);
+                    return new List<T> { singleObject };
                 }
             }
 
