@@ -1,4 +1,4 @@
-﻿function Get-KFCertificate
+﻿function Get-KFCertificates
 {
     param (
         [string]$StoreName = "My"   # Default store name is "My" (Personal)
@@ -38,10 +38,11 @@ function Get-KFIISBoundCertificates
 {
     # Import the WebAdministration module
     Import-Module IISAdministration
-    Import-Module WebAdministration
+    #Import-Module WebAdministration
 
     # Get all websites
-    $websites = Get-Website
+    #$websites = Get-Website
+    $websites = Get-IISSite
 
     # Initialize an array to store the results
     $certificates = @()
@@ -51,13 +52,15 @@ function Get-KFIISBoundCertificates
         $siteName = $site.name
         
         # Get the bindings for the site
-        $bindings = Get-WebBinding -Name $siteName
+        #$bindings = Get-WebBinding -Name $siteName
+        $bindings = Get-IISSiteBinding -Name $siteName
         
         foreach ($binding in $bindings) {
             # Check if the binding has an SSL certificate
             if ($binding.protocol -eq 'https') {
                 # Get the certificate hash
-                $certHash = $binding.certificateHash
+                #$certHash = $binding.certificateHash
+                $certHash = $binding.RawAttributes.certificateHash
                 
                 # Get the certificate store
                 $StoreName = $binding.certificateStoreName
@@ -290,7 +293,7 @@ function Remove-KFCertificateFromStore
         if ($cert) {
             # Remove the certificate from the store
             $store.Remove($cert)
-            Write-Host "Certificate removed successfully from $StorePath."
+            Write-Info "Certificate removed successfully from $StorePath."
         } else {
             Write-Error "Certificate not found in $StorePath."
         }

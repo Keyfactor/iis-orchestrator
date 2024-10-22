@@ -129,6 +129,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             {
                 ps.Initialize();
 
+                // Check if IISAdministration is available and loaded
+                command = "Get-Module -ListAvailable";
+                Dictionary<string, object> parameters = new Dictionary<string, object>();
+                results = ps.ExecuteScriptBlock(command, parameters);
+
                 command = "Get-KFIISBoundCertificates";
                 results = ps.ExecuteFunction(command);
 
@@ -136,7 +141,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 if (results != null && results.Count > 0)
                 {
                     var jsonResults = results[0].ToString();
-                    var certInfoList = Certificate.Utilities.DeserializeCertificates(jsonResults); // JsonConvert.DeserializeObject<List<IISCertificateInfo>>(jsonResults);
+                    var certInfoList = Certificate.Utilities.DeserializeCertificates<IISCertificateInfo>(jsonResults); // JsonConvert.DeserializeObject<List<IISCertificateInfo>>(jsonResults);
 
                     foreach (IISCertificateInfo cert in certInfoList)
                     {
@@ -156,7 +161,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             new CurrentInventoryItem
                             {
                                 Certificates = new[] {cert.CertificateBase64 },
-                                Alias = cert.Thumbprint,
+                                Alias = cert.Thumbprint + ":" + cert.Binding?.ToString(),
                                 PrivateKeyEntry = cert.HasPrivateKey,
                                 UseChainLevel = false,
                                 ItemStatus = OrchestratorInventoryItemStatus.Unknown,

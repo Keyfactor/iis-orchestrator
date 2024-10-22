@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert;
+using Keyfactor.Orchestrators.Extensions;
 
 namespace WinCertUnitTests
 {
@@ -14,14 +17,21 @@ namespace WinCertUnitTests
         {
             Inventory inv = new();
             RemoteSettings settings = new();
-            settings.ClientMachineName = "localMachine";
-            settings.Protocol = "ssh";
-            settings.Port = "443";
+            settings.ClientMachineName = "vmlabsvr1";
+            settings.Protocol = "http";
+            settings.Port = "5985";
             settings.IncludePortInSPN = false;
             settings.ServerUserName = "administrator";
-            settings.ServerPassword = "@dminP@ssword@";
+            settings.ServerPassword = "@dminP@ssword%";
 
-            List<CurrentInventoryItem> certs = inv.QueryIISCertificates(settings);
+            // This function calls the Get-KFCertificates function and take the StoreName argument
+            List<CurrentInventoryItem> certs = inv.QueryWinCertCertificates(settings, "My");
+        }
+
+        [TestMethod]
+        public void TestAddCertificateToStore()
+        {
+
         }
     }
 }

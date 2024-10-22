@@ -37,6 +37,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private PowerShell PS;
         private Collection<PSObject> _PSSession = new Collection<PSObject>();
 
+        private string scriptFileLocation = string.Empty;
+
         private string protocol;
         private string port;
         private bool useSPN;
@@ -102,6 +104,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogDebug($"isLocalMachine flag set to: {isLocalMachine}");
             _logger.LogDebug($"Protocol is set to: {protocol}");
 
+            scriptFileLocation = FindPSLocation(AppDomain.CurrentDomain.BaseDirectory, "WinCertFull.ps1");
+            _logger.LogTrace($"Script file located here: {scriptFileLocation}");
+
             if (!isLocalMachine)
             {
                 if (protocol == "ssh")
@@ -131,7 +136,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     .AddParameter("SessionOption", sessionOption);
                 }
 
-                _logger.LogTrace("Attempting to invoke PS-Session command.");
+                _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
                 _PSSession = PS.Invoke();
                 if (PS.HadErrors)
                 {
@@ -145,16 +150,24 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 PS.Commands.Clear();
                 _logger.LogTrace("PS-Session established");
 
-            }
-
-            // Load KF PowerShell Scripts
-            if (!IsLocalMachine)
-            {
                 PS.AddCommand("Invoke-Command")
                     .AddParameter("Session", _PSSession)
-                    .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript("WinCertFull.ps1")));
+                    .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript(scriptFileLocation)));
 
                 var results = PS.Invoke();
+            }
+            else
+            {
+                _logger.LogTrace("Setting Execution Policy to Unrestricted");
+                // PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
+                PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope CurrentUser -Force");
+                PS.Invoke();  // Ensure the script is invoked and loaded
+                PS.Commands.Clear();  // Clear commands after loading functions
+
+                _logger.LogTrace("Setting script file into memory");
+                PS.AddScript(". '" + scriptFileLocation + "'");
+                PS.Invoke();  // Ensure the script is invoked and loaded
+                PS.Commands.Clear();  // Clear commands after loading functions
             }
         }
 
@@ -171,23 +184,38 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public Collection<PSObject>? ExecuteScriptBlock(string scriptBlock, Dictionary<string, object>? parameters = null)
         {
+            // THIS IS ONLY FOR TESTING
+            //using (PS)
+            //{
+                PS.AddCommand(scriptBlock);
+                foreach (var param in parameters)
+                {
+                    PS.AddParameter(param.Key, param.Value);
+                }
+
+                var results = PS.Invoke();
+
+                // Display the results
+                foreach (var result in results)
+                {
+                    Console.WriteLine(result);
+                }
+
+                // Handle any errors
+                if (PS.Streams.Error.Count > 0)
+                {
+                    foreach (var error in PS.Streams.Error)
+                    {
+                        Console.WriteLine($"Error: {error}");
+                    }
+                }
+            //}
+
             return ExecutePowerShell(scriptBlock, parameters);
         }
 
         private Collection<PSObject>? ExecutePowerShell(string scriptBlock, Dictionary<string, object>? parameters = null)
         {
-            if (isLocalMachine)
-            {
-                PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
-                PS.Invoke();  // Ensure the script is invoked and loaded
-                PS.Commands.Clear();  // Clear commands after loading functions
-
-                string scriptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PowerShellScripts", "WinCertFull.ps1");
-                PS.AddScript(". '" + scriptFilePath + "'");
-                PS.Invoke();  // Ensure the script is invoked and loaded
-                PS.Commands.Clear();  // Clear commands after loading functions
-            }
-
             // Add parameters to the script block
             var argList = new List<object>();
             if (parameters != null)
@@ -198,36 +226,44 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
             }
 
-            if (!isLocalMachine)
-            {
-                PS.AddCommand("Invoke-Command")
-                    .AddParameter("Session", _PSSession) // send session only when necessary (remote)
-                    .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
-                    .AddParameter("ArgumentList", argList.ToArray());
-            }
-            else
-            {
-                PS.AddCommand("Invoke-Command")
-                    .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
-                    .AddParameter("ArgumentList", argList.ToArray());
-            }
-
             try
             {
+                if (!isLocalMachine)
+                {
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("Session", _PSSession) // send session only when necessary (remote)
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
+                        .AddParameter("ArgumentList", argList.ToArray());
+                }
+                else
+                {
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
+                        .AddParameter("ArgumentList", argList.ToArray());
+                }
+
+                bool hadErrors = false;
+                string errorList = string.Empty;
+                _logger.LogTrace($"Script block:\n{scriptBlock}");
+
                 var results = PS.Invoke();
                 if (PS.HadErrors)
                 {
+                    errorList = string.Empty;
                     foreach (var error in PS.Streams.Error)
                     {
-                        Console.WriteLine($"Error: {error}");
+                        errorList += error + "\n";
+                        _logger.LogError($"Error: {error}");
                     }
-                }
 
+                    throw new ApplicationException(errorList);
+                }
+                
                 return results;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception: {ex.Message}");
+                _logger.LogError($"Error while executing script: {ex.Message}");
                 return null;
             }
             finally
@@ -294,6 +330,34 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 return File.ReadAllText(scriptFilePath);
             }else
             { throw new Exception($"File: {scriptFilePath} was not found."); }
+        }
+
+        private static string FindPSLocation(string directory, string fileName)
+        {
+            try
+            {
+                foreach (string file in Directory.GetFiles(directory))
+                {
+                    if (Path.GetFileName(file).Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Path.GetFullPath(file);
+                    }
+                }
+
+                foreach (string subDir in Directory.GetDirectories(directory))
+                {
+                    string result = FindPSLocation(subDir, fileName);
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        return result;
+                    }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            return null;
         }
 
         public static void ProcessPowerShellScriptEvent(object? sender, DataAddedEventArgs e)
