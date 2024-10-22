@@ -129,11 +129,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             {
                 ps.Initialize();
 
-                // Check if IISAdministration is available and loaded
-                command = "Get-Module -ListAvailable";
-                Dictionary<string, object> parameters = new Dictionary<string, object>();
-                results = ps.ExecuteScriptBlock(command, parameters);
-
                 command = "Get-KFIISBoundCertificates";
                 results = ps.ExecuteFunction(command);
 
