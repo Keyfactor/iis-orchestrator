@@ -27,6 +27,7 @@ using System.Management.Automation.Remoting;
 using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Text.Json;
+using System.Xml.Serialization;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -105,75 +106,107 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogDebug($"Protocol is set to: {protocol}");
 
             scriptFileLocation = FindPSLocation(AppDomain.CurrentDomain.BaseDirectory, "WinCertFull.ps1");
+            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script file: WinCertFull.ps1"); }
+
             _logger.LogTrace($"Script file located here: {scriptFileLocation}");
 
             if (!isLocalMachine)
             {
-                if (protocol == "ssh")
-                {
-                    // TODO: Need to add logic when using keyfilePath
-                    // TODO: Need to add keyfilePath parameter
-                    PS.AddCommand("New-PSSession")
-                        .AddParameter("HostName", ClientMachineName)
-                        .AddParameter("UserName", serverUserName);
-
-                }
-                else
-                {
-                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                    PSCredential myCreds = new PSCredential(serverUserName, pw);
-
-                    // Create the PSSessionOption object
-                    var sessionOption = new PSSessionOption
-                    {
-                        IncludePortInSPN = useSPN
-                    };
-
-                    PS.AddCommand("New-PSSession")
-                    .AddParameter("ComputerName", ClientMachineName)
-                    .AddParameter("Port", port)
-                    .AddParameter("Credential", myCreds)
-                    .AddParameter("SessionOption", sessionOption);
-                }
-
-                _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
-                _PSSession = PS.Invoke();
-                if (PS.HadErrors)
-                {
-                    foreach (var error in PS.Streams.Error)
-                    {
-                        _logger.LogError($"Error: {error}");
-                    }
-                    throw new Exception($"An error occurred while attempting to connect to the client machine: {clientMachineName}");
-                }
-
-                PS.Commands.Clear();
-                _logger.LogTrace("PS-Session established");
-
-                PS.AddCommand("Invoke-Command")
-                    .AddParameter("Session", _PSSession)
-                    .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript(scriptFileLocation)));
-
-                var results = PS.Invoke();
+                InitializeRemoteSession();
             }
             else
             {
-                _logger.LogTrace("Setting Execution Policy to Unrestricted");
-                // PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
-                PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope CurrentUser -Force");
-                PS.Invoke();  // Ensure the script is invoked and loaded
-                PS.Commands.Clear();  // Clear commands after loading functions
-
-                _logger.LogTrace("Setting script file into memory");
-                PS.AddScript(". '" + scriptFileLocation + "'");
-                PS.Invoke();  // Ensure the script is invoked and loaded
-                PS.Commands.Clear();  // Clear commands after loading functions
+                InitializeLocalSession();
             }
         }
+
+        private void InitializeRemoteSession()
+        {
+            if (protocol == "ssh")
+            {
+                // TODO: Need to add logic when using keyfilePath
+                // TODO: Need to add keyfilePath parameter
+                PS.AddCommand("New-PSSession")
+                    .AddParameter("HostName", ClientMachineName)
+                    .AddParameter("UserName", serverUserName);
+
+            }
+            else
+            {
+                var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                PSCredential myCreds = new PSCredential(serverUserName, pw);
+
+                // Create the PSSessionOption object
+                var sessionOption = new PSSessionOption
+                {
+                    IncludePortInSPN = useSPN
+                };
+
+                PS.AddCommand("New-PSSession")
+                .AddParameter("ComputerName", ClientMachineName)
+                .AddParameter("Port", port)
+                .AddParameter("Credential", myCreds)
+                .AddParameter("SessionOption", sessionOption);
+            }
+
+            _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
+            _PSSession = PS.Invoke();
+            CheckErrors();
+
+            PS.Commands.Clear();
+            _logger.LogTrace("PS-Session established");
+
+            PS.AddCommand("Invoke-Command")
+                .AddParameter("Session", _PSSession)
+                .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript(scriptFileLocation)));
+
+            var results = PS.Invoke();
+            CheckErrors();
+        }
+
+        private void InitializeLocalSession()
+        {
+            _logger.LogTrace("Setting Execution Policy to Unrestricted");
+            PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
+            PS.Invoke();  // Ensure the script is invoked and loaded
+            CheckErrors();
+
+            PS.Commands.Clear();  // Clear commands after loading functions
+
+            // Trying this to get IISAdministration loaded!!
+            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
+            rs.Open();
+
+            PS.Runspace = rs;
+
+            _logger.LogTrace("Setting script file into memory");
+            PS.AddScript(". '" + scriptFileLocation + "'");
+            PS.Invoke();  // Ensure the script is invoked and loaded
+            CheckErrors();
+
+            PS.Commands.Clear();  // Clear commands after loading functions
+        }
+
 
         public void Terminate()
         {
             PS.Commands.Clear();
+            if (_PSSession.Count > 0)
+            {
+                PS.AddCommand("Remove-Session").AddParameter("Session", _PSSession);
+                PS.Invoke();
+                CheckErrors();
+            }
+
+            try
+            {
+                PS.Runspace.Close();
+            }
+            catch (Exception)
+            {
+            }
+
             PS.Dispose();
         }
 
@@ -187,28 +220,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             // THIS IS ONLY FOR TESTING
             //using (PS)
             //{
-                PS.AddCommand(scriptBlock);
-                foreach (var param in parameters)
-                {
-                    PS.AddParameter(param.Key, param.Value);
-                }
+            PS.AddCommand(scriptBlock);
+            foreach (var param in parameters)
+            {
+                PS.AddParameter(param.Key, param.Value);
+            }
 
-                var results = PS.Invoke();
-
-                // Display the results
-                foreach (var result in results)
-                {
-                    Console.WriteLine(result);
-                }
-
-                // Handle any errors
-                if (PS.Streams.Error.Count > 0)
-                {
-                    foreach (var error in PS.Streams.Error)
-                    {
-                        Console.WriteLine($"Error: {error}");
-                    }
-                }
+            var results = PS.Invoke();
+            CheckErrors();
+    
+            // Display the results
+            foreach (var result in results)
+            {
+                Console.WriteLine(result);
+            }
             //}
 
             return ExecutePowerShell(scriptBlock, parameters);
@@ -237,9 +262,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
                 else
                 {
-                    PS.AddCommand("Invoke-Command")
-                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
-                        .AddParameter("ArgumentList", argList.ToArray());
+                    PS.AddScript(scriptBlock).AddArgument(argList.ToArray());
+                    //PS.AddCommand("Invoke-Command")
+                    //    .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
+                    //    .AddParameter("ArgumentList", argList.ToArray());
                 }
 
                 bool hadErrors = false;
@@ -247,18 +273,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _logger.LogTrace($"Script block:\n{scriptBlock}");
 
                 var results = PS.Invoke();
-                if (PS.HadErrors)
-                {
-                    errorList = string.Empty;
-                    foreach (var error in PS.Streams.Error)
-                    {
-                        errorList += error + "\n";
-                        _logger.LogError($"Error: {error}");
-                    }
+                CheckErrors();
 
-                    throw new ApplicationException(errorList);
-                }
-                
                 return results;
             }
             catch (Exception ex)
@@ -295,16 +311,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 {
                     _logger.LogTrace("Ready to invoke the script");
                     var results = PS.Invoke();
-                    if (PS.HadErrors)
-                    {
-                        _logger.LogTrace("There were errors detected.");
-                        foreach (var error in PS.Streams.Error)
-                        {
-                            _logger.LogError($"Error: {error}");
-                        }
-
-                        throw new Exception("An error occurred when executing a PowerShell script.  Please review the logs for more information.");
-                    }
+                    CheckErrors();
 
                     var jsonResults = results[0].ToString();
                     var certInfoList = JsonSerializer.Deserialize<List<CertificateInfo>>(jsonResults);
@@ -317,6 +324,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     return null;
                 }
 
+            }
+        }
+
+        private void CheckErrors()
+        {
+            string errorList = string.Empty;
+            if (PS.HadErrors)
+            {
+                errorList = string.Empty;
+                foreach (var error in PS.Streams.Error)
+                {
+                    errorList += error + "\n";
+                    _logger.LogError($"Error: {error}");
+                }
+
+                throw new ApplicationException(errorList);
             }
         }
 
