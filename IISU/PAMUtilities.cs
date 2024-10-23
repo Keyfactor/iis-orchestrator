@@ -22,7 +22,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         internal static string ResolvePAMField(IPAMSecretResolver resolver, ILogger logger, string name, string key)
         {
             logger.LogDebug($"Attempting to resolve PAM eligible field {name}");
-            return string.IsNullOrEmpty(key) ? key : resolver.Resolve(key);
+            if (resolver == null) return key;
+            else
+            {
+                return string.IsNullOrEmpty(key) ? key : resolver.Resolve(key);
+            }
         }
     }
 }
