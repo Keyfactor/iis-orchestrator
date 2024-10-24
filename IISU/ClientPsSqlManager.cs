@@ -66,7 +66,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 RestartService = jobProperties.RestartService;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
-                _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
+                _runSpace = PSHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
             }
             catch (Exception e)
             {
@@ -121,7 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 RestartService = jobProperties.RestartService;
 
                 _logger.LogTrace($"Establishing runspace on client machine: {ClientMachineName}");
-                _runSpace = PsHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
+                _runSpace = PSHelper.GetClientPsRunspace(winRmProtocol, ClientMachineName, winRmPort, includePortInSPN, serverUsername, serverPassword);
             }
             catch (Exception e)
             {
@@ -216,7 +216,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
                 return null;
             }
-            catch (ArgumentOutOfRangeException ex)
+            catch (ArgumentOutOfRangeException)
             {
                 throw new Exception($"There were no SQL instances with the name: {instanceName}.  Please check the spelling of the SQL instance.");
             }

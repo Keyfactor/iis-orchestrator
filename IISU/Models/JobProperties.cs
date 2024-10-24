@@ -45,19 +45,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         public bool ServerUseSsl { get; set; }
 
         [JsonProperty("sniflag")]
-        [DefaultValue(SniFlag.None)]
-        public SniFlag SniFlag { get; set; }
+        [DefaultValue("0")]
+        public string SniFlag { get; set; }
 
         [JsonProperty("RestartService")]
         [DefaultValue(true)]
         public bool RestartService { get; set; }
-    }
-
-    internal enum SniFlag
-    {
-        None = 0,
-        Sni = 1,
-        NoneCentral = 2,
-        SniCentral = 3
     }
 }

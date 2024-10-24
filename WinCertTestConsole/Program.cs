@@ -14,10 +14,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
+using System.Management.Automation;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Moq;
@@ -75,25 +79,59 @@ namespace WinCertTestConsole
             // Display message to user to provide parameters.
             Console.WriteLine("Running");
 
+            // Short-cut settings for WinCert
+            CaseName = "Inventory";
+            UserName = "user4";
+            Password = "Password1";
+            StorePath = "My";
+            ClientMachine = "192.168.230.170";
+            WinRmPort = "5985";
+            string StoreType = "WinCert";
+            //
+
             switch (CaseName)
             {
                 case "Inventory":
-                    Console.WriteLine("Running Inventory");
-                    InventoryJobConfiguration invJobConfig;
-                    invJobConfig = GetInventoryJobConfiguration();
-                    Console.WriteLine("Got Inventory Config");
-                    SubmitInventoryUpdate sui = GetItems;
-                    var secretResolver = new Mock<IPAMSecretResolver>();
-                    secretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == invJobConfig.ServerUsername)))
-                        .Returns(() => invJobConfig.ServerUsername);
-                    secretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == invJobConfig.ServerPassword)))
-                        .Returns(() => invJobConfig.ServerPassword);
-                    var inv = new Inventory(secretResolver.Object);
-                    Console.WriteLine("Created Inventory Object With Constructor");
-                    var invResponse = inv.ProcessJob(invJobConfig, sui);
-                    Console.WriteLine("Back From Inventory");
-                    Console.Write(JsonConvert.SerializeObject(invResponse));
-                    Console.ReadLine();
+                    if (StoreType == "WinIIS")
+                    {
+                        Console.WriteLine("Running WinIIS Inventory");
+                        InventoryJobConfiguration invJobConfig;
+                        invJobConfig = GetInventoryJobConfiguration(StoreType);
+                        Console.WriteLine("Got Inventory Config");
+                        SubmitInventoryUpdate sui = GetItems;
+                        var secretResolver = new Mock<IPAMSecretResolver>();
+                        secretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == invJobConfig.ServerUsername)))
+                            .Returns(() => invJobConfig.ServerUsername);
+                        secretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == invJobConfig.ServerPassword)))
+                            .Returns(() => invJobConfig.ServerPassword);
+                        var inv = new Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU.Inventory(secretResolver.Object);
+                        Console.WriteLine("Created Inventory Object With Constructor");
+                        var invResponse = inv.ProcessJob(invJobConfig, sui);
+                        Console.WriteLine("Back From Inventory");
+                        Console.Write(JsonConvert.SerializeObject(invResponse));
+                        Console.ReadLine();
+                    }
+                    else if(StoreType == "WinCert")
+                    {
+                        Console.WriteLine("Running WinCert Inventory");
+                        InventoryJobConfiguration invJobConfig;
+                        invJobConfig = GetInventoryJobConfiguration(StoreType);
+                        Console.WriteLine("Got Inventory Config");
+                        SubmitInventoryUpdate sui = GetItems;
+                        var secretResolver = new Mock<IPAMSecretResolver>();
+                        secretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == invJobConfig.ServerUsername)))
+                            .Returns(() => invJobConfig.ServerUsername);
+                        secretResolver.Setup(m => m.Resolve(It.Is<string>(s => s == invJobConfig.ServerPassword)))
+                            .Returns(() => invJobConfig.ServerPassword);
+                        var inv = new Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert.Inventory(secretResolver.Object);
+                        Console.WriteLine("Created Inventory Object With Constructor");
+                        var invResponse = inv.ProcessJob(invJobConfig, sui);
+                        Console.WriteLine("Back From Inventory");
+                        Console.Write(JsonConvert.SerializeObject(invResponse));
+                        Console.ReadLine();
+
+                    }
+
                     break;
 
                 case "Management":
@@ -162,7 +200,7 @@ namespace WinCertTestConsole
             mgmtSecretResolver
                 .Setup(m => m.Resolve(It.Is<string>(s => s == jobConfiguration.ServerPassword)))
                 .Returns(() => jobConfiguration.ServerPassword);
-            var mgmt = new Management(mgmtSecretResolver.Object);
+            var mgmt = new Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU.Management(mgmtSecretResolver.Object);
             var result = mgmt.ProcessJob(jobConfiguration);
             Console.Write(JsonConvert.SerializeObject(result));
             Console.ReadLine();
@@ -174,9 +212,19 @@ namespace WinCertTestConsole
         }
 
 
-        public static InventoryJobConfiguration GetInventoryJobConfiguration()
+        public static InventoryJobConfiguration GetInventoryJobConfiguration(string storeType)
         {
-            var fileContent = File.ReadAllText("Inventory.json").Replace("UserNameGoesHere", UserName)
+            string myFileName = string.Empty;
+
+            if (storeType == "WinIIS")
+            {
+                myFileName = "WinIISInventory.json";
+            }else if (storeType == "WinCert")
+            {
+                myFileName = "WinCertInventory.json";
+            }
+
+            var fileContent = File.ReadAllText(myFileName).Replace("UserNameGoesHere", UserName)
                 .Replace("PasswordGoesHere", Password).Replace("StorePathGoesHere", StorePath)
                 .Replace("ClientMachineGoesHere", ClientMachine);
             var result =

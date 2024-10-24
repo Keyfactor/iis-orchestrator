@@ -9,10 +9,10 @@
 		}
 	],
 	"CertificateStoreDetails": {
-		"ClientMachine": "iisbindingstest.command.local",
+		"ClientMachine": "192.168.230.170",
 		"StorePath": "My",
 		"StorePassword": "",
-		"Properties": "{\"spnwithport\":\"false\",\"WinRm Protocol\":\"https\",\"WinRm Port\":\"5986\",\"ServerUsername\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
+		"Properties": "{\"spnwithport\":\"false\",\"WinRm Protocol\":\"http\",\"WinRm Port\":\"5985\",\"ServerUsername\":null,\"ServerPassword\":null,\"ServerUseSsl\":\"true\"}",
 		"Type": 104
 	},
 	"JobCancelled": false,

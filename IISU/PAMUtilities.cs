@@ -14,9 +14,6 @@
 
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -24,12 +21,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
     {
         internal static string ResolvePAMField(IPAMSecretResolver resolver, ILogger logger, string name, string key)
         {
+            logger.LogDebug($"Attempting to resolve PAM eligible field {name}");
             if (resolver == null) return key;
             else
             {
-                return resolver.Resolve(key);
+                return string.IsNullOrEmpty(key) ? key : resolver.Resolve(key);
             }
-
         }
     }
 }

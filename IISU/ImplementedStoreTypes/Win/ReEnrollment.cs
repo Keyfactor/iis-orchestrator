@@ -22,7 +22,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
     {
         private ILogger _logger;
 
-        public string ExtensionName => string.Empty;
+        public string ExtensionName => "WinCertReEnrollment";
 
         public ReEnrollment(IPAMSecretResolver resolver)
         {
