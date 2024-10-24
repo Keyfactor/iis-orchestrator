@@ -20,6 +20,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
@@ -215,62 +216,33 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return ExecutePowerShell(functionName);
         }
 
-        public Collection<PSObject>? ExecuteScriptBlock(string scriptBlock, Dictionary<string, object>? parameters = null)
+        public Collection<PSObject>? ExecutePowerShell(string commandName, Dictionary<string, object>? parameters = null)
         {
-            // THIS IS ONLY FOR TESTING
-            //using (PS)
-            //{
-            PS.AddCommand(scriptBlock);
-            foreach (var param in parameters)
-            {
-                PS.AddParameter(param.Key, param.Value);
-            }
-
-            var results = PS.Invoke();
-            CheckErrors();
-    
-            // Display the results
-            foreach (var result in results)
-            {
-                Console.WriteLine(result);
-            }
-            //}
-
-            return ExecutePowerShell(scriptBlock, parameters);
-        }
-
-        private Collection<PSObject>? ExecutePowerShell(string scriptBlock, Dictionary<string, object>? parameters = null)
-        {
-            // Add parameters to the script block
-            var argList = new List<object>();
-            if (parameters != null)
-            {
-                foreach (var parameter in parameters.Values)
-                {
-                    argList.Add(parameter);
-                }
-            }
-
             try
             {
                 if (!isLocalMachine)
                 {
                     PS.AddCommand("Invoke-Command")
                         .AddParameter("Session", _PSSession) // send session only when necessary (remote)
-                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
-                        .AddParameter("ArgumentList", argList.ToArray());
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(commandName))
+                        .AddParameter("ArgumentList", parameters?.Values.ToArray());
                 }
                 else
                 {
-                    PS.AddScript(scriptBlock).AddArgument(argList.ToArray());
-                    //PS.AddCommand("Invoke-Command")
-                    //    .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
-                    //    .AddParameter("ArgumentList", argList.ToArray());
+                    PS.AddCommand(commandName);
+
+                    if (parameters != null)
+                    {
+                        foreach (var parameter in parameters)
+                        {
+                            PS.AddParameter(parameter.Key, parameter.Value);
+                        }
+                    }
                 }
 
                 bool hadErrors = false;
                 string errorList = string.Empty;
-                _logger.LogTrace($"Script block:\n{scriptBlock}");
+                _logger.LogTrace($"Script block:\n{commandName}");
 
                 var results = PS.Invoke();
                 CheckErrors();
@@ -339,7 +311,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     _logger.LogError($"Error: {error}");
                 }
 
-                throw new ApplicationException(errorList);
+                throw new Exception(errorList);
             }
         }
 

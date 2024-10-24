@@ -23,6 +23,8 @@ using System;
 using System.Management.Automation;
 using Keyfactor.Logging;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Management.Automation.Runspaces;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
@@ -31,7 +33,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         public string ExtensionName => "WinCertManagement";
         private ILogger _logger;
 
-        private string command = string.Empty;
         private PSHelper _psHelper;
         private Collection<PSObject>? _results = null;
 
@@ -98,7 +99,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                             string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
                             string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
 
-                            complete = AddCertificate(certificateContents, privateKeyPassword, _storePath, cryptoProvider);
+                            complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
                             _logger.LogTrace($"Completed adding the certificate to the store");
 
                             break;
@@ -107,7 +108,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                         {
                             string thumbprint = config.JobCertificate.Alias;
 
-                            complete = RemoveCertificate(thumbprint, _storePath);
+                            complete = RemoveCertificate(thumbprint);
                             _logger.LogTrace($"Completed removing the certificate from the store");
 
                             break;
@@ -134,7 +135,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
             }
         }
 
-        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string storePath, string cryptoProvider)
+        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
         {
             try
             {
@@ -143,15 +144,26 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     _psHelper.Initialize();
 
                     _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
-                    command = $"Add-KFCertificateToStore -Base64Cert '{certificateContents}' -PrivateKeyPassword '{privateKeyPassword}' -StoreName '{storePath}' -CryptoServiceProvider '{cryptoProvider}'";
-                    _results = _psHelper.ExecuteFunction(command);
+
+                    // Manditory parameters
+                    var parameters = new Dictionary<string, object>
+                    {
+                        { "Base64Cert", certificateContents },
+                        { "StorePath", _storePath },
+                    };
+
+                    // Optional parameters
+                    if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
+                    if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
+
+                    _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
                     _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
 
                     // This should return the thumbprint of the certificate
                     if (_results != null && _results.Count > 0)
                     {
                         var thumbprint = _results[0].ToString();
-                        _logger.LogTrace($"Added certificate to store {storePath}, returned with the thumbprint {thumbprint}");
+                        _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {thumbprint}");
                     }
                     else
                     {
@@ -182,7 +194,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
             }
         }
 
-        public JobResult RemoveCertificate(string thumbprint, string storePath)
+        public JobResult RemoveCertificate(string thumbprint)
         {
             try
             {
@@ -190,9 +202,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 {
                     _psHelper.Initialize();
 
-                    _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {storePath}");
-                    command = $"Remove-KFCertificateFromStore -Thumbprint '{thumbprint}' -StorePath '{storePath}'";
-                    _psHelper.ExecuteFunction(command);
+                    _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
+
+                    var parameters = new Dictionary<string, object>()
+                    {
+                        { "Thumbprint", thumbprint },
+                        { "StorePath", _storePath }
+                    };
+
+                    _psHelper.ExecutePowerShell("Remove-KFCertificateFromStore", parameters);
                     _logger.LogTrace("Returned from executing PS function (Remove-KFCertificateFromStore)");
                     
                     _psHelper.Terminate();
