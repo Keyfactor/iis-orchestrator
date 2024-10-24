@@ -126,14 +126,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            string command = string.Empty;
-
             using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
             {
                 ps.Initialize();
 
-                command = $"Get-KFCertificates -StoreName '{StoreName}'";
-                results = ps.ExecuteFunction(command);
+                var parameters = new Dictionary<string, object>
+                {
+                    { "StoreName", StoreName }
+                };
+                
+                results = ps.ExecutePowerShell("Get-KFCertificates", parameters);
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)

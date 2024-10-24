@@ -13,9 +13,11 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Management.Automation;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinIIS;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -30,7 +32,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         public string ExtensionName => "WinIISUManagement";
         private ILogger _logger;
 
-        private string command = string.Empty;
         private PSHelper _psHelper;
         private Collection<PSObject>? _results = null;
 
@@ -100,42 +101,67 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
 
                             // Add Certificate to Cert Store
-                            using (_psHelper)
+                            try
                             {
-
-                                string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, _storePath, cryptoProvider);
+                                string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
                                 _logger.LogTrace($"Completed adding the certificate to the store");
 
                                 // Bind Certificate to IIS Site
                                 if (newThumbprint != null)
                                 {
+                                    IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
+                                    BindCertificate(bindingInfo, newThumbprint);
 
+                                    complete = new JobResult
+                                    {
+                                        Result = OrchestratorJobStatusJobResult.Success,
+                                        JobHistoryId = _jobHistoryID,
+                                        FailureMessage = ""
+                                    };
                                 }
-
+                            }
+                            catch (Exception ex)
+                            {
+                                return new JobResult
+                                {
+                                    Result = OrchestratorJobStatusJobResult.Failure,
+                                    JobHistoryId = _jobHistoryID,
+                                    FailureMessage = ex.Message
+                                };
                             }
 
+                            _logger.LogTrace($"Completed adding and binding the certificate to the store");
 
-                            return new JobResult
-                            {
-                                Result = OrchestratorJobStatusJobResult.Success,
-                                JobHistoryId = _jobHistoryID,
-                                FailureMessage = ""
-                            };
+                            break;
                         }
                     case CertStoreOperationType.Remove:
                         {
+                            // Removing a certificate involves two steps: UnBind the certificate, then delete the cert from the store
+                            
                             string thumbprint = config.JobCertificate.Alias;
+                            try
+                            {
+                                if (UnBindCertificate(new IISBindingInfo(config.JobProperties)))
+                                {
+                                    complete = RemoveCertificate(thumbprint);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                return new JobResult
+                                {
+                                    Result = OrchestratorJobStatusJobResult.Failure,
+                                    JobHistoryId = _jobHistoryID,
+                                    FailureMessage = ex.Message
+                                };
+                            }
 
-                            //complete = RemoveCertificate(thumbprint, _storePath);
                             _logger.LogTrace($"Completed removing the certificate from the store");
 
                             break;
                         }
                 }
 
-                _psHelper.Terminate();
-
-                _logger.MethodExit();
                 return complete;
             }
             catch (Exception ex)
@@ -149,34 +175,44 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     FailureMessage = ex.Message
                 };
             }
+            finally 
+            { 
+                _psHelper.Terminate();
+                _logger.MethodExit(); 
+            }
         }
 
-        public string AddCertificate(string certificateContents, string privateKeyPassword, string storePath, string cryptoProvider)
+        public string AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
         {
             try
             {
                 string newThumbprint = string.Empty;
 
-                using (_psHelper)
+                _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
+
+                // Manditory parameters
+                var parameters = new Dictionary<string, object>
                 {
-                    _psHelper.Initialize();
+                    { "Base64Cert", certificateContents },
+                    { "StorePath", _storePath },
+                };
 
-                    _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
-                    command = $"Add-KFCertificateToStore -Base64Cert '{certificateContents}' -PrivateKeyPassword '{privateKeyPassword}' -StoreName '{storePath}' -CryptoServiceProvider '{cryptoProvider}'";
-                    _results = _psHelper.ExecuteFunction(command);
-                    _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+                // Optional parameters
+                if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
+                if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
 
-                    // This should return the thumbprint of the certificate
-                    if (_results != null && _results.Count > 0)
-                    {
-                        newThumbprint= _results[0].ToString();
-                        _logger.LogTrace($"Added certificate to store {storePath}, returned with the thumbprint {newThumbprint}");
-                    }
-                    else
-                    {
-                        _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell informaiton.");
-                    }
-                    _psHelper.Terminate();
+                _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
+                _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+
+                // This should return the thumbprint of the certificate
+                if (_results != null && _results.Count > 0)
+                {
+                    newThumbprint= _results[0].ToString();
+                    _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {newThumbprint}");
+                }
+                else
+                {
+                    _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell informaiton.");
                 }
 
                 return newThumbprint;
@@ -190,107 +226,107 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             }
         }
 
-        public void BindCertificate(string siteName, string protocol, string ipAddress, string port, string sniFlag, string storeName, string thumbPrint, string hostName = "")
+        public JobResult RemoveCertificate(string thumbprint)
         {
-            /*
-                function New-KFIISSiteBinding
-             */
+            try
+            {
+                using (_psHelper)
+                {
+                    _psHelper.Initialize();
 
+                    _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
+
+                    var parameters = new Dictionary<string, object>()
+                    {
+                        { "Thumbprint", thumbprint },
+                        { "StorePath", _storePath }
+                    };
+
+                    _psHelper.ExecutePowerShell("Remove-KFCertificateFromStore", parameters);
+                    _logger.LogTrace("Returned from executing PS function (Remove-KFCertificateFromStore)");
+
+                    _psHelper.Terminate();
+                }
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = ""
+                };
+            }
+            catch (Exception ex)
+            {
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogWarning(failureMessage);
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = failureMessage
+                };
+            }
         }
 
+        public void BindCertificate(IISBindingInfo bindingInfo, string thumbprint)
+        {
+            _logger.LogTrace("Attempting to bind and execute PS function (New-KFIISSiteBinding)");
+                
+            // Manditory parameters
+            var parameters = new Dictionary<string, object>
+            {
+                { "Thumbprint", thumbprint },
+                { "WebSite", bindingInfo.SiteName },
+                { "Protocol", bindingInfo.Protocol },
+                { "IPAddress", bindingInfo.IPAddress },
+                { "Port", bindingInfo.Port },
+                { "SNIFlag", bindingInfo.SniFlag },
+                { "StorePath", _storePath },
+            };
 
+            // Optional parameters
+            if (!string.IsNullOrEmpty(bindingInfo.HostName)) { parameters.Add("HostName", bindingInfo.HostName); }
 
-//        private JobResult PerformAddCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
-//        {
-//            try
-//            {
-//#nullable enable
-//                string certificateContents = config.JobCertificate.Contents;
-//                string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
-//                string storePath = config.CertificateStoreDetails.StorePath;
-//                long jobNumber = config.JobHistoryId;
-//                string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
-//#nullable disable
+            _results = _psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);
+            _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
 
-//                // If a crypto provider was provided, check to see if it exists
-//                if (cryptoProvider != null)
-//                {
-//                    _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
-//                    if (!PSHelper.IsCSPFound(PSHelper.GetCSPList(myRunspace), cryptoProvider))
-//                    { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
-//                }
+            // This should return the thumbprint of the certificate
+            if (_results != null && _results.Count > 0)
+            {
+                _logger.LogTrace($"Bound certificate with the thumbprint: '{thumbprint}' to site: '{bindingInfo.SiteName}'.");
+            }
+            else
+            {
+                _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell informaiton.");
+            }
+        }
 
-//                if (storePath != null)
-//                {
-//                    _logger.LogInformation($"Attempting to add IISU certificate to cert store: {storePath}");
-//                }
+        public bool UnBindCertificate(IISBindingInfo bindingInfo)
+        {
+            _logger.LogTrace("Attempting to UnBind and execute PS function (Remove-KFIISBinding)");
 
-//                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
+            // Manditory parameters
+            var parameters = new Dictionary<string, object>
+            {
+                { "SiteName", bindingInfo.SiteName },
+                { "IPAddress", bindingInfo.IPAddress },
+                { "Port", bindingInfo.Port },
+            };
 
-//                // This method is retired
-//                //JobResult result = manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
+            // Optional parameters
+            if (!string.IsNullOrEmpty(bindingInfo.HostName)) { parameters.Add("HostName", bindingInfo.HostName); }
 
-//                // Write the certificate contents to a temporary file on the remote computer, returning the filename.
-//                string filePath = manager.CreatePFXFile(certificateContents, privateKeyPassword);
-//                _logger.LogTrace($"{filePath} was created.");
-
-//                // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
-//                JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider, storePath);
-
-//                // Delete the temporary file
-//                manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
-
-//                if (result.Result == OrchestratorJobStatusJobResult.Success)
-//                {
-//                    // Bind to IIS
-//                    _logger.LogInformation("Attempting to bind certificate to website.");
-//                    ClientPSIIManager iisManager = new ClientPSIIManager(config, serverUsername, serverPassword);
-//                    result = iisManager.BindCertificate(manager.X509Cert);
-
-//                    // Provide logging information
-//                    if (result.Result == OrchestratorJobStatusJobResult.Success) { _logger.LogInformation("Certificate was successfully bound to the website.");  }
-//                    else { _logger.LogInformation("There was an issue while attempting to bind the certificate to the website.  Check the logs for more information."); }
-
-//                    return result;
-//                }
-//                else return result;
-//            }
-//            catch (Exception e)
-//            {
-//                return new JobResult
-//                {
-//                    Result = OrchestratorJobStatusJobResult.Failure,
-//                    JobHistoryId = config.JobHistoryId,
-//                    FailureMessage =
-//                        $"Management/Add {e.Message}"
-//                };
-//            }
-//        }
-
-//        private JobResult PerformRemoveCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
-//        {
-//            _logger.LogTrace("Before Remove Certificate...");
-
-//            string storePath = config.CertificateStoreDetails.StorePath;
-//            long jobNumber = config.JobHistoryId;
-
-//            // First we need to unbind the certificate from IIS before we remove it from the store
-//            ClientPSIIManager iisManager = new ClientPSIIManager(config, serverUsername, serverPassword);
-//            JobResult result = iisManager.UnBindCertificate();
-
-//            if (result.Result == OrchestratorJobStatusJobResult.Success)
-//            {
-//                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
-//                manager.RemoveCertificate(config.JobCertificate.Alias, storePath);
-
-//                return new JobResult
-//                {
-//                    Result = OrchestratorJobStatusJobResult.Success,
-//                    JobHistoryId = config.JobHistoryId,
-//                    FailureMessage = ""
-//                };
-//            }
-//            else return result;
-//        }
+            try
+            {
+                _results = _psHelper.ExecutePowerShell("Remove-KFIISBinding", parameters);
+                _logger.LogTrace("Returned from executing PS function (Remove-KFIISBinding)");
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
     }
 }

@@ -123,14 +123,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            string command = string.Empty;
-
             using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
             {
                 ps.Initialize();
 
-                command = "Get-KFIISBoundCertificates";
-                results = ps.ExecuteFunction(command);
+                results = ps.ExecutePowerShell("Get-KFIISBoundCertificates");
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)
