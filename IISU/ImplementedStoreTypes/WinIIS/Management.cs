@@ -88,81 +88,83 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
 
-                using (_psHelper)
-                
                 _psHelper.Initialize();
 
-                switch (_operationType)
+                using (_psHelper)
                 {
-                    case CertStoreOperationType.Add:
-                        {
-                            string certificateContents = config.JobCertificate.Contents;
-                            string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
-                            string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
-
-                            // Add Certificate to Cert Store
-                            try
+                    switch (_operationType)
+                    {
+                        case CertStoreOperationType.Add:
                             {
-                                string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
-                                _logger.LogTrace($"Completed adding the certificate to the store");
+                                string certificateContents = config.JobCertificate.Contents;
+                                string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+                                string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
 
-                                // Bind Certificate to IIS Site
-                                if (newThumbprint != null)
+                                // Add Certificate to Cert Store
+                                try
                                 {
-                                    IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
-                                    BindCertificate(bindingInfo, newThumbprint);
+                                    string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
+                                    _logger.LogTrace($"Completed adding the certificate to the store");
 
-                                    complete = new JobResult
+                                    // Bind Certificate to IIS Site
+                                    if (newThumbprint != null)
                                     {
-                                        Result = OrchestratorJobStatusJobResult.Success,
+                                        IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
+                                        BindCertificate(bindingInfo, newThumbprint);
+
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = ""
+                                        };
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    return new JobResult
+                                    {
+                                        Result = OrchestratorJobStatusJobResult.Failure,
                                         JobHistoryId = _jobHistoryID,
-                                        FailureMessage = ""
+                                        FailureMessage = ex.Message
                                     };
                                 }
-                            }
-                            catch (Exception ex)
-                            {
-                                return new JobResult
-                                {
-                                    Result = OrchestratorJobStatusJobResult.Failure,
-                                    JobHistoryId = _jobHistoryID,
-                                    FailureMessage = ex.Message
-                                };
-                            }
 
-                            _logger.LogTrace($"Completed adding and binding the certificate to the store");
+                                _logger.LogTrace($"Completed adding and binding the certificate to the store");
 
-                            break;
-                        }
-                    case CertStoreOperationType.Remove:
-                        {
-                            // Removing a certificate involves two steps: UnBind the certificate, then delete the cert from the store
-                            
-                            string thumbprint = config.JobCertificate.Alias;
-                            try
+                                break;
+                            }
+                        case CertStoreOperationType.Remove:
                             {
-                                if (UnBindCertificate(new IISBindingInfo(config.JobProperties)))
+                                // Removing a certificate involves two steps: UnBind the certificate, then delete the cert from the store
+
+                                string thumbprint = config.JobCertificate.Alias;
+                                try
                                 {
-                                    complete = RemoveCertificate(thumbprint);
+                                    if (UnBindCertificate(new IISBindingInfo(config.JobProperties)))
+                                    {
+                                        complete = RemoveCertificate(thumbprint);
+                                    }
                                 }
-                            }
-                            catch (Exception ex)
-                            {
-                                return new JobResult
+                                catch (Exception ex)
                                 {
-                                    Result = OrchestratorJobStatusJobResult.Failure,
-                                    JobHistoryId = _jobHistoryID,
-                                    FailureMessage = ex.Message
-                                };
+                                    return new JobResult
+                                    {
+                                        Result = OrchestratorJobStatusJobResult.Failure,
+                                        JobHistoryId = _jobHistoryID,
+                                        FailureMessage = ex.Message
+                                    };
+                                }
+
+                                _logger.LogTrace($"Completed removing the certificate from the store");
+
+                                break;
                             }
-
-                            _logger.LogTrace($"Completed removing the certificate from the store");
-
-                            break;
-                        }
+                    }
                 }
 
                 return complete;
+
             }
             catch (Exception ex)
             {
@@ -194,7 +196,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 var parameters = new Dictionary<string, object>
                 {
                     { "Base64Cert", certificateContents },
-                    { "StorePath", _storePath },
+                    { "StoreName", _storePath },
                 };
 
                 // Optional parameters
@@ -207,7 +209,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 // This should return the thumbprint of the certificate
                 if (_results != null && _results.Count > 0)
                 {
-                    newThumbprint= _results[0].ToString();
+                    newThumbprint = _results[0].ToString();
                     _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {newThumbprint}");
                 }
                 else
@@ -282,7 +284,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 { "IPAddress", bindingInfo.IPAddress },
                 { "Port", bindingInfo.Port },
                 { "SNIFlag", bindingInfo.SniFlag },
-                { "StorePath", _storePath },
+                { "StoreName", _storePath },
             };
 
             // Optional parameters

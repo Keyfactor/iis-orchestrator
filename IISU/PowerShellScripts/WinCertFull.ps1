@@ -44,6 +44,8 @@ function Get-KFIISBoundCertificates
     #$websites = Get-Website
     $websites = Get-IISSite
 
+    Write-Information "There were ${websites}.count found"
+
     # Initialize an array to store the results
     $certificates = @()
 
@@ -190,7 +192,8 @@ function Add-KFCertificateToStore
         if($CryptoServiceProvider)
         {
             if(-not (Test-CryptoServiceProvider -CSPName $CryptoServiceProvider)){
-                Write-Host "The CSP $CryptoServiceProvider was not found on the system."
+                Write-Information "INFO: The CSP $CryptoServiceProvider was not found on the system."
+                Write-Warning "WARN: CSP $CryptoServiceProvider was not found on the system."
                 return
             }
         }
@@ -202,9 +205,12 @@ function Add-KFCertificateToStore
         $tempStoreName = [System.IO.Path]::GetTempFileName()
         [System.IO.File]::WriteAllBytes($tempStoreName, $certBytes)
 
+        $tempPfxPath = [System.IO.Path]::ChangeExtension($tempStoreName, ".pfx")
+
         $thumbprint = $null
 
         if ($CryptoServiceProvider) {
+            Write-Information "Adding certificate with the CSP '$CryptoServiceProvider'"
             # Create a temporary PFX file
             $tempPfxPath = [System.IO.Path]::ChangeExtension($tempStoreName, ".pfx")
             $pfxPassword = if ($PrivateKeyPassword) { $PrivateKeyPassword } else { "" }
@@ -237,33 +243,44 @@ function Add-KFCertificateToStore
             Remove-Item $tempPfxPath
         } else {
             # Load the certificate from the temporary file
-            if ($PrivateKeyPassword) {
-                $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempStoreName, $PrivateKeyPassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
-            } else {
-                $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempStoreName)
+            if ($PrivateKeyPassword) 
+            {
+                Write-Information "Writing the certificate using a Private Key Password."
+                $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $certBytes, $PrivateKeyPassword, 18
+            }else
+            {
+                Write-Information "No Private Key Password is present."
+                $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $certBytes, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet
             }
 
-            # Open the certificate store
-            $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($StoreName, [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine)
-            $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-
-            # Add the certificate to the store
-            $store.Add($cert)
-
-            # Get the thumbprint so it can be returned to the calling function
-            $thumbprint = $cert.Thumbprint
+            Write-Information "Store Name: '$StoreName'"
+            $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $StoreName, "LocalMachine"
+            $certStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite -bor [System.Security.Cryptography.X509Certificates.OpenFlags]::OpenExistingOnly)
+            
+            Write-Information "Adding certificate."
+            $certStore.Add($cert)
+            Write-Information "Certificate added successfully."
 
             # Close the store
-            $store.Close()
+            $certStore.Close()
+            Write-Information "Certificate store closed."
+
         }
 
         # Clean up the temporary file
         Remove-Item $tempStoreName
 
-        Write-Host "Certificate added successfully to $StoreName."
+        Write-Information "Certificate added successfully to $StoreName."
+
+        $newCert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName" | Where-Object { $_.Subject -like "*$($cert.Subject)*" } | Sort-Object NotAfter -Descending | Select-Object -First 1
+        if ($newCert) {
+            $thumbprint = $newCert.Thumbprint
+        } else { $thumbprint = $null }
+
         return $thumbprint
+
     } catch {
-        Write-Error "An error occurred: $_"
+        Write-Error "An error occurred: $_" 6>&1
         return $null
     }
 }
