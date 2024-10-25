@@ -13,7 +13,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
         public string Protocol { get; set; }
         public string IPAddress { get; set; }
         public string Port { get; set; }
-        public string HostName { get; set; }
+        public string? HostName { get; set; }
         public string SniFlag { get; set; }
 
         public IISBindingInfo(Dictionary<string, object> bindingInfo)
@@ -22,7 +22,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
             Protocol = bindingInfo["Protocol"].ToString();
             IPAddress = bindingInfo["IPAddress"].ToString();
             Port = bindingInfo["Port"].ToString();
-            HostName = bindingInfo["HostName"].ToString();
+            HostName = bindingInfo["HostName"]?.ToString();
             SniFlag = MigrateSNIFlag(bindingInfo["SniFlag"].ToString());
         }
 
