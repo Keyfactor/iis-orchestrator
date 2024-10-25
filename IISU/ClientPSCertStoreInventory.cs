@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Logging;
 using Microsoft.Extensions.Logging;
 using System;
@@ -21,9 +22,15 @@ using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    abstract class ClientPSCertStoreInventory
+    public abstract class ClientPSCertStoreInventory
     {
         private ILogger _logger;
+
+        protected ClientPSCertStoreInventory()
+        {
+            _logger = LogHandler.GetClassLogger<ClientPSCertStoreInventory>();
+        }
+
         public ClientPSCertStoreInventory(ILogger logger)
         {
             _logger = logger;
