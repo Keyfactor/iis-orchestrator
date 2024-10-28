@@ -50,10 +50,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             if (isLocal)
             {
-                //return RunspaceFactory.CreateRunspace();
+#if NET6_0
                 PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
                 Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
-
+#elif NET8_0_OR_GREATER
+                InitialSessionState iss = InitialSessionState.CreateDefault();
+                Runspace rs = RunspaceFactory.CreateRunspace(iss);
+#endif
                 return rs;
             }
             else

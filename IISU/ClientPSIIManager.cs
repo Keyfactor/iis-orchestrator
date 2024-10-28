@@ -20,17 +20,14 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using System.Net;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    internal class ClientPSIIManager
+    public class ClientPSIIManager
     {
         private string SiteName { get; set; }
         private string Port { get; set; }
@@ -55,22 +52,30 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private PowerShell ps;
 
-        //public ClientPSIIManager(ILogger logger, Runspace runSpace)
-        //{
-        //    _logger = logger;
-        //    _runSpace = runSpace;
+        /// <summary>
+        /// This constructor is used for unit testing
+        /// </summary>
+        /// <param name="runSpace"></param>
+        /// <param name="IPAddress"></param>
+        /// <param name="Port"></param>
+        /// <param name="HostName"></param>
+        /// <param name="Thumbprint"></param>
+        /// <param name="StorePath"></param>
+        /// <param name="sniFlag"></param>
+        public ClientPSIIManager(Runspace runSpace, string SiteName, string Protocol, string IPAddress, string Port, string HostName, string Thumbprint, string StorePath, string sniFlag)
+        {
+            _logger = LogHandler.GetClassLogger<ClientPSIIManager>();
+            _runSpace = runSpace;
 
-        //    ps = PowerShell.Create();
-        //    ps.Runspace = _runSpace;
-        //}
-
-        //public ClientPSIIManager(ILogger logger, Runspace runSpace, PowerShell powerShell)
-        //{
-        //    _logger = logger;
-        //    _runSpace = runSpace;
-
-        //    ps = powerShell;
-        //}
+            this.SiteName = SiteName;
+            this.Protocol = Protocol;
+            this.IPAddress = IPAddress;
+            this.Port = Port;
+            this.HostName = HostName;
+            this.RenewalThumbprint = Thumbprint;
+            this.StorePath = StorePath;
+            this.SniFlag = sniFlag;
+        }
 
         public ClientPSIIManager(ReenrollmentJobConfiguration config, string serverUsername, string serverPassword)
         {
@@ -82,7 +87,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"]?.ToString()[..1];
+                SniFlag = MigrateSNIFlag(config.JobProperties["SniFlag"]?.ToString());
                 IPAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
@@ -119,7 +124,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 Port = config.JobProperties["Port"].ToString();
                 HostName = config.JobProperties["HostName"]?.ToString();
                 Protocol = config.JobProperties["Protocol"].ToString();
-                SniFlag = config.JobProperties["SniFlag"].ToString()?[..1];
+                SniFlag = MigrateSNIFlag(config.JobProperties["SniFlag"]?.ToString());
                 IPAddress = config.JobProperties["IPAddress"].ToString();
 
                 PrivateKeyPassword = ""; // A reenrollment does not have a PFX Password
@@ -166,6 +171,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 if (RenewalThumbprint?.Length > 0)
                 {
                     _logger.LogTrace($"Thumbprint Length > 0 {RenewalThumbprint}");
+
+                    // Get the bindings for all the websites
                     ps.AddCommand("Import-Module")
                         .AddParameter("Name", "WebAdministration")
                         .AddStatement();
@@ -176,6 +183,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     ps.AddScript(searchScript).AddStatement();
                     _logger.LogTrace($"Search Script: {searchScript}");
                     var bindings = ps.Invoke();
+
+                    bool hadPSError = false;        // Flag to indicate if any website had problem with binding
+                    List<string> bindingSiteErrorMessage = new List<string>();
+
                     foreach (var binding in bindings)
                     {
                         if (binding.Properties["Protocol"].Value.ToString().Contains("https"))
@@ -197,100 +208,142 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             if (RenewalThumbprint == bindingThumbprint)
                             {
                                 _logger.LogTrace($"Thumbprint Match {RenewalThumbprint}={bindingThumbprint}");
-                                var funcScript = string.Format(@"
-                                            $ErrorActionPreference = ""Stop""
-
-                                            $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
-                                            if($IISInstalled) {{
-                                                Import-Module WebAdministration
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" |
-                                                    ForEach-Object {{ Remove-WebBinding -BindingInformation  $_.bindingInformation }}
-
-                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" | 
-                                                    ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", bindingSiteName, //{0} 
-                                    bindingIpAddress, //{1}
-                                    bindingPort, //{2}
-                                    bindingProtocol, //{3}
-                                    bindingHostName, //{4}
-                                    x509Cert.Thumbprint, //{5} 
-                                    StorePath, //{6}
-                                    bindingSniFlg); //{7}
-
-                                _logger.LogTrace($"funcScript {funcScript}");
-                                ps.AddScript(funcScript);
-                                _logger.LogTrace("funcScript added...");
-                                ps.Invoke();
-                                _logger.LogTrace("funcScript Invoked...");
-                                foreach (var cmd in ps.Commands.Commands)
+                                try
                                 {
-                                    _logger.LogTrace("Logging PowerShell Command");
-                                    _logger.LogTrace(cmd.CommandText);
-                                }
+                                    Collection<PSObject> results = (Collection<PSObject>)PerformIISBinding(bindingSiteName, bindingProtocol, bindingIpAddress, bindingPort, bindingHostName, bindingSniFlg, bindingThumbprint, StorePath);
 
-                                ps.Commands.Clear();
-                                _logger.LogTrace("Commands Cleared..");
+                                    // Check if PowerShell had any errors for this binding
+                                    if (ps.HadErrors)
+                                    {
+                                        var psError = ps.Streams.Error.ReadAll()
+                                            .Aggregate(string.Empty, (current, error) =>
+                                                current + (error.ErrorDetails != null && !string.IsNullOrEmpty(error.ErrorDetails.Message)
+                                                    ? error.ErrorDetails.Message
+                                                    : error.Exception != null
+                                                        ? error.Exception.Message
+                                                        : error.ToString()) + Environment.NewLine);
+
+                                        string computerName = string.Empty;
+                                        if (_runSpace.ConnectionInfo is null)
+                                        {
+                                            computerName = "localMachine";
+                                        }
+                                        else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                                        string oops = $"PowerShell Error on Site {bindingSiteName} on {computerName}: {psError}";
+                                        bindingSiteErrorMessage.Add(oops);
+                                        hadPSError = true;
+
+                                        _logger.LogTrace(oops);
+                                    }
+
+                                    // Clear the commands and go to the next website
+                                    ps.Commands.Clear();
+                                    _logger.LogTrace("Commands Cleared..");
+                                }
+                                catch (Exception e)
+                                {
+                                    string computerName = string.Empty;
+                                    if (_runSpace.ConnectionInfo is null)
+                                    {
+                                        computerName = "localMachine";
+                                    }
+                                    else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                                    string oops = $"Application Exception on Site {bindingSiteName} on {computerName}: {e.Message}";
+                                    bindingSiteErrorMessage.Add(oops);
+                                    hadPSError = true;
+
+                                    _logger.LogTrace(oops);
+                                }
                             }
                         }
                     }
-                }
-                else
-                {
-                    var funcScript = string.Format(@"
-                                            $ErrorActionPreference = ""Stop""
 
-                                            $IISInstalled = Get-Module -ListAvailable | where {{$_.Name -eq ""WebAdministration""}}
-                                            if($IISInstalled) {{
-                                                Import-Module WebAdministration
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -Port ""{2}"" -Protocol ""{3}"" -HostHeader ""{4}"" |
-                                                    ForEach-Object {{ Remove-WebBinding -BindingInformation  $_.bindingInformation }}
-
-                                                New-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" -SslFlags ""{7}""
-                                                Get-WebBinding -Name ""{0}"" -IPAddress ""{1}"" -HostHeader ""{4}"" -Port ""{2}"" -Protocol ""{3}"" | 
-                                                    ForEach-Object {{ $_.AddSslCertificate(""{5}"", ""{6}"") }}
-                                            }}", SiteName, //{0} 
-                        IPAddress, //{1}
-                        Port, //{2}
-                        Protocol, //{3}
-                        HostName, //{4}
-                        x509Cert.Thumbprint, //{5} 
-                        StorePath, //{6}
-                        Convert.ToInt16(SniFlag)); //{7}
-                    foreach (var cmd in ps.Commands.Commands)
+                    if (hadPSError)
                     {
-                        _logger.LogTrace("Logging PowerShell Command");
-                        _logger.LogTrace(cmd.CommandText);
-                    }
-
-                    _logger.LogTrace($"funcScript {funcScript}");
-                    ps.AddScript(funcScript);
-                    _logger.LogTrace("funcScript added...");
-                    ps.Invoke();
-                    _logger.LogTrace("funcScript Invoked...");
-                }
-
-                if (ps.HadErrors)
-                {
-                    var psError = ps.Streams.Error.ReadAll()
-                        .Aggregate(string.Empty, (current, error) => current + error.ErrorDetails.Message);
-                    {
+                        // Report errors and job results
                         return new JobResult
                         {
                             Result = OrchestratorJobStatusJobResult.Failure,
                             JobHistoryId = JobHistoryID,
-                            FailureMessage =
-                                $"Site {StorePath} on server {_runSpace.ConnectionInfo.ComputerName}: {psError}"
+                            FailureMessage = string.Join(Environment.NewLine, bindingSiteErrorMessage)
+                        };
+                    }
+                    else
+                    {
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Success,
+                            JobHistoryId = JobHistoryID,
+                            FailureMessage = ""
                         };
                     }
                 }
-
-                return new JobResult
+                else
                 {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = JobHistoryID,
-                    FailureMessage = ""
-                };
+                    bool hadError = false;
+                    string errorMessage = string.Empty;
+
+                    try
+                    {
+                        Collection<PSObject> results = (Collection<PSObject>)PerformIISBinding(SiteName, Protocol, IPAddress, Port, HostName, SniFlag, x509Cert.Thumbprint, StorePath);
+
+                        if (ps.HadErrors)
+                        {
+                            var psError = ps.Streams.Error.ReadAll()
+                                .Aggregate(string.Empty, (current, error) =>
+                                    current + (error.ErrorDetails != null && !string.IsNullOrEmpty(error.ErrorDetails.Message)
+                                        ? error.ErrorDetails.Message
+                                        : error.Exception != null
+                                            ? error.Exception.Message
+                                            : error.ToString()) + Environment.NewLine);
+
+                            errorMessage = psError;
+                            hadError = true;
+
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        string computerName = string.Empty;
+                        if (_runSpace.ConnectionInfo is null)
+                        {
+                            computerName = "localMachine";
+                        }
+                        else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                        errorMessage = $"Binding attempt failed on Site {SiteName} on {computerName}, Application error: {e.Message}";
+                        hadError = true;
+                        _logger.LogTrace(errorMessage);
+                    }
+
+                    if (hadError)
+                    {
+                        string computerName = string.Empty;
+                        if (_runSpace.ConnectionInfo is null)
+                        {
+                            computerName = "localMachine";
+                        }
+                        else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = JobHistoryID,
+                            FailureMessage = $"Binding attempt failed on Site {SiteName} on {computerName}: {errorMessage}"
+                        };
+                    }
+                    else
+                    {
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Success,
+                            JobHistoryId = JobHistoryID,
+                            FailureMessage = ""
+                        };
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -298,7 +351,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
                     JobHistoryId = JobHistoryID,
-                    FailureMessage = $"Error Occurred in InstallCertificate {LogHandler.FlattenException(e)}"
+                    FailureMessage = $"Application Error Occurred in BindCertificate: {LogHandler.FlattenException(e)}"
                 };
             }
             finally
@@ -311,6 +364,81 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public JobResult UnBindCertificate()
         {
+#if NET8_0_OR_GREATER
+            bool hadError = false;
+            string errorMessage = string.Empty;
+
+            try
+            {
+                _logger.MethodEntry();
+
+                _runSpace.Open();
+                ps = PowerShell.Create();
+                ps.Runspace = _runSpace;
+
+                Collection<PSObject> results = (Collection<PSObject>)PerformIISUnBinding(SiteName, Protocol, IPAddress, Port, HostName);
+
+                if (ps.HadErrors)
+                {
+                    var psError = ps.Streams.Error.ReadAll()
+                        .Aggregate(string.Empty, (current, error) =>
+                            current + (error.ErrorDetails != null && !string.IsNullOrEmpty(error.ErrorDetails.Message)
+                                ? error.ErrorDetails.Message
+                                : error.Exception != null
+                                    ? error.Exception.Message
+                                    : error.ToString()) + Environment.NewLine);
+
+                    errorMessage = psError;
+                    hadError = true;
+
+                }
+            }
+            catch (Exception e)
+            {
+                string computerName = string.Empty;
+                if (_runSpace.ConnectionInfo is null)
+                {
+                    computerName = "localMachine";
+                }
+                else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                errorMessage = $"Binding attempt failed on Site {SiteName} on {computerName}, Application error: {e.Message}";
+                hadError = true;
+                _logger.LogTrace(errorMessage);
+            }
+            finally
+            {
+                _runSpace.Close();
+                ps.Runspace.Close();
+                ps.Dispose();
+            }
+
+            if (hadError)
+            {
+                string computerName = string.Empty;
+                if (_runSpace.ConnectionInfo is null)
+                {
+                    computerName = "localMachine";
+                }
+                else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = JobHistoryID,
+                    FailureMessage = $"Binding attempt failed on Site {SiteName} on {computerName}: {errorMessage}"
+                };
+            }
+            else
+            {
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = JobHistoryID,
+                    FailureMessage = ""
+                };
+            }
+#endif
             try
             {
                 _logger.MethodEntry();
@@ -340,12 +468,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 if (foundBindings.Count == 0)
                 {
                     _logger.LogTrace($"{foundBindings.Count} Bindings Found...");
+
+                    string computerName = string.Empty;
+                    if (_runSpace.ConnectionInfo is null)
+                    {
+                        computerName = "localMachine";
+                    }
+                    else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
                     return new JobResult
                     {
                         Result = OrchestratorJobStatusJobResult.Failure,
                         JobHistoryId = JobHistoryID,
                         FailureMessage =
-                            $"Site {Protocol} binding for Site {SiteName} on server {_runSpace.ConnectionInfo.ComputerName} not found."
+                            $"Site {Protocol} binding for Site {SiteName} on {computerName} not found."
                     };
                 }
 
@@ -387,12 +523,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     {
                         _logger.LogTrace("PowerShell Had Errors");
                         var psError = ps.Streams.Error.ReadAll().Aggregate(String.Empty, (current, error) => current + error.ErrorDetails.Message);
+
+                        string computerName = string.Empty;
+                        if (_runSpace.ConnectionInfo is null)
+                        {
+                            computerName = "localMachine";
+                        }
+                        else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
                         return new JobResult
                         {
                             Result = OrchestratorJobStatusJobResult.Failure,
                             JobHistoryId = JobHistoryID,
                             FailureMessage =
-                                $"Failed to remove {Protocol} binding for Site {SiteName} on server {_runSpace.ConnectionInfo.ComputerName} not found, error {psError}"
+                                $"Failed to remove {Protocol} binding for Site {SiteName} on {computerName} not found, error {psError}"
                         };
                     }
                 }
@@ -407,7 +551,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             catch (Exception ex)
             {
-                var failureMessage = $"Unbinging for Site '{StorePath}' on server '{_runSpace.ConnectionInfo.ComputerName}' with error: '{LogHandler.FlattenException(ex)}'";
+                string computerName = string.Empty;
+                if (_runSpace.ConnectionInfo is null)
+                {
+                    computerName = "localMachine";
+                }
+                else { computerName = "Server: " + _runSpace.ConnectionInfo.ComputerName; }
+
+                var failureMessage = $"Unbinding for Site '{StorePath}' on {computerName} with error: {LogHandler.FlattenException(ex)}";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult
@@ -422,6 +573,207 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _runSpace.Close();
                 ps.Runspace.Close();
                 ps.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="webSiteName"></param>
+        /// <param name="protocol"></param>
+        /// <param name="ipAddress"></param>
+        /// <param name="port"></param>
+        /// <param name="hostName"></param>
+        /// <param name="sslFlags"></param>
+        /// <param name="thumbprint"></param>
+        /// <param name="storeName"></param>
+        /// <returns></returns>
+        private object PerformIISUnBinding(string webSiteName, string protocol, string ipAddress, string port, string hostName)
+        {
+            string funcScript = @"
+                param (
+                        [string]$SiteName,       # Name of the site
+                        [string]$IPAddress,      # IP Address of the binding
+                        [string]$Port,           # Port number of the binding
+                        [string]$Hostname,       # Hostname (optional)
+                        [string]$Protocol = ""https"" # Protocol (default to """"https"""")
+                    )
+
+                    # Set Execution Policy (optional, depending on your environment)
+                    Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+
+                    # Check if the IISAdministration module is already loaded
+                    if (-not (Get-Module -Name IISAdministration)) {
+                        try {
+                            # Attempt to import the IISAdministration module
+                            Import-Module IISAdministration -ErrorAction Stop
+                        }
+                        catch {
+                            throw ""Failed to load the IISAdministration module. Ensure it is installed and available.""
+                        }
+                    }
+
+                    try {
+                        # Get the bindings for the specified site
+                        $bindings = Get-IISSiteBinding -Name $SiteName
+        
+                        # Check if any bindings match the specified criteria
+                        $matchingBindings = $bindings | Where-Object {
+                            ($_.bindingInformation -eq ""${IPAddress}:${Port}:${Hostname}"") -and 
+                            ($_.protocol -eq $Protocol)
+                        }
+        
+                        if ($matchingBindings) {
+                            # Unbind the matching certificates
+                            foreach ($binding in $matchingBindings) {
+                                Write-Host """"Removing binding: $($binding.bindingInformation) with protocol: $($binding.protocol)""""
+                                Write-Host """"Binding information: 
+                                Remove-IISSiteBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -confirm:$false
+                            }
+                            Write-Host """"Successfully removed the matching bindings from the site: $SiteName""""
+                        } else {
+                            Write-Host """"No matching bindings found for site: $SiteName""""
+                        }
+                    }
+                    catch {
+                        throw ""An error occurred while unbinding the certificate from site ${SiteName}: $_""
+                    }
+            ";
+
+            ps.AddScript(funcScript);
+            ps.AddParameter("SiteName", webSiteName);
+            ps.AddParameter("IPAddress", ipAddress);
+            ps.AddParameter("Port", port);
+            ps.AddParameter("Hostname", hostName);
+            ps.AddParameter("Protocol", protocol);
+
+            _logger.LogTrace("funcScript added...");
+            var results = ps.Invoke();
+            _logger.LogTrace("funcScript Invoked...");
+
+            return results;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="webSiteName"></param>
+        /// <param name="protocol"></param>
+        /// <param name="ipAddress"></param>
+        /// <param name="port"></param>
+        /// <param name="hostName"></param>
+        /// <param name="sslFlags"></param>
+        /// <param name="thumbprint"></param>
+        /// <param name="storeName"></param>
+        /// <returns></returns>
+        private object PerformIISBinding(string webSiteName, string protocol, string ipAddress, string port, string hostName, string sslFlags, string thumbprint, string storeName)
+        {
+            string funcScript = @"
+                param (
+                    $SiteName,        # The name of the IIS site
+                    $IPAddress,       # The IP Address for the binding
+                    $Port,            # The port number for the binding
+                    $Hostname,        # Hostname for the binding (if any)
+                    $Protocol,        # Protocol (e.g., HTTP, HTTPS)
+                    $Thumbprint,      # Certificate thumbprint for HTTPS bindings
+                    $StoreName,       # Certificate store location (e.g., ""My"" for personal certs)
+                    $SslFlags         # SSL flags (if any)
+                )
+
+                # Set Execution Policy (optional, depending on your environment)
+                Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+
+                # Check if the IISAdministration module is available
+                #$module = Get-Module -Name IISAdministration -ListAvailable
+
+                #if (-not $module) {
+                    #throw ""The IISAdministration module is not installed on this system.""
+                #}
+
+                # Check if the IISAdministration module is already loaded
+                if (-not (Get-Module -Name IISAdministration)) {
+                    try {
+                        # Attempt to import the IISAdministration module
+                        Import-Module IISAdministration -ErrorAction Stop
+                    }
+                    catch {
+                        throw ""Failed to load the IISAdministration module. Ensure it is installed and available.""
+                    }
+                }
+
+                # Retrieve the existing binding information
+                $myBinding = ""${IPAddress}:${Port}:${Hostname}""
+                Write-Host ""myBinding: "" $myBinding
+
+                $siteBindings = Get-IISSiteBinding -Name $SiteName
+                $existingBinding = $siteBindings | Where-Object { $_.bindingInformation -eq $myBinding -and $_.protocol -eq $Protocol }
+    
+                Write-Host ""Binding:"" $existingBinding
+
+                if ($null -ne $existingBinding) {
+                    # Remove the existing binding
+                    Remove-IISSiteBinding -Name $SiteName -BindingInformation $existingBinding.BindingInformation -Protocol $existingBinding.Protocol -Confirm:$false
+        
+                    Write-Host ""Removed existing binding: $($existingBinding.BindingInformation)""
+                }
+        
+                # Create the new binding with modified properties
+                $newBindingInfo = ""${IPAddress}:${Port}:${Hostname}""
+        
+                try
+                {
+                    New-IISSiteBinding -Name $SiteName `
+                        -BindingInformation $newBindingInfo `
+                        -Protocol $Protocol `
+                        -CertificateThumbprint $Thumbprint `
+                        -CertStoreLocation $StoreName `
+                        -SslFlag $SslFlags
+
+                    Write-Host ""New binding added: $newBindingInfo""
+                }
+                catch {
+                    throw $_
+                }
+            ";
+
+            ps.AddScript(funcScript);
+            ps.AddParameter("SiteName", webSiteName);
+            ps.AddParameter("IPAddress", ipAddress);
+            ps.AddParameter("Port", port);
+            ps.AddParameter("Hostname", hostName);
+            ps.AddParameter("Protocol", protocol);
+            ps.AddParameter("Thumbprint", thumbprint);
+            ps.AddParameter("StoreName", storeName);
+            ps.AddParameter("SslFlags", sslFlags);
+
+            _logger.LogTrace("funcScript added...");
+            var results = ps.Invoke();
+            _logger.LogTrace("funcScript Invoked...");
+
+            return results;
+        }
+
+        public static string MigrateSNIFlag(string input)
+        {
+            // Check if the input is numeric, if so, just return it as an integer
+            if (int.TryParse(input, out int numericValue))
+            {
+                return numericValue.ToString();
+            }
+
+            // Handle the string cases
+            switch (input.ToLower())
+            {
+                case "0 - no sni":
+                    return "0";
+                case "1 - sni enabled":
+                    return "1";
+                case "2 - non sni binding":
+                    return "2";
+                case "3 - sni binding":
+                    return "3";
+                default:
+                    throw new ArgumentOutOfRangeException($"Received an invalid value '{input}' for sni/ssl Flag value");
             }
         }
     }
