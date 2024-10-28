@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Keyfactor.Extensions.Orchestrator.WindowsCertStore</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <TargetFramework>net6.0</TargetFramework>
+      <TargetFrameworks>net6.0</TargetFrameworks>
     <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
@@ -31,14 +31,20 @@
   <ItemGroup>
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.19" />
-
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.19" Condition="'$(TargetFramework)' == 'net6.0'" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.5" Condition="'$(TargetFramework)' == 'net8.0'" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.Management.Automation">
+      <Version>7.4.5</Version>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
