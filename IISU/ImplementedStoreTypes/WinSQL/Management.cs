@@ -13,8 +13,13 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Drawing.Text;
 using System.IO;
+using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using System.Numerics;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -27,13 +32,21 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
+        public string ExtensionName => "WinSqlManagement";
         private ILogger _logger;
 
-        public string ExtensionName => "WinSqlManagement";
+        private PSHelper _psHelper;
+        private Collection<PSObject>? _results = null;
 
-        private Runspace myRunspace;
+        // Function wide config values
+        private string _clientMachineName = string.Empty;
+        private string _storePath = string.Empty;
+        private long _jobHistoryID = 0;
+        private CertStoreOperationType _operationType;
 
-        private string RenewalThumbprint;
+        private string RenewalThumbprint = string.Empty;
+        private string SQLInstanceNames = "MSSQLSERVER";
+        private bool RestartSQLService = false;
 
         public Management(IPAMSecretResolver resolver)
         {
@@ -56,48 +69,133 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     _logger.LogTrace(e.Message);
                 }
 
+                var complete = new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage = "Invalid Management Operation"
+                };
+
+                // Start parsing config information and establishing PS Session
+                _jobHistoryID = config.JobHistoryId;
+                _storePath = config.CertificateStoreDetails.StorePath;
+                _clientMachineName = config.CertificateStoreDetails.ClientMachine;
+                _operationType = config.OperationType;
+
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
                 var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-                string protocol = jobProperties.WinRmProtocol;
-                string port = jobProperties.WinRmPort;
-                bool IncludePortInSPN = jobProperties.SpnPortFlag;
-                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
-                string storePath = config.CertificateStoreDetails.StorePath;
-                long JobHistoryID = config.JobHistoryId;
 
-                _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                myRunspace = PSHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
+                string protocol = jobProperties?.WinRmProtocol;
+                string port = jobProperties?.WinRmPort;
+                bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
+                
+                RestartSQLService = jobProperties.RestartService;
 
-                var complete = new JobResult
+                if (config.JobProperties.ContainsKey("InstanceName"))
                 {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    FailureMessage =
-                        "Invalid Management Operation"
-                };
-
-                switch (config.OperationType)
-                {
-                    case CertStoreOperationType.Add:
-                        _logger.LogTrace("Entering Add...");
-                        myRunspace.Open();
-                        complete = PerformAddCertificate(config, serverUserName, serverPassword);
-                        myRunspace.Close();
-                        _logger.LogTrace("After Perform Addition...");
-                        break;
-                    case CertStoreOperationType.Remove:
-                        _logger.LogTrace("Entering Remove...");
-                        _logger.LogTrace("After PerformRemoval...");
-                        myRunspace.Open();
-                        complete = PerformRemoveCertificate(config, serverUserName, serverPassword);
-                        myRunspace.Close();
-                        _logger.LogTrace("After Perform Removal...");
-                        break;
+                    SQLInstanceNames = config.JobProperties["InstanceName"]?.ToString() ?? "MSSQLSERVER";
                 }
 
-                _logger.MethodExit();
+                if (config.JobProperties.ContainsKey("RenewalThumbprint"))
+                {
+                    RenewalThumbprint = config.JobProperties["RenewalThumbprint"]?.ToString();
+                }
+
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+
+                _psHelper.Initialize();
+
+                using (_psHelper)
+                {
+                    switch (_operationType)
+                    {
+                        case CertStoreOperationType.Add:
+                            {
+                                string certificateContents = config.JobCertificate.Contents;
+                                string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+                                string cryptoProvider = config.JobProperties["ProviderName"]?.ToString() ?? string.Empty;
+
+                                // Add Certificate to Cert Store
+                                try
+                                {
+                                    string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
+                                    _logger.LogTrace($"Completed adding the certificate to the store");
+
+                                    // Bind Certificate to SQL Instance
+                                    if (newThumbprint != null)
+                                    {
+                                        complete = BindSQLCertificate(newThumbprint, RenewalThumbprint);
+                                        // Check the RenewalThumbprint.  If there is a value, this is a renewal
+                                        if (config.JobProperties.ContainsKey("RenewalThumbprint"))
+                                        {
+                                            // This is a renewal.
+                                            // Check if there is an existing certificate.  If there is, replace it with the new one.
+                                            string renewalThumbprint = config.JobProperties["RenewalThumbprint"]?.ToString() ?? string.Empty;
+                                        }
+                                        else
+                                        {
+                                            // This is a new certificate - just bind it.
+                                        }
+
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = ""
+                                        };
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    return new JobResult
+                                    {
+                                        Result = OrchestratorJobStatusJobResult.Failure,
+                                        JobHistoryId = _jobHistoryID,
+                                        FailureMessage = ex.Message
+                                    };
+                                }
+
+                                _logger.LogTrace($"Completed adding and binding the certificate to the store");
+
+                                break;
+                            }
+                        case CertStoreOperationType.Remove:
+                            {
+                                string thumbprint = config.JobCertificate.Alias;
+
+                                complete = RemoveCertificate(thumbprint);
+                                _logger.LogTrace($"Completed removing the certificate from the store");
+
+                                break;
+                            }
+                    }
+                }
+
                 return complete;
+
+                //switch (config.OperationType)
+                //{
+                //    case CertStoreOperationType.Add:
+                //        _logger.LogTrace("Entering Add...");
+                //        myRunspace.Open();
+                //        complete = PerformAddCertificate(config, serverUserName, serverPassword);
+                //        myRunspace.Close();
+                //        _logger.LogTrace("After Perform Addition...");
+                //        break;
+                //    case CertStoreOperationType.Remove:
+                //        _logger.LogTrace("Entering Remove...");
+                //        _logger.LogTrace("After PerformRemoval...");
+                //        myRunspace.Open();
+                //        complete = PerformRemoveCertificate(config, serverUserName, serverPassword);
+                //        myRunspace.Close();
+                //        _logger.LogTrace("After Perform Removal...");
+                //        break;
+                //}
+
+                //_logger.MethodExit();
+                //return complete;
             }
             catch (Exception ex)
             {
@@ -115,105 +213,203 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             }
         }
 
-        private JobResult PerformAddCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
+        public JobResult RemoveCertificate(string thumbprint)
         {
-            _logger.LogTrace("Before PerformAddition...");
+            return new JobResult
+                { Result= OrchestratorJobStatusJobResult.Success, JobHistoryId = _jobHistoryID, FailureMessage = "" };
+        }
 
+
+        public string AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
+        {
             try
             {
-#nullable enable
-                string certificateContents = config.JobCertificate.Contents;
-                string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
-                string storePath = config.CertificateStoreDetails.StorePath;
-                long jobNumber = config.JobHistoryId;
-                string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
-#nullable disable
+                string newThumbprint = string.Empty;
 
-                // If a crypto provider was provided, check to see if it exists
-                if (cryptoProvider != null)
+                _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
+
+                // Mandatory parameters
+                var parameters = new Dictionary<string, object>
                 {
-                    _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
-                    if (!PSHelper.IsCSPFound(PSHelper.GetCSPList(myRunspace), cryptoProvider))
-                    { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
+                    { "Base64Cert", certificateContents },
+                    { "StoreName", _storePath },
+                };
+
+                // Optional parameters
+                if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
+                if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
+
+                _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
+                _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+
+                // This should return the thumbprint of the certificate
+                if (_results != null && _results.Count > 0)
+                {
+                    newThumbprint = _results[0].ToString();
+                    _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {newThumbprint}");
+                }
+                else
+                {
+                    _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
                 }
 
-                if (storePath != null)
-                {
-                    _logger.LogInformation($"Attempting to add WinSql certificate to cert store: {storePath}");
-                }
-
-                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
-
-                // This method is retired
-                //JobResult result = manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
-
-                // Write the certificate contents to a temporary file on the remote computer, returning the filename.
-                string filePath = manager.CreatePFXFile(certificateContents, privateKeyPassword);
-                _logger.LogTrace($"{filePath} was created.");
-
-                // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
-                JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider, storePath);
-
-                // Delete the temporary file
-                manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
-
-                if (result.Result == OrchestratorJobStatusJobResult.Success)
-                {
-
-                    if (config.JobProperties.ContainsKey("RenewalThumbprint"))
-                    {
-                        RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
-                        _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
-                    }
-
-                    // Bind to SQL Server
-                    ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
-                    result = sqlManager.BindCertificates(RenewalThumbprint, manager.X509Cert);
-
-                    // Provide logging information
-                    if (result.Result == OrchestratorJobStatusJobResult.Success) { _logger.LogInformation("Certificate was successfully bound to the SQL Server."); }
-                    else { _logger.LogInformation("There was an issue while attempting to bind the certificate to the SQL Server.  Check the logs for more information."); }
-                    
-                    return result;
-                }
-                else return result;
+                return newThumbprint;
             }
-            catch (Exception e)
+            catch (Exception ex)
+            {
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogError(failureMessage);
+
+                throw new Exception(failureMessage);
+            }
+        }
+
+        private JobResult BindSQLCertificate(string newThumbprint, string renewalThumbprint)
+        {
+            bool hadError = false;
+            var instances = SQLInstanceNames.Split(",");
+
+            foreach (var instanceName in instances)
+            {
+                var parameters = new Dictionary<string, object>
+                {
+                    { "Thumbprint", newThumbprint },
+                    { "SqlInstanceName", instanceName },
+                    { "StoreName", _storePath },
+                    { "RestartService", RestartSQLService }
+                };
+
+                try
+                {
+                    _results = _psHelper.ExecutePowerShell("Bind-CertificateToSqlInstance", parameters);
+                    _logger.LogTrace("Return from executing PS function (Bind-CertificateToSqlInstance)");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
+                    hadError= true;
+                }
+            }
+
+            if (hadError)
             {
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Management/Add {e.Message}"
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = "Unable to bind one or more certificates to the SQL Instances."
                 };
-            }
-        }
-
-        private JobResult PerformRemoveCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
-        {
-            _logger.LogTrace("Before Remove Certificate...");
-
-            string storePath = config.CertificateStoreDetails.StorePath;
-            long jobNumber = config.JobHistoryId;
-
-            // Clear registry entry for SQL Server
-            ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
-            JobResult result = sqlManager.UnBindCertificate();
-
-            if (result.Result == OrchestratorJobStatusJobResult.Success)
+            } else 
             {
-                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
-                manager.RemoveCertificate(config.JobCertificate.Alias, storePath);
-
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = config.JobHistoryId,
+                    JobHistoryId = _jobHistoryID,
                     FailureMessage = ""
                 };
             }
-            else return result;
         }
+
+
+//        private JobResult PerformAddCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
+//        {
+//            _logger.LogTrace("Before PerformAddition...");
+
+//            try
+//            {
+//#nullable enable
+//                string certificateContents = config.JobCertificate.Contents;
+//                string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+//                string storePath = config.CertificateStoreDetails.StorePath;
+//                long jobNumber = config.JobHistoryId;
+//                string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
+//#nullable disable
+
+//                // If a crypto provider was provided, check to see if it exists
+//                if (cryptoProvider != null)
+//                {
+//                    _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
+//                    if (!PSHelper.IsCSPFound(PSHelper.GetCSPList(myRunspace), cryptoProvider))
+//                    { throw new Exception($"The Crypto Profider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
+//                }
+
+//                if (storePath != null)
+//                {
+//                    _logger.LogInformation($"Attempting to add WinSql certificate to cert store: {storePath}");
+//                }
+
+//                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
+
+//                // This method is retired
+//                //JobResult result = manager.AddCertificate(certificateContents, privateKeyPassword, storePath);
+
+//                // Write the certificate contents to a temporary file on the remote computer, returning the filename.
+//                string filePath = manager.CreatePFXFile(certificateContents, privateKeyPassword);
+//                _logger.LogTrace($"{filePath} was created.");
+
+//                // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
+//                JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider, storePath);
+
+//                // Delete the temporary file
+//                manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
+
+//                if (result.Result == OrchestratorJobStatusJobResult.Success)
+//                {
+
+//                    if (config.JobProperties.ContainsKey("RenewalThumbprint"))
+//                    {
+//                        RenewalThumbprint = config.JobProperties["RenewalThumbprint"].ToString();
+//                        _logger.LogTrace($"Found Thumbprint Will Renew all Certs with this thumbprint: {RenewalThumbprint}");
+//                    }
+
+//                    // Bind to SQL Server
+//                    ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
+//                    result = sqlManager.BindCertificates(RenewalThumbprint, manager.X509Cert);
+
+//                    // Provide logging information
+//                    if (result.Result == OrchestratorJobStatusJobResult.Success) { _logger.LogInformation("Certificate was successfully bound to the SQL Server."); }
+//                    else { _logger.LogInformation("There was an issue while attempting to bind the certificate to the SQL Server.  Check the logs for more information."); }
+                    
+//                    return result;
+//                }
+//                else return result;
+//            }
+//            catch (Exception e)
+//            {
+//                return new JobResult
+//                {
+//                    Result = OrchestratorJobStatusJobResult.Failure,
+//                    JobHistoryId = config.JobHistoryId,
+//                    FailureMessage =
+//                        $"Management/Add {e.Message}"
+//                };
+//            }
+//        }
+
+        //private JobResult PerformRemoveCertificate(ManagementJobConfiguration config, string serverUsername, string serverPassword)
+        //{
+        //    _logger.LogTrace("Before Remove Certificate...");
+
+        //    string storePath = config.CertificateStoreDetails.StorePath;
+        //    long jobNumber = config.JobHistoryId;
+
+        //    // Clear registry entry for SQL Server
+        //    ClientPsSqlManager sqlManager = new ClientPsSqlManager(config, serverUsername, serverPassword);
+        //    JobResult result = sqlManager.UnBindCertificate();
+
+        //    if (result.Result == OrchestratorJobStatusJobResult.Success)
+        //    {
+        //        ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
+        //        manager.RemoveCertificate(config.JobCertificate.Alias, storePath);
+
+        //        return new JobResult
+        //        {
+        //            Result = OrchestratorJobStatusJobResult.Success,
+        //            JobHistoryId = config.JobHistoryId,
+        //            FailureMessage = ""
+        //        };
+        //    }
+        //    else return result;
+        //}
     }
 }

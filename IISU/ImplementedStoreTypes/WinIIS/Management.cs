@@ -138,7 +138,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             {
                                 // Removing a certificate involves two steps: UnBind the certificate, then delete the cert from the store
 
-                                string thumbprint = config.JobCertificate.Alias;
+                                string thumbprint = config.JobCertificate.Alias.Split(':')[0];
                                 try
                                 {
                                     if (UnBindCertificate(new IISBindingInfo(config.JobProperties)))
@@ -192,7 +192,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                 _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
 
-                // Manditory parameters
+                // Mandatory parameters
                 var parameters = new Dictionary<string, object>
                 {
                     { "Base64Cert", certificateContents },
@@ -214,19 +214,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 }
                 else
                 {
-                    _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell informaiton.");
+                    _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
                 }
 
                 return newThumbprint;
             }
-            catch (Exception ex)
+            catch (Exception ex)        
             {
                 var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
                 _logger.LogError(failureMessage);
 
                 throw new Exception (failureMessage);
             }
-        }
+}
 
         public JobResult RemoveCertificate(string thumbprint)
         {

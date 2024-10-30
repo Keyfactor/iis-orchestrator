@@ -42,8 +42,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         private long _jobHistoryID = 0;
         private CertStoreOperationType _operationType;
 
-        //private Runspace myRunspace;
-
         public Management(IPAMSecretResolver resolver)
         {
             _resolver= resolver;
@@ -70,8 +68,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
                     JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        "Invalid Management Operation"
+                    FailureMessage = "Invalid Management Operation"
                 };
 
                 // Start parsing config information and establishing PS Session
@@ -80,11 +77,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 _clientMachineName = config.CertificateStoreDetails.ClientMachine;
                 _operationType = config.OperationType;
 
-                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-
                 string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
                 string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
 
+                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
@@ -167,7 +164,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     }
                     else
                     {
-                        _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell informaiton.");
+                        _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
                     }
                     _psHelper.Terminate();
                 }
