@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Compile Remove="ImplementedStoreTypes\WinIIS\IISManager.cs" />
+    <Compile Remove="ImplementedStoreTypes\Win\WinInventory.cs" />
     <Compile Remove="PowerShellCertRequest.cs" />
   </ItemGroup>
 
