@@ -121,94 +121,86 @@ function Add-KFCertificateToStore
     )
 
     try {
-        # Before we get started, if a CSP has been provided, make sure it exists
-        if($CryptoServiceProvider)
+
+        $thumbprint = $null
+
+        if ($CryptoServiceProvider) 
         {
-            if(-not (Test-CryptoServiceProvider -CSPName $CryptoServiceProvider)){
+            # Test to see if CSP exists
+            if(-not (Test-CryptoServiceProvider -CSPName $CryptoServiceProvider))
+            {
                 Write-Information "INFO: The CSP $CryptoServiceProvider was not found on the system."
                 Write-Warning "WARN: CSP $CryptoServiceProvider was not found on the system."
                 return
             }
-        }
 
-        # Convert Base64 string to byte array
-        $certBytes = [Convert]::FromBase64String($Base64Cert)
-
-        # Create a temporary file to store the certificate
-        $tempStoreName = [System.IO.Path]::GetTempFileName()
-        $tempPfxPath = [System.IO.Path]::ChangeExtension($tempStoreName, ".pfx")
-        [System.IO.File]::WriteAllBytes($tempPfxPath, $certBytes)
-
-        #$tempPfxPath = [System.IO.Path]::ChangeExtension($tempStoreName, ".pfx")
-
-        $thumbprint = $null
-
-        if ($CryptoServiceProvider) {
             Write-Information "Adding certificate with the CSP '$CryptoServiceProvider'"
-            # Create a temporary PFX file
-            $tempPfxPath = [System.IO.Path]::ChangeExtension($tempStoreName, ".pfx")
-            $pfxPassword = if ($PrivateKeyPassword) { $PrivateKeyPassword } else { "" }
 
-            # Create the PFX from the certificate
-            $pfxCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempStoreName, $pfxPassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
-    
-            # Export the PFX to the temporary file
-            $pfxBytes = $pfxCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $pfxPassword)
-            [System.IO.File]::WriteAllBytes($tempPfxPath, $pfxBytes)
+            # Write certificate to a temporary PFX file
+            $tempFileName = [System.IO.Path]::GetTempFileName() + '.pfx'
+            [System.IO.File]::WriteAllBytes($tempFileName, [System.Convert]::FromBase64String($Base64Cert))
 
-            #$pfxCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempStoreName, $pfxPassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
-            #$pfxCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $pfxPassword) | Set-Content -Encoding Byte -Path $tempPfxPath
+            # Initialize output variable
+            $output = ""
 
-            # Use certutil to import the PFX with the specified CSP
-            $importCmd = "certutil -f -importpfx -csp '$CryptoServiceProvider' -p '$pfxPassword' $StoreName $tempPfxPath"
-            write-host $importCmd
-            Invoke-Expression $importCmd
+            # Execute certutil based on whether a private key password was supplied
+            try {
+                if ($PrivateKeyPassword) {
+                    $output = certutil -f -csp $CryptoServiceProvider -p $PrivateKeyPassword $StoreName $tempFileName
+                }
+                else {
+                    $output = certutil -f -importpfx -csp $CryptoServiceProvider -p $PrivateKeyPassword $StoreName $tempFileName
+                }
 
-            #$importCmd = "certutil -f -importpfx $tempPfxPath -p $pfxPassword -csp `"$CryptoServiceProvider`""
-            #Invoke-Expression $importCmd
+                # Check for errors based on the last exit code
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Certutil failed with exit code $LASTEXITCODE. Output: $output"
+                }
 
-            # Retrieve the thumbprint after the import
-            $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName" | Where-Object { $_.Subject -like "*$($pfxCert.Subject)*" } | Sort-Object NotAfter -Descending | Select-Object -First 1
-            if ($cert) {
-                $thumbprint = $cert.Thumbprint
+                # Additional check for known error keywords in output (optional)
+                if ($output -match "(ERROR|FAILED|EXCEPTION)") {
+                    throw "Certutil output indicates an error: $output"
+                }
+
+                # Retrieve the certificate thumbprint from the store
+                $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName" | Sort-Object -Property NotAfter -Descending | Select-Object -First 1
+                if ($cert) {
+                    $thumbprint = $cert.Thumbprint
+                    Write-Output "Certificate imported successfully. Thumbprint: $thumbprint"
+                }
+                else {
+                    throw "Certificate import succeeded, but no certificate was found in the $StoreName store."
+                }
+
+            } catch {
+                # Handle any errors and log the exception message
+                Write-Error "Error during certificate import: $_"
+                $output = "Error: $_"
+            } finally {
+                # Ensure the temporary file is deleted
+                if (Test-Path $tempFileName) {
+                    Remove-Item $tempFileName -Force
+                }
             }
 
-            # Clean up the temporary PFX file
-            Remove-Item $tempPfxPath
+            # Output the final result
+            $output
+
         } else {
-            # Load the certificate from the temporary file
-            if ($PrivateKeyPassword) {
-                Write-Information "Writing the certificate using a Private Key Password." 
-                Write-Information "Temp Store Name: $tempStoreName" 
-                Write-Information "Temp PFX Name: $tempPfxPath" 
-                #$flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
-                $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempPfxPath, $PrivateKeyPassword, 18)
-            } else { 
-                Write-Information "No Private Key Password was provided." 
-                $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempPfxPath)
-            }
-
-            # Open the certificate store
-            $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($StoreName, [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine)
-            $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+            $bytes = [System.Convert]::FromBase64String($Base64Cert)
+            $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, "LocalMachine"
             Write-Information "Store '$StoreName' is open." 
+            $certStore.Open(5)
 
-            # Add the certificate to the store
-            Write-Information "About to add the certificate to the store." 
-            $store.Add($cert)
-            Write-Information "Certificate was added." 
+            $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $PrivateKeyPassword, 18 <# Persist, Machine #>
+            $certStore.Add($cert)
+            $certStore.Close();
+            Write-Information "Store '$StoreName' is closed." 
 
             # Get the thumbprint so it can be returned to the calling function
             $thumbprint = $cert.Thumbprint
             Write-Information "The thumbprint '$thumbprint' was created." 
-
-            # Close the store
-            $store.Close()
-            Write-Information "Store is closed." 
         }
-
-        # Clean up the temporary file
-        Remove-Item $tempStoreName
 
         Write-Host "Certificate added successfully to $StoreName." 
         return $thumbprint
@@ -379,55 +371,61 @@ function Remove-KFIISBinding
 }
 
 # Function to get certificate information for a SQL Server instance
-function Get-SQLInstanceCertInfo {
-    param (
-        [string]$instanceName
-    )
-    
-    $regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceName\MSSQLServer\SuperSocketNetLib"
-    $certInfo = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
-    
-    if ($certInfo) {
-        $certHash = $certInfo.Certificate
-        $certStore = "My"  # Certificates are typically stored in the Personal store
-
-        if ($certHash) {
-            $cert = Get-ChildItem -Path "Cert:\LocalMachine\$certStore\$certHash" -ErrorAction SilentlyContinue
-            
-            if ($cert) {
-                return [PSCustomObject]@{
-                    InstanceName   = $instanceName
-                    Certificate    = $cert.Subject
-                    ExpiryDate     = $cert.NotAfter
-                    Issuer         = $cert.Issuer
-                    Thumbprint     = $cert.Thumbprint
-                    HasPrivateKey  = $cert.HasPrivateKey
-                    SAN            = ($cert.Extensions | Where-Object { $_.Oid.FriendlyName -eq "Subject Alternative Name" }).Format(1)
-                }
-            }
-        }
-    }
-}
-
 function GET-KFSQLInventory
 {
     # Get all SQL Server instances
     $sqlInstances = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server").InstalledInstances
+    Write-Information "There are $sqlInstances.Count instances that will be checked for certificates."
 
     # Initialize an array to store the results
     $certificates = @()
 
     foreach ($instance in $sqlInstances) {
+        Write-Information "Checking instance: $instance for Certificates."
+
         # Get the SQL Full Instance Name
         $fullInstanceName = Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $instance
 
-        $certInfo = Get-SQLInstanceCertInfo -instanceName $fullInstanceName
-        $certificates += $certInfo
+        $regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$fullInstanceName\MSSQLServer\SuperSocketNetLib"
+        $certInfo = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+    
+        if ($certInfo) {
+            $certHash = $certInfo.Certificate
+            $certStore = "My"  # Certificates are typically stored in the Personal store
+
+            if ($certHash) {
+                $cert = Get-ChildItem -Path "Cert:\LocalMachine\$certStore\$certHash" -ErrorAction SilentlyContinue
+            
+                if ($cert) {
+                    $certInfo = [PSCustomObject]@{
+                        InstanceName   = $instance
+                        StoreName      = $certStore
+                        Certificate    = $cert.Subject
+                        ExpiryDate     = $cert.NotAfter
+                        Issuer         = $cert.Issuer
+                        Thumbprint     = $cert.Thumbprint
+                        HasPrivateKey  = $cert.HasPrivateKey
+                        SAN            = Get-KFSAN $cert
+                        ProviderName   = Get-CertificateCSP $cert 
+                        Base64Data     = [System.Convert]::ToBase64String($cert.RawData)
+                    }
+
+                    Write-Information "Certificate found for $instance."
+
+                    # Add the certificate information to the array
+                    $certificates += $certInfo
+                }
+            }
+        }
     }
 
     # Output the results
-    $certificates | Format-Table -AutoSize
+    if ($certificates) {
+        $certificates | ConvertTo-Json
+    }
 }
+
+
 
 function Set-SQLCertificateAcl {
     param (
@@ -437,7 +435,7 @@ function Set-SQLCertificateAcl {
         [Parameter(Mandatory = $true)]
         [string]$SqlServiceUser
     )
-
+    Write-Information "Entered Set-SQLCertificateAcl"
     # Get the certificate from the LocalMachine store
     $certificate = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { $_.Thumbprint -eq $Thumbprint }
 
@@ -445,20 +443,27 @@ function Set-SQLCertificateAcl {
         Write-Error "Certificate with thumbprint $Thumbprint not found in LocalMachine\My store."
         return $null
     }
+    Write-Information "Obtained the certificate"
 
     # Retrieve the private key information
     $privKey = $certificate.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
+    Write-Information "Private Key: '$privKey'"
+
     $keyPath = "$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\"
     $privKeyPath = (Get-Item "$keyPath\$privKey")
+    Write-Information "Private Key Path is: $privKeyPath"
 
     # Retrieve the current ACL for the private key
     $Acl = Get-Acl $privKeyPath
     $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule($SqlServiceUser, "Read", "Allow")
 
     # Add the new access rule
+    Write-Information "Attempting to add new Access Rule"
     $Acl.SetAccessRule($Ar)
+    Write-Information "Access Rule has been added"
 
     # Set the new ACL on the private key file
+    Write-Information "Attaching the ACL on the private key file"
     Set-Acl -Path $privKeyPath.FullName -AclObject $Acl
 
     Write-Output "ACL updated successfully for the private key."
@@ -478,23 +483,31 @@ function Bind-CertificateToSqlInstance {
     )
 
     try {
+        Write-Information "Entered Bind-CertificateToSqlInstance"
+
         # Open the certificate store
         $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($StoreName, [System.Security.Cryptography.X509Certificates.StoreLocation]::$StoreLocation)
         $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
 
         # Find the certificate by thumbprint
         $certificate = $store.Certificates | Where-Object { $_.Thumbprint -eq $Thumbprint }
+        Write-Information "Obtained Certificate using thumbprint: $Thumbprint"
 
         if (-not $certificate) {
             throw "Certificate with thumbprint $Thumbprint not found in store $StoreLocation\$StoreName."
         }
 
+
         # Get the SQL Full Instance Name
         $fullInstanceName = Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $SqlInstanceName
+        Write-Information "Obtained SQL Full Instance Name: $fullInstanceName"
+
+        $SQLServiceName = Get-SQLServiceName $fullInstanceName
 
         # Update ACL for the private key, giving the SQL service user read access
-        $SQLServiceUser = Get-SQLServiceUser $fullInstanceName
-        Set-SQLCertificalACL -Thumbprint $Thumbprint -SQLServiceUser $SQLServiceUser
+        $SQLServiceUser = Get-SQLServiceUser $SQLServiceName
+        Set-SQLCertificateAcl -Thumbprint $Thumbprint -SQLServiceUser $SQLServiceUser
+        Write-Information "Updated ACL For SQL Service User: $SQLServiceUser"
         
         # Get the SQL Server instance registry path
         $regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\${fullInstanceName}\MSSQLServer\SuperSocketNetLib"
@@ -508,11 +521,14 @@ function Bind-CertificateToSqlInstance {
 
         # Close the certificate store
         $store.Close()
+        Write-Information "Store Closed"
 
         # Restart SQL Server for changes to take effect
+        Write-Information "Checking if restart has been authorized"
+
         if ($RestartService.IsPresent) {
-            Write-Information "Restarting SQL Server service..."
-            Restart-Service -Name $SQLServiceUser -Force
+            Write-Information "Attempting to restart SQL Service Name: $SQLServiceName"
+            Restart-Service -Name $SQLServiceName -Force
             Write-Information "SQL Server service restarted."
         } else {
             Write-Information "Please restart SQL Server service manually for changes to take effect."
@@ -565,18 +581,39 @@ function UnBind-KFSqlServerCertificate {
 # Example usage:
 # Clear-SqlServerCertificate -SqlInstanceName "MSSQLSERVER"
 
-
-function Get-SQLServiceUser {
+function Get-SQLServiceName
+{
     param (
         [Parameter(Mandatory = $true)]
         [string]$SQLInstanceName
     )
 
-    # Construct the SQL service name (assuming default MSSQL naming convention)
-    $serviceName = if ($SQLInstanceName -eq "MSSQLSERVER") { "MSSQLSERVER" } else { "MSSQL$SQLInstanceName" }
+    # Return an empty string if the instance value is null or empty
+    if ([string]::IsNullOrEmpty($SQLInstanceName)) {
+        return ""
+    }
+
+    # Split the instance value by '.' and retrieve the second part
+    $instanceName = $SQLInstanceName.Split('.')[1]
+
+    # Determine the service name based on the instance name
+    if ($instanceName -eq "MSSQLSERVER") {
+        $serviceName = "MSSQLSERVER"
+    } else {
+        $serviceName = "MSSQL`$$instanceName"
+    }
+
+    return $serviceName
+}
+
+function Get-SQLServiceUser {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$SQLServiceName
+    )
 
     # Use Get-CimInstance instead of Get-WmiObject
-    $serviceUser = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'").StartName
+    $serviceUser = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$SQLServiceName'").StartName
 
     if ($serviceUser) {
         return $serviceUser
@@ -588,6 +625,7 @@ function Get-SQLServiceUser {
 
 # Example usage:
 # Get-SQLServiceUser -SQLInstanceName "MSSQLSERVER"
+
 
 
 
