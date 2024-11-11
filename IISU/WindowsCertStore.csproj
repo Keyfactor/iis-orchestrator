@@ -60,8 +60,5 @@
     <None Update="PowerShellScripts\WinCertInventory.ps1">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="PowerShellScripts\WinCertFull.ps1">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>
