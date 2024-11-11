@@ -149,7 +149,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     var parameters = new Dictionary<string, object>
                     {
                         { "Base64Cert", certificateContents },
-                        { "StorePath", _storePath },
+                        { "StoreName", _storePath },
                     };
 
                     // Optional parameters
