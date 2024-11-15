@@ -57,6 +57,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
 <details><summary>Windows Certificate (WinCert)</summary>
 
+
 ### WinCert
 
 The Windows Certificate Certificate Store Type, known by its short name 'WinCert,' enables the management of certificates within the Windows local machine certificate stores. This store type is a versatile option for general Windows certificate management and supports functionalities including inventory, add, remove, and reenrollment of certificates.
@@ -73,6 +74,7 @@ The store type represents the various certificate stores present on a Windows Se
 </details>
 
 <details><summary>IIS Bound Certificate (IISU)</summary>
+
 
 ### IISU
 
@@ -92,6 +94,7 @@ The IISU store type represents the IIS servers and their certificate bindings. I
 </details>
 
 <details><summary>WinSql (WinSql)</summary>
+
 
 ### WinSql
 
@@ -172,7 +175,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
     | Supports Remove | ✅ Checked | Check the box. Indicates that the Store Type supports Management Remove |
     | Supports Discovery | 🔲 Unchecked |  Indicates that the Store Type supports Discovery |
-    | Supports Reenrollment | 🔲 Unchecked |  Indicates that the Store Type supports Reenrollment |
+    | Supports Reenrollment | ✅ Checked |  Indicates that the Store Type supports Reenrollment |
     | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
     | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
     | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |
@@ -253,7 +256,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
     | Supports Remove | ✅ Checked | Check the box. Indicates that the Store Type supports Management Remove |
     | Supports Discovery | 🔲 Unchecked |  Indicates that the Store Type supports Discovery |
-    | Supports Reenrollment | 🔲 Unchecked |  Indicates that the Store Type supports Reenrollment |
+    | Supports Reenrollment | ✅ Checked |  Indicates that the Store Type supports Reenrollment |
     | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
     | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
     | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |
