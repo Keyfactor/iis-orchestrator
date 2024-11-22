@@ -1,4 +1,9 @@
-﻿function Get-KFCertificates
+﻿# Set preferences globally at the script level
+$DebugPreference = "Continue"
+$VerbosePreference = "Continue"
+$InformationPreference = "Continue"
+
+function Get-KFCertificates
 {
     param (
         [string]$StoreName = "My"   # Default store name is "My" (Personal)
@@ -234,8 +239,9 @@ function Remove-KFCertificateFromStore
 
         if ($cert) {
             # Remove the certificate from the store
+            Write-Information "Attempting to remove certificate from store '$StorePath' with the thumbprint: $Thumbprint"
             $store.Remove($cert)
-            Write-Info "Certificate removed successfully from $StorePath."
+            Write-Information "Certificate removed successfully from store '$StorePath'"
         } else {
             Write-Error "Certificate not found in $StorePath."
         }
@@ -371,7 +377,79 @@ function Remove-KFIISBinding
 }
 
 # Function to get certificate information for a SQL Server instance
-function GET-KFSQLInventory
+function GET-KFSQLInventory {
+    # Retrieve all SQL Server instances
+    $sqlInstances = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server").InstalledInstances
+    Write-Information "There are $($sqlInstances.Count) instances that will be checked for certificates."
+
+    # Dictionary to store instance names by thumbprint
+    $commonInstances = @{}
+
+    # First loop: gather thumbprints for each instance
+    foreach ($instance in $sqlInstances) {
+        Write-Information "Checking instance: $instance for Certificates."
+
+        # Get the registry path for the SQL instance
+        $fullInstanceName = Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $instance
+        $regLocation = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$fullInstanceName\MSSQLServer\SuperSocketNetLib"
+        
+        try {
+            # Retrieve the certificate thumbprint from the registry
+            $thumbprint = (Get-ItemPropertyValue -Path $regLocation -Name "Certificate" -ErrorAction Stop).ToUpper()
+            
+            if ($thumbprint) {
+                # Store instance names by thumbprint
+                if ($commonInstances.ContainsKey($thumbprint)) {
+                    $commonInstances[$thumbprint] += ",$instance"
+                } else {
+                    $commonInstances[$thumbprint] = $instance
+                }
+            }
+        } catch {
+            Write-Information "No certificate found for instance: $instance."
+        }
+    }
+
+    # Array to store results
+    $myBoundCerts = @()
+
+    # Second loop: process each unique thumbprint and gather certificate data
+    foreach ($kp in $commonInstances.GetEnumerator()) {
+        $thumbprint = $kp.Key
+        $instanceNames = $kp.Value
+
+        # Find the certificate in the local machine store
+        $certStore = "My"
+        $cert = Get-ChildItem -Path "Cert:\LocalMachine\$certStore\$thumbprint" -ErrorAction SilentlyContinue
+
+        if ($cert) {
+            # Create a hashtable with the certificate parameters
+            $sqlSettingsDict = @{
+                InstanceName = $instanceNames
+                ProviderName = $cert.PrivateKey.CspKeyContainerInfo.ProviderName
+            }
+
+            # Build the inventory item for this certificate
+            $inventoryItem = [PSCustomObject]@{
+                Certificates     = [Convert]::ToBase64String($cert.RawData)
+                Alias            = $thumbprint
+                PrivateKeyEntry  = $cert.HasPrivateKey
+                UseChainLevel    = $false
+                ItemStatus       = "Unknown"  # OrchestratorInventoryItemStatus.Unknown equivalent
+                Parameters       = $sqlSettingsDict
+            }
+
+            # Add the inventory item to the results array
+            $myBoundCerts += $inventoryItem
+        }
+    }
+
+    # Return the array of inventory items
+    return $myBoundCerts  | ConvertTo-Json
+}
+
+
+function GET-KFSQLInventoryOLD
 {
     # Get all SQL Server instances
     $sqlInstances = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server").InstalledInstances
@@ -626,6 +704,153 @@ function Get-SQLServiceUser {
 # Example usage:
 # Get-SQLServiceUser -SQLInstanceName "MSSQLSERVER"
 
+##### ReEnrollment functions
+function New-CSREnrollment 
+{
+    param (
+        [string]$SubjectText,
+        [string]$ProviderName = "Microsoft Strong Cryptographic Provider",
+        [string]$KeyType,
+        [string]$KeyLength,
+        [string]$SAN
+    )
+
+    # Validate the Crypto Service Provider
+    Validate-CryptoProvider -ProviderName $ProviderName
+
+    # Build the SAN entries if provided
+    $sanContent = ""
+    if ($SAN) {
+        $sanEntries = $SAN -split "&"
+        $sanDirectives = $sanEntries | ForEach-Object { "_continue_ = `"$($_)`"" }
+        $sanContent = @"
+[Extensions]
+2.5.29.17 = `"{text}`"
+$($sanDirectives -join "`n")
+"@
+    }
+
+    # Generate INF file content for the CSR
+    $infContent = @"
+[Version]
+Signature=`"$`Windows NT$`"
+
+[NewRequest]
+Subject = "$SubjectText"
+ProviderName = "$ProviderName"
+MachineKeySet = True
+HashAlgorithm = SHA256
+KeyAlgorithm = $KeyType
+KeyLength = $KeyLength
+KeySpec = 0
+
+$sanContent
+"@
+
+    Write-Verbose "INF Contents: $infContent"
+
+    # Path to temporary INF file
+    $infFile = [System.IO.Path]::GetTempFileName() + ".inf"
+    $csrOutputFile = [System.IO.Path]::GetTempFileName() + ".csr"
+
+    Set-Content -Path $infFile -Value $infContent
+    Write-Information "Generated INF file at: $infFile"
+
+    try {
+        # Run certreq to generate CSR
+        $certReqCommand = "certreq -new -q `"$infFile`" `"$csrOutputFile`""
+        Write-Information "Running certreq: $certReqCommand"
+
+        # Capture the output and errors
+        $certReqOutput = & certreq -new -q $infFile $csrOutputFile 2>&1
+
+        # Check the exit code of the command
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Certreq failed with exit code $LASTEXITCODE. Output: $certReqOutput"
+            throw "Failed to create CSR file due to certreq error."
+        }
+
+        # If successful, proceed
+        Write-Information "Certreq completed successfully."
+
+        # Read CSR file
+        if (Test-Path $csrOutputFile) {
+            $csrContent = Get-Content -Path $csrOutputFile -Raw
+            Write-Information "CSR successfully created at: $csrOutputFile"
+            return $csrContent
+        } else {
+            throw "Failed to create CSR file."
+        }
+    } catch {
+        Write-Error "An error occurred: $_"
+    } finally {
+        # Clean up temporary files
+        if (Test-Path $infFile) {
+            Remove-Item -Path $infFile -Force
+            Write-Information "Deleted temporary INF file."
+        }
+
+        if (Test-Path $csrOutputFile) {
+            Remove-Item -Path $csrOutputFile -Force
+            Write-Information "Deleted temporary CSR file."
+        }
+    }
+}
+
+function Import-SignedCertificate {
+    param (
+        [Parameter(Mandatory = $true)]
+        [byte[]]$RawData,               # RawData from the certificate
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("My", "Root", "CA", "TrustedPublisher", "TrustedPeople")]
+        [string]$StoreName              # Store to which the certificate should be imported
+    )
+
+    try {
+        # Step 1: Convert raw certificate data to Base64 string with line breaks
+        Write-Verbose "Converting raw certificate data to Base64 string."
+        $csrData = [System.Convert]::ToBase64String($RawData, [System.Base64FormattingOptions]::InsertLineBreaks)
+
+        # Step 2: Create PEM-formatted certificate content
+        Write-Verbose "Creating PEM-formatted certificate content."
+        $certContent = @(
+            "-----BEGIN CERTIFICATE-----"
+            $csrData
+            "-----END CERTIFICATE-----"
+        ) -join "`n"
+
+        # Step 3: Create a temporary file for the certificate
+        Write-Verbose "Creating a temporary file for the certificate."
+        $cerFilename = [System.IO.Path]::GetTempFileName()
+        Set-Content -Path $cerFilename -Value $certContent -Force
+        Write-Verbose "Temporary certificate file created at: $cerFilename"
+
+        # Step 4: Import the certificate into the specified store
+        Write-Verbose "Importing the certificate to the store: Cert:\LocalMachine\$StoreName"
+        Set-Location -Path "Cert:\LocalMachine\$StoreName"
+
+        $importResult = Import-Certificate -FilePath $cerFilename
+        if ($importResult) {
+            Write-Verbose "Certificate successfully imported to Cert:\LocalMachine\$StoreName."
+        } else {
+            throw "Certificate import failed."
+        }
+
+        # Step 5: Cleanup temporary file
+        if (Test-Path $cerFilename) {
+            Remove-Item -Path $cerFilename -Force
+            Write-Verbose "Temporary file deleted: $cerFilename"
+        }
+
+        # Step 6: Return the imported certificate's thumbprint
+        return $importResult.Thumbprint
+
+    } catch {
+        Write-Error "An error occurred during the certificate export and import process: $_"
+    }
+}
+#####
 
 
 
@@ -731,4 +956,48 @@ function Get-KFCertificateByThumbprint
         Write-Error "An error occurred while retrieving the certificate: $_"
         return $null
     }    
+}
+
+function Get-CryptoProviders {
+    # Retrieves the list of available Crypto Service Providers using certutil
+    try {
+        Write-Verbose "Retrieving Crypto Service Providers using certutil..."
+        $certUtilOutput = certutil -csplist
+        
+        # Parse the output to extract CSP names
+        $cspInfoList = @()
+        foreach ($line in $certUtilOutput) {
+            if ($line -match "Provider Name:") {
+                $cspName = ($line -split ":")[1].Trim()
+                $cspInfoList += $cspName
+            }
+        }
+
+        if ($cspInfoList.Count -eq 0) {
+            throw "No Crypto Service Providers were found. Ensure certutil is functioning properly."
+        }
+
+        Write-Verbose "Retrieved the following CSPs:"
+        $cspInfoList | ForEach-Object { Write-Verbose $_ }
+
+        return $cspInfoList
+    } catch {
+        throw "Failed to retrieve Crypto Service Providers: $_"
+    }
+}
+
+function Validate-CryptoProvider {
+    param (
+        [Parameter(Mandatory)]
+        [string]$ProviderName
+    )
+    Write-Verbose "Validating CSP: $ProviderName"
+
+    $availableProviders = Get-CryptoProviders
+
+    if (-not ($availableProviders -contains $ProviderName)) {
+        throw "Crypto Service Provider '$ProviderName' is either invalid or not found on this system."
+    }
+
+    Write-Verbose "Crypto Service Provider '$ProviderName' is valid."
 }

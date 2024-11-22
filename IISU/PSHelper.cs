@@ -252,7 +252,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             catch (Exception ex)
             {
                 _logger.LogError($"Error while executing script: {ex.Message}");
-                return null;
+                throw new Exception(ex.Message);
             }
             finally
             {

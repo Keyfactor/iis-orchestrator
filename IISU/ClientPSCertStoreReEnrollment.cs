@@ -38,6 +38,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private readonly ILogger _logger;
         private readonly IPAMSecretResolver _resolver;
 
+        private PSHelper _psHelper;
+        private Collection<PSObject>? _results = null;
+
         public ClientPSCertStoreReEnrollment(ILogger logger, IPAMSecretResolver resolver)
         {
             _logger = logger;
@@ -45,6 +48,216 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         }
 
         public JobResult PerformReEnrollment(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReenrollment, CertStoreBindingTypeENUM bindingType)
+        {
+            JobResult jobResult = null;
+
+            try
+            {
+                _logger.MethodEntry();
+
+                var serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
+                var serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
+
+                // Get JobProperties from Config
+                var subjectText = config.JobProperties["subjectText"] as string;
+                var providerName = config.JobProperties["ProviderName"] as string;
+                var keyType = config.JobProperties["keyType"] as string;
+                var SAN = config.JobProperties["SAN"] as string;
+
+                int keySize = 0;
+                if (config.JobProperties["keySize"] is not null && int.TryParse(config.JobProperties["keySize"].ToString(), out int size))
+                {
+                    keySize = size;
+                }
+
+                // Extract values necessary to create remote PS connection
+                JobProperties jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties,
+                    new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+
+                string protocol = jobProperties.WinRmProtocol;
+                string port = jobProperties.WinRmPort;
+                bool includePortInSPN = jobProperties.SpnPortFlag;
+                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
+                string storePath = config.CertificateStoreDetails.StorePath;
+
+                //_psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword);
+
+                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword);
+                _psHelper.Initialize();
+
+                using (_psHelper)
+                {
+                    // First create and return the CSR
+                    string csr = CreateCSR(subjectText, providerName, keyType, keySize, SAN);
+
+                    if (csr != string.Empty)
+                    {
+                        // Submit and Sign the CSR in Command
+                        _logger.LogTrace("Attempting to sign CSR");
+                        X509Certificate2 myCert = submitReenrollment.Invoke(csr);
+
+                        // Import the certificate
+                        string thumbprint = ImportCertificate(myCert.RawData, storePath);
+
+                        // If there is binding, bind it to the correct store type
+                        switch (bindingType)
+                        {
+                            case CertStoreBindingTypeENUM.WinIIS:
+                                break;
+                            case CertStoreBindingTypeENUM.WinSQL:
+                                break;
+                        }
+
+                        jobResult = new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Success,
+                            JobHistoryId = config.JobHistoryId,
+                            FailureMessage = ""
+                        };
+
+                    }
+                    else
+                    {
+                        jobResult = new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = config.JobHistoryId,
+                            FailureMessage = "No CSR was generated to perform a reenrollment.  Please check the logs for further details."
+                        };
+
+                    }
+                }
+
+                return jobResult;
+
+            }
+            catch (Exception ex)
+            {
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = config.JobHistoryId,
+                    FailureMessage = ex.Message
+                };
+            }
+            finally
+            { 
+                _psHelper.Terminate(); 
+            }
+
+        }
+
+        private string CreateCSR(string subjectText, string providerName, string keyType, int keySize, string SAN)
+        {
+            string errorMsg = "";
+
+            try
+            {
+                string myCSR = "";
+
+                _logger.LogTrace("Entering ReEnrollment function: CreateCSR");
+
+                // Set the parameters for the function
+                var parameters = new Dictionary<string, object>
+                {
+                    { "subjectText", subjectText },
+                    { "providerName", providerName },
+                    { "keyType", keyType },
+                    { "keyLength", keySize },
+                    { "SAN", SAN }
+                };
+                _logger.LogTrace("Attempting to execute PS function (New-CsrEnrollment)");
+                _results = _psHelper.ExecutePowerShell("New-CsrEnrollment", parameters);
+                _logger.LogTrace("Returned from executing PS function (New-CsrEnrollment)");
+
+                // This should return the CSR that was generated
+                if (_results == null || _results.Count == 0)
+                {
+                    _logger.LogError("No results were returned, resulting in no CSR created.");
+                }
+                else if (_results.Count == 1)
+                {
+                    myCSR = _results[0]?.ToString();
+                    if (!string.IsNullOrEmpty(myCSR))
+                    {
+                        _logger.LogTrace("Created a CSR.");
+                    }
+                    else
+                    {
+                        _logger.LogError("The returned result is empty, resulting in no CSR created.");
+                    }
+                }
+                else // _results.Count > 1
+                {
+                    var messages = string.Join(Environment.NewLine, _results.Select(r => r?.ToString()));
+                    errorMsg = "Multiple results returned, indicating potential errors and no CSR was created.\n";
+                    errorMsg += $"Details:{Environment.NewLine}{messages}";
+                    _logger.LogError(errorMsg);
+
+                    throw new ApplicationException(errorMsg);
+
+                }
+
+                return myCSR;
+            }
+            catch (ApplicationException appEx)
+            {
+                throw new Exception(appEx.Message);
+            }
+            catch (Exception ex)
+            {
+                var failureMessage = $"ReEnrollment error at Creating CSR with error: '{ex.Message}'";
+                _logger.LogError(LogHandler.FlattenException(ex));
+
+                throw new Exception(failureMessage);
+            }
+        }
+
+        private string ImportCertificate(byte[] certificateRawData, string storeName)
+        {
+            try
+            {
+                string myThumbprint = "";
+
+                _logger.LogTrace("Entering ReEnrollment function: ImportCertificate");
+
+                // Set the parameters for the function
+                var parameters = new Dictionary<string, object>
+                {
+                    { "rawData", certificateRawData },
+                    { "storeName", storeName }
+                };
+
+                _logger.LogTrace("Attempting to execute PS function (Import-SignedCertificate)");
+                _results = _psHelper.ExecutePowerShell("Import-SignedCertificate", parameters);
+                _logger.LogTrace("Returned from executing PS function (Import-SignedCertificate)");
+
+                // This should return the CSR that was generated
+                if (_results != null && _results.Count > 0)
+                {
+                    myThumbprint = _results[0].ToString();
+                    _logger.LogTrace($"Imported the CSR and returned the following thumbprint: {myThumbprint}");
+                }
+                else
+                {
+                    _logger.LogError("No results were returned, resulting in no CSR created.");
+                }
+
+                return myThumbprint;
+
+            }
+            catch (Exception ex)
+            {
+                var failureMessage = $"ReEnrollment error while attempting to import the certificate with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogError(failureMessage);
+
+                throw new Exception(failureMessage);
+            }
+        }
+
+
+
+        public JobResult PerformReEnrollmentORIG(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReenrollment, CertStoreBindingTypeENUM bindingType)
         {
             bool hasError = false;
 
