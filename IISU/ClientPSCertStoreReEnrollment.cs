@@ -88,13 +88,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 using (_psHelper)
                 {
                     // First create and return the CSR
-                    string csr = CreateCSR(subjectText, providerName, keyType, keySize, SAN);
+                    var csr = CreateCSR(subjectText, providerName, keyType, keySize, SAN);
 
                     if (csr != string.Empty)
                     {
                         // Submit and Sign the CSR in Command
                         _logger.LogTrace("Attempting to sign CSR");
-                        X509Certificate2 myCert = submitReenrollment.Invoke(csr);
+                        X509Certificate2 myCert = submitReenrollment.Invoke(csr.ToString());
 
                         // Import the certificate
                         string thumbprint = ImportCertificate(myCert.RawData, storePath);
