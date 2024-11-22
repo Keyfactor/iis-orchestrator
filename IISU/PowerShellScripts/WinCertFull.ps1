@@ -722,7 +722,7 @@ function New-CSREnrollment
     $sanContent = ""
     if ($SAN) {
         $sanEntries = $SAN -split "&"
-        $sanDirectives = $sanEntries | ForEach-Object { "_continue_ = `"$($_)`"" }
+        $sanDirectives = $sanEntries | ForEach-Object { "_continue_ = `"$($_)&`"" }
         $sanContent = @"
 [Extensions]
 2.5.29.17 = `"{text}`"
