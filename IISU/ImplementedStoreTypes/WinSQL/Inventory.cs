@@ -142,16 +142,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     {
                         var siteSettingsDict = new Dictionary<string, object>
                                 {
-                                    { "InstanceName", cert.InstanceName},
-                                    { "ProviderName", cert.ProviderName}
+                                    { "InstanceName", cert.Parameters.InstanceName},
+                                    { "ProviderName", cert.Parameters.ProviderName}
                                 };
 
                         Inventory.Add(
                             new CurrentInventoryItem
                             {
-                                Certificates = new[] { cert.Base64Data },
-                                Alias = cert.Thumbprint,
-                                PrivateKeyEntry = cert.HasPrivateKey,
+                                Certificates = new[] { cert.Certificates },
+                                Alias = cert.Alias,
+                                PrivateKeyEntry = cert.PrivateKeyEntry,
                                 UseChainLevel = false,
                                 ItemStatus = OrchestratorInventoryItemStatus.Unknown,
                                 Parameters = siteSettingsDict

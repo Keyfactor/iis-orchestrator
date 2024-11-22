@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Ignore Spelling: thumbprint
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -163,6 +165,32 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                             }
                         case CertStoreOperationType.Remove:
                             {
+                                try
+                                {
+                                    // Unbind the certificates
+                                    if (UnBindSQLCertificate().Result == OrchestratorJobStatusJobResult.Success)
+                                    {
+                                        // Remove the certificate from the cert store
+                                        complete = RemoveCertificate(config.JobCertificate.Alias);
+                                        _logger.LogTrace($"Completed removing the certificate from the store");
+
+                                        break;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    return new JobResult
+                                    {
+                                        Result = OrchestratorJobStatusJobResult.Failure,
+                                        JobHistoryId = _jobHistoryID,
+                                        FailureMessage = ex.Message
+                                    };
+                                }
+
+                                _logger.LogTrace($"Completed unbinding and removing the certificate from the store");
+
+                                break;
+
                                 string thumbprint = config.JobCertificate.Alias;
 
                                 complete = RemoveCertificate(thumbprint);
@@ -215,10 +243,46 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
         public JobResult RemoveCertificate(string thumbprint)
         {
-            return new JobResult
-                { Result= OrchestratorJobStatusJobResult.Success, JobHistoryId = _jobHistoryID, FailureMessage = "" };
-        }
+            try
+            {
+                using (_psHelper)
+                {
+                    _psHelper.Initialize();
 
+                    _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
+
+                    var parameters = new Dictionary<string, object>()
+                    {
+                        { "Thumbprint", thumbprint },
+                        { "StorePath", _storePath }
+                    };
+
+                    _psHelper.ExecutePowerShell("Remove-KFCertificateFromStore", parameters);
+                    _logger.LogTrace("Returned from executing PS function (Remove-KFCertificateFromStore)");
+
+                    _psHelper.Terminate();
+                }
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = ""
+                };
+            }
+            catch (Exception ex)
+            {
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogWarning(failureMessage);
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = failureMessage
+                };
+            }
+        }
 
         public string AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
         {
@@ -300,6 +364,50 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     FailureMessage = "Unable to bind one or more certificates to the SQL Instances."
                 };
             } else 
+            {
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = ""
+                };
+            }
+        }
+
+        private JobResult UnBindSQLCertificate()
+        {
+            bool hadError = false;
+            var instances = SQLInstanceNames.Split(",");
+
+            foreach (var instanceName in instances)
+            {
+                var parameters = new Dictionary<string, object>
+                {
+                    { "SqlInstanceName", instanceName.Trim() }
+                };
+
+                try
+                {
+                    _results = _psHelper.ExecutePowerShell("UnBind-KFSqlServerCertificate", parameters);
+                    _logger.LogTrace("Returned from executing PS function (UnBind-KFSqlServerCertificate)");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
+                    hadError = true;
+                }
+            }
+
+            if (hadError)
+            {
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = "Unable to unbind one or more certificates from the SQL Instances."
+                };
+            }
+            else
             {
                 return new JobResult
                 {
