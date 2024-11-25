@@ -358,14 +358,14 @@ BEGIN TRY
 		)
 		VALUES	
 		(
-			@current_storetype_id,  -- StoreTypeId
+			@current_storetype_id,	-- StoreTypeId
 			'SniFlag',				-- Name
-			'SNI Support',			-- DisplayName
-			2,					    -- Type
+			'SSL Flags',			-- DisplayName
+			0,						-- Type
 			14,						-- RequiredWhen
 			NULL,					-- DependsOn
-			'0 - No SNI',			-- DefaultValue
-			'0 - No SNI,1 - SNI Enabled,2 - Non SNI Binding,3 - SNI Binding'	-- Options
+			'0',					-- DefaultValue
+			NULL					-- Options
 		);
 
 	-- create Protocol entry parameter
