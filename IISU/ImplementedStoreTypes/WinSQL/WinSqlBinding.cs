@@ -1,5 +1,6 @@
 ﻿// Ignore Spelling: Keyfactor Sql
 
+using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
         private static ILogger _logger;
         private static Collection<PSObject>? _results = null;
 
+        public WinSqlBinding()
+        {
+            _logger = LogHandler.GetClassLogger<Management>();
+            _logger.MethodEntry();
+        }
+
         public static bool BindSQLCertificate(PSHelper psHelper, string SQLInstanceNames, string newThumbprint, string renewalThumbprint, string storePath, bool restartSQLService)
         {
             bool hadError = false;
@@ -27,7 +34,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             {
                 var parameters = new Dictionary<string, object>
                 {
-                    { "Thumbprint", newThumbprint },
+                    { "Thumbprint", newThumbprint.ToLower() },
                     { "SqlInstanceName", instanceName.Trim() },
                     { "StoreName", storePath },
                     { "RestartService", restartSQLService }
