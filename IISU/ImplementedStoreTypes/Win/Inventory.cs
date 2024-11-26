@@ -15,13 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Management.Automation;
-using System.Management.Automation.Runspaces;
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.Win;
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinIIS;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;

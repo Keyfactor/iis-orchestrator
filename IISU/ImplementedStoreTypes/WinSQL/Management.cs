@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Ignore Spelling: thumbprint
+// Ignore Spelling: thumbprint Keyfactor sql
 
 using System;
 using System.Collections.Generic;
@@ -22,6 +22,7 @@ using System.IO;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Numerics;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -128,25 +129,25 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                     // Bind Certificate to SQL Instance
                                     if (newThumbprint != null)
                                     {
-                                        complete = BindSQLCertificate(newThumbprint, RenewalThumbprint);
-                                        // Check the RenewalThumbprint.  If there is a value, this is a renewal
-                                        if (config.JobProperties.ContainsKey("RenewalThumbprint"))
+                                        if (WinSqlBinding.BindSQLCertificate(_psHelper, SQLInstanceNames, newThumbprint, RenewalThumbprint, _storePath, RestartSQLService))
                                         {
-                                            // This is a renewal.
-                                            // Check if there is an existing certificate.  If there is, replace it with the new one.
-                                            string renewalThumbprint = config.JobProperties["RenewalThumbprint"]?.ToString() ?? string.Empty;
+                                            complete = new JobResult
+                                            {
+                                                Result = OrchestratorJobStatusJobResult.Success,
+                                                JobHistoryId = _jobHistoryID,
+                                                FailureMessage = ""
+                                            };
                                         }
                                         else
                                         {
-                                            // This is a new certificate - just bind it.
+                                            complete = new JobResult
+                                            {
+                                                Result = OrchestratorJobStatusJobResult.Failure,
+                                                JobHistoryId = _jobHistoryID,
+                                                FailureMessage = "Unable to Bind certificate to SQL Instance"
+                                            };
                                         }
 
-                                        complete = new JobResult
-                                        {
-                                            Result = OrchestratorJobStatusJobResult.Success,
-                                            JobHistoryId = _jobHistoryID,
-                                            FailureMessage = ""
-                                        };
                                     }
                                 }
                                 catch (Exception ex)
@@ -168,7 +169,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                 try
                                 {
                                     // Unbind the certificates
-                                    if (UnBindSQLCertificate().Result == OrchestratorJobStatusJobResult.Success)
+                                    if (WinSqlBinding.UnBindSQLCertificate(_psHelper, SQLInstanceNames))
                                     {
                                         // Remove the certificate from the cert store
                                         complete = RemoveCertificate(config.JobCertificate.Alias);
@@ -176,6 +177,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
                                         break;
                                     }
+                                    else
+                                    {
+                                        return new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = "Unable to unbind one or more certificates from the SQL Instances."
+                                        };
+                                    }
+
                                 }
                                 catch (Exception ex)
                                 {
@@ -188,42 +199,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                 }
 
                                 _logger.LogTrace($"Completed unbinding and removing the certificate from the store");
-
-                                break;
-
-                                string thumbprint = config.JobCertificate.Alias;
-
-                                complete = RemoveCertificate(thumbprint);
-                                _logger.LogTrace($"Completed removing the certificate from the store");
-
-                                break;
+                                return complete;
                             }
                     }
                 }
 
                 return complete;
-
-                //switch (config.OperationType)
-                //{
-                //    case CertStoreOperationType.Add:
-                //        _logger.LogTrace("Entering Add...");
-                //        myRunspace.Open();
-                //        complete = PerformAddCertificate(config, serverUserName, serverPassword);
-                //        myRunspace.Close();
-                //        _logger.LogTrace("After Perform Addition...");
-                //        break;
-                //    case CertStoreOperationType.Remove:
-                //        _logger.LogTrace("Entering Remove...");
-                //        _logger.LogTrace("After PerformRemoval...");
-                //        myRunspace.Open();
-                //        complete = PerformRemoveCertificate(config, serverUserName, serverPassword);
-                //        myRunspace.Close();
-                //        _logger.LogTrace("After Perform Removal...");
-                //        break;
-                //}
-
-                //_logger.MethodExit();
-                //return complete;
             }
             catch (Exception ex)
             {
@@ -328,94 +309,94 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             }
         }
 
-        private JobResult BindSQLCertificate(string newThumbprint, string renewalThumbprint)
-        {
-            bool hadError = false;
-            var instances = SQLInstanceNames.Split(",");
+        //private JobResult BindSQLCertificate(string newThumbprint, string renewalThumbprint)
+        //{
+        //    bool hadError = false;
+        //    var instances = SQLInstanceNames.Split(",");
 
-            foreach (var instanceName in instances)
-            {
-                var parameters = new Dictionary<string, object>
-                {
-                    { "Thumbprint", newThumbprint },
-                    { "SqlInstanceName", instanceName.Trim() },
-                    { "StoreName", _storePath },
-                    { "RestartService", RestartSQLService }
-                };
+        //    foreach (var instanceName in instances)
+        //    {
+        //        var parameters = new Dictionary<string, object>
+        //        {
+        //            { "Thumbprint", newThumbprint },
+        //            { "SqlInstanceName", instanceName.Trim() },
+        //            { "StoreName", _storePath },
+        //            { "RestartService", RestartSQLService }
+        //        };
 
-                try
-                {
-                    _results = _psHelper.ExecutePowerShell("Bind-CertificateToSqlInstance", parameters);
-                    _logger.LogTrace("Return from executing PS function (Bind-CertificateToSqlInstance)");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
-                    hadError= true;
-                }
-            }
+        //        try
+        //        {
+        //            _results = _psHelper.ExecutePowerShell("Bind-CertificateToSqlInstance", parameters);
+        //            _logger.LogTrace("Return from executing PS function (Bind-CertificateToSqlInstance)");
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
+        //            hadError= true;
+        //        }
+        //    }
 
-            if (hadError)
-            {
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = _jobHistoryID,
-                    FailureMessage = "Unable to bind one or more certificates to the SQL Instances."
-                };
-            } else 
-            {
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = _jobHistoryID,
-                    FailureMessage = ""
-                };
-            }
-        }
+        //    if (hadError)
+        //    {
+        //        return new JobResult
+        //        {
+        //            Result = OrchestratorJobStatusJobResult.Failure,
+        //            JobHistoryId = _jobHistoryID,
+        //            FailureMessage = "Unable to bind one or more certificates to the SQL Instances."
+        //        };
+        //    } else 
+        //    {
+        //        return new JobResult
+        //        {
+        //            Result = OrchestratorJobStatusJobResult.Success,
+        //            JobHistoryId = _jobHistoryID,
+        //            FailureMessage = ""
+        //        };
+        //    }
+        //}
 
-        private JobResult UnBindSQLCertificate()
-        {
-            bool hadError = false;
-            var instances = SQLInstanceNames.Split(",");
+        //private JobResult UnBindSQLCertificate()
+        //{
+        //    bool hadError = false;
+        //    var instances = SQLInstanceNames.Split(",");
 
-            foreach (var instanceName in instances)
-            {
-                var parameters = new Dictionary<string, object>
-                {
-                    { "SqlInstanceName", instanceName.Trim() }
-                };
+        //    foreach (var instanceName in instances)
+        //    {
+        //        var parameters = new Dictionary<string, object>
+        //        {
+        //            { "SqlInstanceName", instanceName.Trim() }
+        //        };
 
-                try
-                {
-                    _results = _psHelper.ExecutePowerShell("UnBind-KFSqlServerCertificate", parameters);
-                    _logger.LogTrace("Returned from executing PS function (UnBind-KFSqlServerCertificate)");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
-                    hadError = true;
-                }
-            }
+        //        try
+        //        {
+        //            _results = _psHelper.ExecutePowerShell("UnBind-KFSqlServerCertificate", parameters);
+        //            _logger.LogTrace("Returned from executing PS function (UnBind-KFSqlServerCertificate)");
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
+        //            hadError = true;
+        //        }
+        //    }
 
-            if (hadError)
-            {
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = _jobHistoryID,
-                    FailureMessage = "Unable to unbind one or more certificates from the SQL Instances."
-                };
-            }
-            else
-            {
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = _jobHistoryID,
-                    FailureMessage = ""
-                };
-            }
-        }
+        //    if (hadError)
+        //    {
+        //        return new JobResult
+        //        {
+        //            Result = OrchestratorJobStatusJobResult.Failure,
+        //            JobHistoryId = _jobHistoryID,
+        //            FailureMessage = "Unable to unbind one or more certificates from the SQL Instances."
+        //        };
+        //    }
+        //    else
+        //    {
+        //        return new JobResult
+        //        {
+        //            Result = OrchestratorJobStatusJobResult.Success,
+        //            JobHistoryId = _jobHistoryID,
+        //            FailureMessage = ""
+        //        };
+        //    }
+        //}
     }
 }

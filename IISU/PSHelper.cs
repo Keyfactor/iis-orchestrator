@@ -32,7 +32,7 @@ using System.Xml.Serialization;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    internal class PSHelper : IDisposable
+    public class PSHelper : IDisposable
     {
         private static ILogger _logger;
 

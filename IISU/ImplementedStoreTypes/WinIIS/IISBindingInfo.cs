@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿// Ignore Spelling: Keyfactor IISU
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinIIS
+using System;
+using System.Collections.Generic;
+
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class IISBindingInfo
     {

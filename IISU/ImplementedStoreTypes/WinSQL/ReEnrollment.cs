@@ -36,7 +36,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
             ClientPSCertStoreReEnrollment myReEnrollment = new ClientPSCertStoreReEnrollment(_logger, _resolver);
 
-            // SQL ReEnrollment performs a different type of binding.  Set the bindcertificate to false and call SQL Binding
+            // SQL ReEnrollment performs a different type of binding.  Set the bind certificate to false and call SQL Binding
             return myReEnrollment.PerformReEnrollment(config, submitReEnrollmentUpdate, CertStoreBindingTypeENUM.WinSQL);
         }
     }

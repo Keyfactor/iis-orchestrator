@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinSQL;
+// Ignore Spelling: Keyfactor Sql
+
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
