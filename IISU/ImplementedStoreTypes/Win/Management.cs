@@ -142,7 +142,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 
                     _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
 
-                    // Manditory parameters
+                    // Mandatory parameters
                     var parameters = new Dictionary<string, object>
                     {
                         { "Base64Cert", certificateContents },

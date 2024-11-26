@@ -17,7 +17,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Management.Automation;
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinIIS;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -109,8 +108,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                     // Bind Certificate to IIS Site
                                     if (newThumbprint != null)
                                     {
+                                        // TODO:  Need to check/test IISU renewal thumbprint
                                         IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
-                                        BindCertificate(bindingInfo, newThumbprint);
+                                        WinIISBinding.BindCertificate(_psHelper, bindingInfo, newThumbprint, "", _storePath);
 
                                         complete = new JobResult
                                         {
@@ -141,7 +141,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 string thumbprint = config.JobCertificate.Alias.Split(':')[0];
                                 try
                                 {
-                                    if (UnBindCertificate(new IISBindingInfo(config.JobProperties)))
+                                    if (WinIISBinding.UnBindCertificate(_psHelper, new IISBindingInfo(config.JobProperties)))
                                     {
                                         complete = RemoveCertificate(thumbprint);
                                     }
@@ -271,64 +271,64 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             }
         }
 
-        public void BindCertificate(IISBindingInfo bindingInfo, string thumbprint)
-        {
-            _logger.LogTrace("Attempting to bind and execute PS function (New-KFIISSiteBinding)");
+        //public void BindCertificate(IISBindingInfo bindingInfo, string thumbprint)
+        //{
+        //    _logger.LogTrace("Attempting to bind and execute PS function (New-KFIISSiteBinding)");
                 
-            // Manditory parameters
-            var parameters = new Dictionary<string, object>
-            {
-                { "Thumbprint", thumbprint },
-                { "WebSite", bindingInfo.SiteName },
-                { "Protocol", bindingInfo.Protocol },
-                { "IPAddress", bindingInfo.IPAddress },
-                { "Port", bindingInfo.Port },
-                { "SNIFlag", bindingInfo.SniFlag },
-                { "StoreName", _storePath },
-            };
+        //    // Manditory parameters
+        //    var parameters = new Dictionary<string, object>
+        //    {
+        //        { "Thumbprint", thumbprint },
+        //        { "WebSite", bindingInfo.SiteName },
+        //        { "Protocol", bindingInfo.Protocol },
+        //        { "IPAddress", bindingInfo.IPAddress },
+        //        { "Port", bindingInfo.Port },
+        //        { "SNIFlag", bindingInfo.SniFlag },
+        //        { "StoreName", _storePath },
+        //    };
 
-            // Optional parameters
-            if (!string.IsNullOrEmpty(bindingInfo.HostName)) { parameters.Add("HostName", bindingInfo.HostName); }
+        //    // Optional parameters
+        //    if (!string.IsNullOrEmpty(bindingInfo.HostName)) { parameters.Add("HostName", bindingInfo.HostName); }
 
-            _results = _psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);
-            _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+        //    _results = _psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);
+        //    _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
 
-            // This should return the thumbprint of the certificate
-            if (_results != null && _results.Count > 0)
-            {
-                _logger.LogTrace($"Bound certificate with the thumbprint: '{thumbprint}' to site: '{bindingInfo.SiteName}'.");
-            }
-            else
-            {
-                _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell informaiton.");
-            }
-        }
+        //    // This should return the thumbprint of the certificate
+        //    if (_results != null && _results.Count > 0)
+        //    {
+        //        _logger.LogTrace($"Bound certificate with the thumbprint: '{thumbprint}' to site: '{bindingInfo.SiteName}'.");
+        //    }
+        //    else
+        //    {
+        //        _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell informaiton.");
+        //    }
+        //}
 
-        public bool UnBindCertificate(IISBindingInfo bindingInfo)
-        {
-            _logger.LogTrace("Attempting to UnBind and execute PS function (Remove-KFIISBinding)");
+        //public bool UnBindCertificate(IISBindingInfo bindingInfo)
+        //{
+        //    _logger.LogTrace("Attempting to UnBind and execute PS function (Remove-KFIISBinding)");
 
-            // Manditory parameters
-            var parameters = new Dictionary<string, object>
-            {
-                { "SiteName", bindingInfo.SiteName },
-                { "IPAddress", bindingInfo.IPAddress },
-                { "Port", bindingInfo.Port },
-            };
+        //    // Mandatory parameters
+        //    var parameters = new Dictionary<string, object>
+        //    {
+        //        { "SiteName", bindingInfo.SiteName },
+        //        { "IPAddress", bindingInfo.IPAddress },
+        //        { "Port", bindingInfo.Port },
+        //    };
 
-            // Optional parameters
-            if (!string.IsNullOrEmpty(bindingInfo.HostName)) { parameters.Add("HostName", bindingInfo.HostName); }
+        //    // Optional parameters
+        //    if (!string.IsNullOrEmpty(bindingInfo.HostName)) { parameters.Add("HostName", bindingInfo.HostName); }
 
-            try
-            {
-                _results = _psHelper.ExecutePowerShell("Remove-KFIISBinding", parameters);
-                _logger.LogTrace("Returned from executing PS function (Remove-KFIISBinding)");
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
+        //    try
+        //    {
+        //        _results = _psHelper.ExecutePowerShell("Remove-KFIISBinding", parameters);
+        //        _logger.LogTrace("Returned from executing PS function (Remove-KFIISBinding)");
+        //        return true;
+        //    }
+        //    catch (Exception)
+        //    {
+        //        return false;
+        //    }
+        //}
     }
 }

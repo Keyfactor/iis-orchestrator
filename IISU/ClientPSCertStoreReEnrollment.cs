@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Ignore Spelling: Keyfactor
+
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -19,17 +21,16 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Management.Automation.Runspaces;
 using System.Management.Automation;
 using System.Management.Automation.Remoting;
-using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using System.Linq;
 using System.IO;
-using Microsoft.PowerShell;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -39,7 +40,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private readonly IPAMSecretResolver _resolver;
 
         private PSHelper _psHelper;
-        private Collection<PSObject>? _results = null;
+        private Collection<PSObject>? _results;
 
         public ClientPSCertStoreReEnrollment(ILogger logger, IPAMSecretResolver resolver)
         {
@@ -100,13 +101,29 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         string thumbprint = ImportCertificate(myCert.RawData, storePath);
 
                         // If there is binding, bind it to the correct store type
-                        switch (bindingType)
+                        if (thumbprint != null)
                         {
-                            case CertStoreBindingTypeENUM.WinIIS:
-                                break;
-                            case CertStoreBindingTypeENUM.WinSQL:
-                                break;
+                            switch (bindingType)
+                            {
+                                case CertStoreBindingTypeENUM.WinIIS:
+                                    // Bind Certificate to IIS Site
+                                    IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
+                                    WinIISBinding.BindCertificate(_psHelper, bindingInfo, thumbprint, "", storePath);
+                                    break;
+                                case CertStoreBindingTypeENUM.WinSQL:
+                                    // Bind Certificate to SQL Instance
+                                    string sqlInstanceNames = "MSSQLSERVER";
+                                    if (config.JobProperties.ContainsKey("InstanceName"))
+                                    {
+                                        sqlInstanceNames = config.JobProperties["InstanceName"]?.ToString() ?? "MSSQLSERVER";
+                                    }
+                                    WinSqlBinding.BindSQLCertificate(_psHelper, sqlInstanceNames, thumbprint, "", storePath, false);
+                                    break;
+                            }
+
                         }
+
+
 
                         jobResult = new JobResult
                         {
@@ -254,8 +271,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 throw new Exception(failureMessage);
             }
         }
-
-
 
         public JobResult PerformReEnrollmentORIG(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReenrollment, CertStoreBindingTypeENUM bindingType)
         {

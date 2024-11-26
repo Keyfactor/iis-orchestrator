@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinIIS
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class IISCertificateInfo
     {
