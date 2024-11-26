@@ -150,12 +150,14 @@ function Add-KFCertificateToStore
 
             # Execute certutil based on whether a private key password was supplied
             try {
-                if ($PrivateKeyPassword) {
-                    $output = certutil -f -csp $CryptoServiceProvider -p $PrivateKeyPassword $StoreName $tempFileName
-                }
-                else {
-                    $output = certutil -f -importpfx -csp $CryptoServiceProvider -p $PrivateKeyPassword $StoreName $tempFileName
-                }
+                    # Generate the appropriate certutil command based on the parameters
+                $cryptoProviderPart = if ($CryptoServiceProvider) { "-csp `"$CryptoServiceProvider`" " } else { "" }
+                $passwordPart = if ($PrivateKeyPassword) { "-p `"$PrivateKeyPassword`" " } else { "" }
+                $action = if ($PrivateKeyPassword) { "importpfx" } else { "addstore" }
+
+                # Construct the full certutil command
+                $command = "certutil -f $cryptoProviderPart$passwordPart-$action $StorePath `"$tempFileName`""
+                $output = Invoke-Expression $command
 
                 # Check for errors based on the last exit code
                 if ($LASTEXITCODE -ne 0) {
