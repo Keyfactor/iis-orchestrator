@@ -4,7 +4,7 @@
     "name": "Windows Certificate Orchestrator",
     "status": "production",
     "link_github": true,
-    "release_dir": "IISU/bin/Release/net6.0",
+    "release_dir": "IISU/bin/Release",
     "release_project": "IISU/WindowsCertStore.csproj",
     "update_catalog": true,
     "support_level": "kf-supported",
