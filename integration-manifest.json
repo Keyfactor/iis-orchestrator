@@ -5,7 +5,7 @@
     "status": "production",
     "link_github": true,
     "release_dir": "IISU/bin/Release/net6.0",
-    "release_project": "iis-orchestrator/blob/main/IISU/WindowsCertStore.csproj",
+    "release_project": "IISU/WindowsCertStore.csproj",
     "update_catalog": true,
     "support_level": "kf-supported",
     "description": "The Windows Certificate Store Orchestrator Extension implements two certificate store types. 1) \u201cWinCert\u201d which manages certificates in a Windows local machine store, and 2) \u201cIISU\u201d which manages certificates and their bindings in a Windows local machine store that are bound to Internet Information Server (IIS) websites. These extensions replace the now deprecated \u201cIIS\u201d cert store type that ships with Keyfactor Command. The \u201cIISU\u201d extension also replaces the \u201cIISBin\u201d certificate store type from prior versions of this repository. This orchestrator extension is in the process of being renamed from \u201cIIS Orchestrator\u201d as it now supports certificates that are not in use by IIS.",
