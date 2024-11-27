@@ -30,7 +30,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
     public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {
         private ILogger _logger;
-        public string ExtensionName => string.Empty;
+        public string ExtensionName => "WinCertInventory";
 
         public Inventory(IPAMSecretResolver resolver)
         {
