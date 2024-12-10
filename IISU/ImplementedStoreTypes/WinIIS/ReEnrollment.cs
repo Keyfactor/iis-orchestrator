@@ -29,7 +29,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             _resolver = resolver;
         }
 
-        public string ExtensionName => string.Empty;
+        public string ExtensionName => "WinIISUReEnrollment";
         
         public JobResult ProcessJob(ReenrollmentJobConfiguration config, SubmitReenrollmentCSR submitReEnrollmentUpdate)
         {
