@@ -40,6 +40,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private Collection<PSObject> _PSSession = new Collection<PSObject>();
 
         private string scriptFileLocation = string.Empty;
+        private string tempKeyFilePath;
 
         private string protocol;
         private string port;
@@ -89,11 +90,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             this.serverPassword = serverPassword;
 
             _logger = LogHandler.GetClassLogger<PSHelper>();
-            _logger.MethodEntry();
+            _logger.LogTrace("Entered PSHelper Constructor");
+            _logger.LogTrace($"Protocol: {this.protocol}");
+            _logger.LogTrace($"Port: {this.port}");
+            _logger.LogTrace($"UseSPN: {this.useSPN}");
+            _logger.LogTrace($"ClientMachineName: {ClientMachineName}");
+            _logger.LogTrace("Constructor Completed");
         }
 
         public void Initialize()
         {
+            _logger.LogTrace("Entered PSHelper.Initialize()");
             PS = PowerShell.Create();
 
             // Add listeners to raise events
@@ -125,15 +132,38 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             if (protocol == "ssh")
             {
-                // TODO: Need to add logic when using keyfilePath
-                // TODO: Need to add keyfilePath parameter
-                PS.AddCommand("New-PSSession")
-                    .AddParameter("HostName", ClientMachineName)
-                    .AddParameter("UserName", serverUserName);
+                _logger.LogTrace("Initializing SSH connection");
 
+                try
+                {
+                    tempKeyFilePath = Path.GetTempFileName();
+                    _logger.LogTrace($"Created temporary KeyFilePath: {tempKeyFilePath}");
+
+                    File.WriteAllText(tempKeyFilePath, serverPassword);
+                    File.SetAttributes(tempKeyFilePath, FileAttributes.ReadOnly);
+
+                    PS.AddCommand("New-PSSession")
+                        .AddParameter("HostName", ClientMachineName)
+                        .AddParameter("UserName", serverUserName);
+
+                    // TODO: THIS IS FOR TESTING ONLY <REMOVE THIS AFTER TESTING>
+                    if (serverPassword != null)
+                    {
+                        // TODO:  Need to write out to file and pass file name.  For right now, the password is the filename.
+                        _logger.LogTrace($"Current KeyFilePath: {tempKeyFilePath}");
+                        PS.AddParameter("KeyFilePath", tempKeyFilePath);
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
+                    throw new Exception("Error while creating temporary KeyFilePath.");
+                }
             }
             else
             {
+                _logger.LogTrace("Initializing WinRM connection");
                 var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
                 PSCredential myCreds = new PSCredential(serverUserName, pw);
 
@@ -152,6 +182,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
             _PSSession = PS.Invoke();
+            _logger.LogTrace("Session Invoked...Checking for errors.");
             CheckErrors();
 
             PS.Commands.Clear();
@@ -198,6 +229,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 PS.AddCommand("Remove-Session").AddParameter("Session", _PSSession);
                 PS.Invoke();
                 CheckErrors();
+            }
+
+            if (File.Exists(tempKeyFilePath))
+            {
+                try
+                {
+                    //File.Delete(tempKeyFilePath);
+                    _logger.LogTrace($"Temporary KeyFilePath deleted: {tempKeyFilePath}");
+                }
+                catch (Exception)
+                {
+                    _logger.LogError($"Error while deleting KeyFilePath.");
+                }
             }
 
             try
