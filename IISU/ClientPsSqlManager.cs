@@ -1,4 +1,4 @@
-﻿// Copyright 2022 Keyfactor
+// Copyright 2022 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -349,18 +349,35 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     _logger.LogTrace("funcScript added...");
                     ps.Invoke();
                     _logger.LogTrace("funcScript Invoked...");
+                    ps.Commands.Clear();
 
+
+                    //Get the SqlServer Service - NAME
+                    _logger.LogTrace("Retrieve ServiceName PS1 script");
+                    funcScript = @$"((Get-WmiObject Win32_service) | Where-Object{{$_.DisplayName -like ""*SQL Server ({instanceName})*""}}).Name";
+                    ps.AddScript(funcScript);
+                    _logger.LogTrace("funcScript added...");
+                    var serviceName = ps.Invoke()[0].ToString();
+                    _logger.LogTrace("funcScript Invoked...");
+                    _logger.LogTrace("Attempted retrieval of serviceName from ServicePath");
+                    ps.Commands.Clear();
+
+                    _logger.LogTrace($"funcScript {funcScript}");
+                    ps.AddScript(funcScript);
+                    _logger.LogTrace("funcScript added...");
+                    ps.Invoke();
+                    _logger.LogTrace("funcScript Invoked...");
                     _logger.LogTrace("Setting up Acl Access for Manage Private Keys");
                     ps.Commands.Clear();
 
-                    //Get the SqlServer Service User Name
-                    var serviceName = GetSqlServerServiceName(GetSqlInstanceValue(instanceName, ps));
-                    funcScript = @$"(Get-WmiObject Win32_Service -Filter ""Name='{serviceName}'"").StartName";
+                    //Get the SqlServer Service - USER
+                    funcScript = @$"((Get-WmiObject Win32_service) | Where-Object{{$_.PathName -like ""*{instanceName}\MSSQL\Binn\sqlservr.exe*""}}).StartName";
+                    _logger.LogTrace($"funcScript {funcScript}");
                     ps.AddScript(funcScript);
                     _logger.LogTrace("funcScript added...");
-                    SqlServiceUser = ps.Invoke()[0].ToString();
+                    var SqlServiceInstanceUser = ps.Invoke()[0].ToString();
                     _logger.LogTrace("funcScript Invoked...");
-                    _logger.LogTrace("Got service login user for ACL Permissions");
+                    _logger.LogTrace("Attempted retrieval of service login user for ACL Permissions");
                     ps.Commands.Clear();
 
                     funcScript = $@"$thumbprint = '{thumbPrint}'
@@ -369,13 +386,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     $keyPath = ""$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\""
                     $privKeyPath = (Get-Item ""$keyPath\$privKey"")
                     $Acl = Get-Acl $privKeyPath
-                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""{SqlServiceUser.Replace("$", "`$")}"", ""Read"", ""Allow"")
+                    $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(""{SqlServiceInstanceUser.Replace("$", "`$")}"", ""Read"", ""Allow"")
                     $Acl.SetAccessRule($Ar)
                     Set-Acl $privKeyPath.FullName $Acl";
 
                     ps.AddScript(funcScript);
                     ps.Invoke();
                     _logger.LogTrace("ACL FuncScript Invoked...");
+                    _logger.LogTrace("Attemptedto set ACL permissions for service login user");
 
                     //If user filled in a service name in the store then restart the SQL Server Services
                     if (RestartService)
@@ -408,4 +426,3 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         }
     }
 }
-
