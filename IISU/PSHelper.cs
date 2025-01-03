@@ -304,6 +304,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
+        [Obsolete]
         public Collection<PSObject>? ExecuteCommand(string scriptBlock, Dictionary<string, object> parameters = null)
         {
             _logger.LogTrace("Executing PowerShell Script");
