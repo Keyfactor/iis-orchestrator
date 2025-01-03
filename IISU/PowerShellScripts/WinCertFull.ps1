@@ -3,111 +3,147 @@ $DebugPreference = "Continue"
 $VerbosePreference = "Continue"
 $InformationPreference = "Continue"
 
-function Get-KFCertificates
-{
+function Get-KFCertificates {
     param (
         [string]$StoreName = "My"   # Default store name is "My" (Personal)
     )
 
-    # Get all certificates from the specified store
-    $certificates = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName"
+    # Define the store path using the provided StoreName parameter
+    $storePath = "Cert:\LocalMachine\$StoreName"
 
-    # Initialize an array to store the results
+    # Check if the store path exists to ensure the store is valid
+    if (-not (Test-Path $storePath)) {
+        # Write an error message and exit the function if the store path is invalid
+        Write-Error "The certificate store path '$storePath' does not exist. Please provide a valid store name."
+        return
+    }
+
+    # Retrieve all certificates from the specified store
+    $certificates = Get-ChildItem -Path $storePath
+
+    # Initialize an empty array to store certificate information objects
     $certInfoList = @()
 
     foreach ($cert in $certificates) {
-        # Create a custom object to store the certificate information
-        $certInfo = [PSCustomObject]@{
-            StoreName      = $StoreName
-            Certificate    = $cert.Subject
-            ExpiryDate     = $cert.NotAfter
-            Issuer         = $cert.Issuer
-            Thumbprint     = $cert.Thumbprint
-            HasPrivateKey  = $cert.HasPrivateKey
-            SAN            = Get-KFSAN $cert
-            ProviderName   = Get-CertificateCSP $cert 
-            Base64Data     = [System.Convert]::ToBase64String($cert.RawData)
+        try {
+            # Create a custom object to store details about the current certificate
+            $certInfo = [PSCustomObject]@{
+                StoreName      = $StoreName                # Name of the certificate store
+                Certificate    = $cert.Subject             # Subject of the certificate
+                ExpiryDate     = $cert.NotAfter            # Expiration date of the certificate
+                Issuer         = $cert.Issuer              # Issuer of the certificate
+                Thumbprint     = $cert.Thumbprint          # Unique thumbprint of the certificate
+                HasPrivateKey  = $cert.HasPrivateKey       # Indicates if the certificate has a private key
+                SAN            = Get-KFSAN $cert           # Subject Alternative Names (if available)
+                ProviderName   = Get-CertificateCSP $cert  # Provider of the certificate
+                Base64Data     = [System.Convert]::ToBase64String($cert.RawData) # Encoded raw certificate data
+            }
+
+            # Add the certificate information object to the results array
+            $certInfoList += $certInfo
+        } catch {
+            # Write a warning message if there is an error processing the current certificate
+            Write-Warning "An error occurred while processing the certificate: $_"
         }
-        
-        # Add the certificate information to the array
-        $certInfoList += $certInfo
     }
 
-    # Output the results
+    # Output the results in JSON format if certificates were found
     if ($certInfoList) {
-        $certInfoList | ConvertTo-Json
+        $certInfoList | ConvertTo-Json -Depth 10
+    } else {
+        # Write a warning if no certificates were found in the specified store
+        Write-Warning "No certificates were found in the store '$StoreName'."
     }
 }
 
-function Get-KFIISBoundCertificates
-{
-    # Import the WebAdministration module
+function Get-KFIISBoundCertificates {
+    # Import the IISAdministration module
     Import-Module IISAdministration
-    #Import-Module WebAdministration
 
     # Get all websites
-    #$websites = Get-Website
     $websites = Get-IISSite
 
-    Write-Information "There were ${websites}.count found"
+    # Write the count of websites found
+    Write-Information "There were $($websites.Count) websites found."
 
     # Initialize an array to store the results
     $certificates = @()
 
+    # Initialize a counter for the total number of bindings with certificates
+    $totalBoundCertificates = 0
+
     foreach ($site in $websites) {
         # Get the site name
         $siteName = $site.name
-        
+
         # Get the bindings for the site
-        #$bindings = Get-WebBinding -Name $siteName
         $bindings = Get-IISSiteBinding -Name $siteName
-        
+
+        # Initialize a counter for bindings with certificates for the current site
+        $siteBoundCertificateCount = 0
+
         foreach ($binding in $bindings) {
             # Check if the binding has an SSL certificate
-            if ($binding.protocol -eq 'https') {
+            if ($binding.protocol -eq 'https' -and $binding.RawAttributes.certificateHash) {
                 # Get the certificate hash
-                #$certHash = $binding.certificateHash
                 $certHash = $binding.RawAttributes.certificateHash
-                
+
                 # Get the certificate store
                 $StoreName = $binding.certificateStoreName
-                
-                # Get the certificate details from the certificate store
-                $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName\$certHash"
 
-                $certBase64 = [Convert]::ToBase64String($cert.RawData)
+                try {
+                    # Get the certificate details from the certificate store
+                    $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName\$certHash"
 
-                # Create a custom object to store the results
-                $certInfo = [PSCustomObject]@{
-                    SiteName       = $siteName
-                    Binding        = $binding.bindingInformation
-                    IPAddress      = ($binding.bindingInformation -split ":")[0]
-                    Port           = ($binding.bindingInformation -split ":")[1]
-                    Hostname       = ($binding.bindingInformation -split ":")[2]
-                    Protocol       = $binding.protocol
-                    SNI            = $binding.sslFlags -eq 1
-                    ProviderName   = Get-CertificateCSP $cert
-                    SAN            = Get-KFSAN $cert
-                    Certificate    = $cert.Subject
-                    ExpiryDate     = $cert.NotAfter
-                    Issuer         = $cert.Issuer
-                    Thumbprint     = $cert.Thumbprint
-                    HasPrivateKey  = $cert.HasPrivateKey
-                    CertificateBase64 = $certBase64
+                    # Convert certificate data to Base64
+                    $certBase64 = [Convert]::ToBase64String($cert.RawData)
+
+                    # Create a custom object to store the results
+                    $certInfo = [PSCustomObject]@{
+                        SiteName           = $siteName
+                        Binding            = $binding.bindingInformation
+                        IPAddress          = ($binding.bindingInformation -split ":")[0]
+                        Port               = ($binding.bindingInformation -split ":")[1]
+                        Hostname           = ($binding.bindingInformation -split ":")[2]
+                        Protocol           = $binding.protocol
+                        SNI                = $binding.sslFlags -eq 1
+                        ProviderName       = Get-CertificateCSP $cert
+                        SAN                = Get-KFSAN $cert
+                        Certificate        = $cert.Subject
+                        ExpiryDate         = $cert.NotAfter
+                        Issuer             = $cert.Issuer
+                        Thumbprint         = $cert.Thumbprint
+                        HasPrivateKey      = $cert.HasPrivateKey
+                        CertificateBase64  = $certBase64
+                    }
+
+                    # Add the certificate information to the array
+                    $certificates += $certInfo
+
+                    # Increment the counters
+                    $siteBoundCertificateCount++
+                    $totalBoundCertificates++
+                } catch {
+                    Write-Warning "Could not retrieve certificate details for hash $certHash in store $StoreName."
                 }
-                
-                # Add the certificate information to the array
-                $certificates += $certInfo
             }
         }
+
+        # Write the count of bindings with certificates for the current site
+        Write-Information "Website: $siteName has $siteBoundCertificateCount bindings with certificates."
     }
 
-    # Output the results
-    if ($certificates) {
+    # Write the total count of bindings with certificates
+    Write-Information "A total of $totalBoundCertificates bindings with valid certificates were found."
+
+    # Output the results in JSON format or indicate no certificates found
+    if ($totalBoundCertificates -gt 0) {
         $certificates | ConvertTo-Json
+    } else {
+        Write-Information "No valid certificates were found bound to websites."
     }
- 
 }
+
 
 function Add-KFCertificateToStore
 {
@@ -172,7 +208,7 @@ function Add-KFCertificateToStore
                 # Retrieve the certificate thumbprint from the store
                 $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName" | Sort-Object -Property NotAfter -Descending | Select-Object -First 1
                 if ($cert) {
-                    $thumbprint = $cert.Thumbprint
+                    $output = $cert.Thumbprint
                     Write-Output "Certificate imported successfully. Thumbprint: $thumbprint"
                 }
                 else {
@@ -191,7 +227,7 @@ function Add-KFCertificateToStore
             }
 
             # Output the final result
-            $output
+            return $output
 
         } else {
             $bytes = [System.Convert]::FromBase64String($Base64Cert)
@@ -227,6 +263,9 @@ function Remove-KFCertificateFromStore
         [switch]$IsAlias
     )
 
+    # Initialize a variable to track success
+    $isSuccessful = $false
+
     try {
         # Open the certificate store
         $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($StorePath, [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine)
@@ -244,16 +283,30 @@ function Remove-KFCertificateFromStore
             Write-Information "Attempting to remove certificate from store '$StorePath' with the thumbprint: $Thumbprint"
             $store.Remove($cert)
             Write-Information "Certificate removed successfully from store '$StorePath'"
+
+            # Mark success
+            $isSuccessful = $true
         } else {
-            Write-Error "Certificate not found in $StorePath."
+            throw [System.Exception]::new("Certificate not found in $StorePath.")
         }
 
         # Close the store
         $store.Close()
     } catch {
+        # Log and rethrow the exception
         Write-Error "An error occurred: $_"
+        throw $_
+    } finally {
+        # Ensure the store is closed
+        if ($store) {
+            $store.Close()
+        }
     }
+
+    # Return the success status
+    return $isSuccessful
 }
+
 
 function New-KFIISSiteBinding
 {
