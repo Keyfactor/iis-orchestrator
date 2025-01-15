@@ -479,9 +479,6 @@
                     },
                     "StorePathValue": "My",
                     "PrivateKeyAllowed": "Optional",
-                    "JobProperties": [
-                        "InstanceName"
-                    ],
                     "ServerRequired": true,
                     "PowerShell": false,
                     "BlueprintAllowed": true,
