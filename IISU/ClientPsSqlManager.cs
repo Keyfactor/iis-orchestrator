@@ -231,17 +231,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return $"HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\{GetSqlInstanceValue(instanceName,ps)}\\MSSQLServer\\SuperSocketNetLib\\";
         }
 
-        public string GetSqlServerServiceName(string instanceValue)
+        public string GetSqlServerServiceName(string instanceName)
         {
-            if(string.IsNullOrEmpty(instanceValue))
+            if(string.IsNullOrEmpty(instanceName))
                 return string.Empty;
 
             //Default SQL Instance has this format
-            if (instanceValue.Split('.')[1] == "MSSQLSERVER")
+            if (instanceName == "MSSQLSERVER")
                 return "MSSQLSERVER";
 
             //Named Instance service has this format
-            return $"MSSQL`${instanceValue.Split('.')[1]}";
+            return $"MSSQL`${instanceName}";
         }
 
         public JobResult BindCertificates(string renewalThumbprint, X509Certificate2 x509Cert)
@@ -344,9 +344,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         _logger.LogTrace(cmd.CommandText);
                     }
 
-                    _logger.LogTrace($"funcScript {funcScript}");
                     ps.AddScript(funcScript);
-                    _logger.LogTrace("funcScript added...");
+                    _logger.LogTrace($"Running script: {funcScript}");
                     ps.Invoke();
                     _logger.LogTrace("funcScript Invoked...");
 
@@ -354,16 +353,21 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     ps.Commands.Clear();
 
                     //Get the SqlServer Service User Name
-                    var serviceName = GetSqlServerServiceName(GetSqlInstanceValue(instanceName, ps));
-                    funcScript = @$"(Get-WmiObject Win32_Service -Filter ""Name='{serviceName}'"").StartName";
-                    ps.AddScript(funcScript);
-                    _logger.LogTrace("funcScript added...");
-                    SqlServiceUser = ps.Invoke()[0].ToString();
-                    _logger.LogTrace("funcScript Invoked...");
-                    _logger.LogTrace("Got service login user for ACL Permissions");
-                    ps.Commands.Clear();
+                    var serviceName = GetSqlServerServiceName(instanceName);
+                    if (serviceName != "")
+                    {
+                        _logger.LogTrace($"Service Name: {serviceName} was returned.");
 
-                    funcScript = $@"$thumbprint = '{thumbPrint}'
+                        funcScript = @$"(Get-WmiObject Win32_Service -Filter ""Name='{serviceName}'"").StartName";
+                        ps.AddScript(funcScript);
+                        _logger.LogTrace($"Running script: {funcScript}");
+                        SqlServiceUser = ps.Invoke()[0].ToString();
+
+                        _logger.LogTrace($"SqlServiceUser: {SqlServiceUser}");
+                        _logger.LogTrace("Got service login user for ACL Permissions");
+                        ps.Commands.Clear();
+
+                        funcScript = $@"$thumbprint = '{thumbPrint}'
                     $Cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {{ $_.Thumbprint -eq $thumbprint }}
                     $privKey = $Cert.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName 
                     $keyPath = ""$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\""
@@ -373,9 +377,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     $Acl.SetAccessRule($Ar)
                     Set-Acl $privKeyPath.FullName $Acl";
 
-                    ps.AddScript(funcScript);
-                    ps.Invoke();
-                    _logger.LogTrace("ACL FuncScript Invoked...");
+                        ps.AddScript(funcScript);
+                        ps.Invoke();
+                        _logger.LogTrace("ACL FuncScript Invoked...");
+
+                    }
+                    else 
+                    {
+                        _logger.LogTrace("No Service User has been returned.  Skipping ACL update.");
+                    }
 
                     //If user filled in a service name in the store then restart the SQL Server Services
                     if (RestartService)
