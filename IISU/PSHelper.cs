@@ -27,6 +27,8 @@ using System.Management.Automation;
 using System.Management.Automation.Remoting;
 using System.Management.Automation.Runspaces;
 using System.Net;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Xml.Serialization;
 
@@ -101,6 +103,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         public void Initialize()
         {
             _logger.LogTrace("Entered PSHelper.Initialize()");
+
             PS = PowerShell.Create();
 
             // Add listeners to raise events
@@ -136,30 +139,35 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 try
                 {
-                    tempKeyFilePath = Path.GetTempFileName();
-                    _logger.LogTrace($"Created temporary KeyFilePath: {tempKeyFilePath}");
-
-                    File.WriteAllText(tempKeyFilePath, serverPassword);
-                    File.SetAttributes(tempKeyFilePath, FileAttributes.ReadOnly);
-
-                    PS.AddCommand("New-PSSession")
-                        .AddParameter("HostName", ClientMachineName)
-                        .AddParameter("UserName", serverUserName);
-
-                    // TODO: THIS IS FOR TESTING ONLY <REMOVE THIS AFTER TESTING>
-                    if (serverPassword != null)
-                    {
-                        // TODO:  Need to write out to file and pass file name.  For right now, the password is the filename.
-                        _logger.LogTrace($"Current KeyFilePath: {tempKeyFilePath}");
-                        PS.AddParameter("KeyFilePath", tempKeyFilePath);
-                    }
-
+                    _logger.LogInformation("Attempting to create a temporary key file");
+                    tempKeyFilePath = createPrivateKeyFile();
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
                     throw new Exception("Error while creating temporary KeyFilePath.");
                 }
+
+
+                Hashtable options = new Hashtable
+                {
+                    { "StrictHostKeyChecking", "No" },
+                    { "UserKnownHostsFile", "/dev/null" }
+                };
+
+                PS.AddCommand("New-PSSession")
+                    .AddParameter("Options", options)
+                    .AddParameter("HostName", ClientMachineName)
+                    .AddParameter("UserName", serverUserName);
+
+                // TODO: THIS IS FOR TESTING ONLY <REMOVE THIS AFTER TESTING>
+                if (serverPassword != null)
+                {
+                    // TODO:  Need to write out to file and pass file name.  For right now, the password is the filename.
+                    _logger.LogTrace($"Current KeyFilePath: {tempKeyFilePath}");
+                    PS.AddParameter("KeyFilePath", tempKeyFilePath);
+                }
+
             }
             else
             {
@@ -182,18 +190,25 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
             _PSSession = PS.Invoke();
-            _logger.LogTrace("Session Invoked...Checking for errors.");
-            CheckErrors();
 
-            PS.Commands.Clear();
-            _logger.LogTrace("PS-Session established");
+            if (_PSSession.Count > 0)
+            {
+                _logger.LogTrace("Session Invoked...Checking for errors.");
+                PS.Commands.Clear();
+                _logger.LogTrace("PS-Session established");
 
-            PS.AddCommand("Invoke-Command")
-                .AddParameter("Session", _PSSession)
-                .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript(scriptFileLocation)));
+                PS.AddCommand("Invoke-Command")
+                    .AddParameter("Session", _PSSession)
+                    .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript(scriptFileLocation)));
 
-            var results = PS.Invoke();
-            CheckErrors();
+                var results = PS.Invoke();
+                CheckErrors();
+            }
+            else
+            {
+                throw new Exception("Failed to create the remote PowerShell Session.");
+            }
+
         }
 
         private void InitializeLocalSession()
@@ -224,9 +239,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         public void Terminate()
         {
             PS.Commands.Clear();
-            if (_PSSession.Count > 0)
+            if (PS != null)
             {
-                PS.AddCommand("Remove-Session").AddParameter("Session", _PSSession);
+                PS.AddCommand("Remove-PSSession").AddParameter("Session", _PSSession);
                 PS.Invoke();
                 CheckErrors();
             }
@@ -235,7 +250,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             {
                 try
                 {
-                    //File.Delete(tempKeyFilePath);
+                    File.Delete(tempKeyFilePath);
                     _logger.LogTrace($"Temporary KeyFilePath deleted: {tempKeyFilePath}");
                 }
                 catch (Exception)
@@ -262,14 +277,104 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public Collection<PSObject>? ExecutePowerShell(string commandName, Dictionary<string, object>? parameters = null)
         {
+            using (PowerShell PS = PowerShell.Create())
+            {
+                try
+                {
+                    string scriptBlock;
+
+                    if (parameters != null && parameters.Count > 0)
+                    {
+                        _logger.LogTrace("Creating script block with parameters.");
+                        string paramBlock = string.Join(", ", parameters.Select(p => $"[{p.Value.GetType().Name}] ${p.Key}"));
+                        string paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
+
+                        scriptBlock = $@"
+                    param({paramBlock})
+                    {commandName} {paramUsage}
+                ";
+                    }
+                    else
+                    {
+                        _logger.LogTrace("Creating script block with no parameters.");
+                        scriptBlock = commandName;
+                    }
+
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock));
+
+                    if (!isLocalMachine)
+                    {
+                        PS.AddParameter("Session", _PSSession);
+                    }
+
+                    if (parameters != null && parameters.Count > 0)
+                    {
+                        PS.AddParameter("ArgumentList", parameters.Values.ToArray());
+                    }
+
+                    _logger.LogTrace($"Executing script block:\n{scriptBlock}");
+
+                    var results = PS.Invoke();
+
+                    if (PS.HadErrors)
+                    {
+                        string errorMessages = string.Join("; ", PS.Streams.Error.Select(e => e.ToString()));
+                        _logger.LogError($"{errorMessages}");
+                        throw new Exception($"PowerShell execution errors: {errorMessages}");
+                    }
+
+                    return results;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error while executing script: {ex.Message}");
+                    throw new Exception($"An error occurred while attempting to execute the PowerShell script: {ex.Message}.");
+                }
+                finally
+                {
+                    PS.Commands.Clear();
+                }
+            }
+        }
+
+
+        public Collection<PSObject>? ExecutePowerShellV2(string commandName, Dictionary<string, object>? parameters = null)
+        {
             try
             {
                 if (!isLocalMachine)
                 {
+                    string scriptBlock;
+
+                    if (parameters != null && parameters.Count > 0)
+                    {
+                        _logger.LogTrace("Creating script block with parameters.");
+                        string paramBlock = string.Join(", ", parameters.Keys.Select(key => $"[{parameters[key].GetType().Name}] ${key}"));
+                        string paramUsage = string.Join(" ", parameters.Keys.Select(key => $"-{key} ${key}"));
+
+                        scriptBlock = $@"
+                            param({paramBlock})
+                            {commandName} {paramUsage}
+                        ";
+                        }
+                    else
+                    {
+                        _logger.LogTrace("Creating script block with no parameters.");
+                        scriptBlock = $@"
+                            {commandName}
+                        ";
+                    }
+
+
                     PS.AddCommand("Invoke-Command")
                         .AddParameter("Session", _PSSession) // send session only when necessary (remote)
-                        .AddParameter("ScriptBlock", ScriptBlock.Create(commandName))
-                        .AddParameter("ArgumentList", parameters?.Values.ToArray());
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(commandName));
+
+                    if (parameters != null && parameters.Count > 0)
+                    {
+                        PS.AddParameter("ArgumentList", parameters.Values.ToArray());
+                    }
                 }
                 else
                 {
@@ -346,6 +451,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private void CheckErrors()
         {
+            _logger.LogTrace("Checking PowerShell session for errors.");
+
             string errorList = string.Empty;
             if (PS.HadErrors)
             {
@@ -577,6 +684,79 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return false;
         }
 
+        private string createPrivateKeyFile()
+        {
+            string tmpFile = Path.GetTempFileName();  // "logs/AdminFile";
+            _logger.LogTrace($"Created temporary KeyFilePath: {tmpFile}, writing bytes.");
+
+            File.WriteAllText(tmpFile, formatPrivateKey(serverPassword));
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                _logger.LogTrace($"Changing permissions on Windows temp file: {tmpFile}.");
+                File.SetAttributes(tmpFile, FileAttributes.ReadOnly);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                ProcessStartInfo chmodInfo = new ProcessStartInfo()
+                {
+                    FileName = "/bin/chmod",
+                    Arguments = "600 " + tmpFile,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (Process chmodProcess = new Process() { StartInfo = chmodInfo })
+                {
+                    chmodProcess.Start();
+                    chmodProcess.WaitForExit();
+                    if (chmodProcess.ExitCode == 0)
+                    {
+                        _logger.LogInformation("File permissions set to 600.");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to set file permissions.");
+                    }
+                }
+            }
+
+            return tmpFile;
+        }
+
+        private static string formatPrivateKey(string privateKey)
+        {
+            String keyType = privateKey.Contains("OPENSSH PRIVATE KEY") ? "OPENSSH" : "RSA";
+
+            return privateKey.Replace($" {keyType} PRIVATE ", "^^^").Replace(" ", System.Environment.NewLine).Replace("^^^", $" {keyType} PRIVATE ") + System.Environment.NewLine;
+        }
+
+        //private string formatPrivateKey(string privateKey)
+        //{
+        //    // Identify the markers in the private key
+        //    string beginMarker = "-----BEGIN OPENSSH PRIVATE KEY-----";
+        //    string endMarker = "-----END OPENSSH PRIVATE KEY-----";
+
+        //    // Locate the positions of the markers
+        //    int beginIndex = privateKey.IndexOf(beginMarker);
+        //    int endIndex = privateKey.IndexOf(endMarker);
+
+        //    // Split the string into three parts: before, key content, and after
+        //    string beforeKey = privateKey.Substring(0, beginIndex + beginMarker.Length);
+        //    string keyContent = privateKey.Substring(beginIndex + beginMarker.Length, endIndex - beginIndex - beginMarker.Length);
+        //    string afterKey = privateKey.Substring(endIndex);
+
+        //    // Replace spaces with actual carriage return and line feed in key content
+        //    keyContent = keyContent.Replace(" ", "\r\n");
+
+        //    // Construct the final string with the correctly formatted key
+        //    string replacedFile = beforeKey + keyContent + afterKey + "\r\n";
+
+        //    // Log the modified string
+        //    _logger.LogTrace(replacedFile);
+
+        //    return replacedFile;
+        //}
 
     }
 }

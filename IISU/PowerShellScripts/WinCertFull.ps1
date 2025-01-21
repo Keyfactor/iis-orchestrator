@@ -163,6 +163,11 @@ function Add-KFCertificateToStore
 
     try {
 
+        Write-Information "Base64Cert: $Base64Cert"
+        Write-Information "PrivateKeyPassword: $PrivateKeyPassword"
+        Write-Information "StoreName: $StoreName"
+        Write-Information "CryptoServiceProvider: $CryptoServiceProvider"
+
         $thumbprint = $null
 
         if ($CryptoServiceProvider) 
@@ -821,8 +826,8 @@ $sanContent
 
         # Check the exit code of the command
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "Certreq failed with exit code $LASTEXITCODE. Output: $certReqOutput"
-            throw "Failed to create CSR file due to certreq error."
+            $errMsg = "Certreq failed with exit code $LASTEXITCODE. Output: $certReqOutput"
+            throw $errMsg
         }
 
         # If successful, proceed
@@ -837,7 +842,7 @@ $sanContent
             throw "Failed to create CSR file."
         }
     } catch {
-        Write-Error "An error occurred: $_"
+        Write-Error $_
     } finally {
         # Clean up temporary files
         if (Test-Path $infFile) {
