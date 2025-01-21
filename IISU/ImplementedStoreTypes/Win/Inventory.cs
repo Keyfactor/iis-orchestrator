@@ -128,7 +128,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 {
                     { "StoreName", StoreName }
                 };
-                
+
                 results = ps.ExecutePowerShell("Get-KFCertificates", parameters);
 
                 // If there are certificates, deserialize the results and send them back to command
@@ -148,7 +148,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                         Inventory.Add(
                             new CurrentInventoryItem
                             {
-                                Certificates = new[] { cert.Base64Data},
+                                Certificates = new[] { cert.Base64Data },
                                 Alias = cert.Thumbprint,
                                 PrivateKeyEntry = cert.HasPrivateKey,
                                 UseChainLevel = false,

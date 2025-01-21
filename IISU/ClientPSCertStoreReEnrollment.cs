@@ -89,7 +89,27 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 using (_psHelper)
                 {
                     // First create and return the CSR
-                    var csr = CreateCSR(subjectText, providerName, keyType, keySize, SAN);
+                    _logger.LogTrace($"Subject Text: {subjectText}");
+                    _logger.LogTrace($"Provider Name: {providerName}");
+                    _logger.LogTrace($"Key Type: {keyType}");
+                    _logger.LogTrace($"Key Size: {keySize}");
+                    _logger.LogTrace($"SAN: {SAN}");
+
+                    string csr = string.Empty;
+
+                    try
+                    {
+                        _logger.LogTrace("Attempting to Create CSR");
+                        csr = CreateCSR(subjectText, providerName, keyType, keySize, SAN);
+                        _logger.LogTrace("Returned from creating CSR");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"Error while attempting to create the CSR: {ex.Message}");
+                        throw new Exception("Unable to create the CSR file.  Check the Orchestrator Logs for more information");
+                    }
+
+                    _logger.LogTrace($"CSR Contents: '{csr}'");
 
                     if (csr != string.Empty)
                     {
@@ -158,10 +178,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 };
             }
             finally
-            { 
-                _psHelper.Terminate(); 
+            {
+                if (_psHelper != null)
+                {
+                    _psHelper.Terminate();
+                }
             }
-
         }
 
         private string CreateCSR(string subjectText, string providerName, string keyType, int keySize, string SAN)
@@ -183,9 +205,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     { "keyLength", keySize },
                     { "SAN", SAN }
                 };
-                _logger.LogTrace("Attempting to execute PS function (New-CsrEnrollment)");
+                _logger.LogInformation("Attempting to execute PS function (New-CsrEnrollment)");
                 _results = _psHelper.ExecutePowerShell("New-CsrEnrollment", parameters);
-                _logger.LogTrace("Returned from executing PS function (New-CsrEnrollment)");
+                _logger.LogInformation("Returned from executing PS function (New-CsrEnrollment)");
 
                 // This should return the CSR that was generated
                 if (_results == null || _results.Count == 0)
