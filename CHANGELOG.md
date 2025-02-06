@@ -1,3 +1,7 @@
+2.5.2
+* fix a naming typo in the 2.5 migration SQL script
+* remove a field from the integration-manifest.json
+
 2.5.1
 * Fixed WinSQL service name when InstanceID differs from InstanceName
 
