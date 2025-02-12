@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// 021225 rcp   Updated and cleaned up unnecessary code
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
