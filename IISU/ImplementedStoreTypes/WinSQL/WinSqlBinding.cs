@@ -27,61 +27,80 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
         public static bool BindSQLCertificate(PSHelper psHelper, string SQLInstanceNames, string newThumbprint, string renewalThumbprint, string storePath, bool restartSQLService)
         {
-            bool hadError = false;
-            var instances = SQLInstanceNames.Split(",");
+            _logger = LogHandler.GetClassLogger<Management>();
+            _logger.MethodEntry();
 
-            foreach (var instanceName in instances)
+            try
             {
                 var parameters = new Dictionary<string, object>
                 {
-                    { "Thumbprint", newThumbprint.ToLower() },
-                    { "SqlInstanceName", instanceName.Trim() },
-                    { "StoreName", storePath },
-                    { "RestartService", restartSQLService }
+                    { "SQLInstance", SQLInstanceNames },
+                    { "RenewalThumbprint", renewalThumbprint.ToLower() },
+                    { "NewThumbprint", newThumbprint.ToLower() }
                 };
 
-                try
+                if (restartSQLService)
                 {
-                    _results = psHelper.ExecutePowerShell("Bind-CertificateToSqlInstance", parameters);
-                    _logger.LogTrace("Return from executing PS function (Bind-CertificateToSqlInstance)");
+                    parameters["RestartService"] = restartSQLService;
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
-                    hadError = true;
-                }
-            }
 
-            if (hadError) return false;
-            else return true;
+                _results = psHelper.ExecutePowerShell("Bind-KFSqlCertificate", parameters);
+                if (_results != null && _results.Count > 0)
+                {
+                    // Extract value from PSObject and convert to bool
+                    if (bool.TryParse(_results[0]?.BaseObject?.ToString(), out bool result))
+                    {
+                        _logger.LogTrace($"PowerShell function Bind-KFSqlCertificate returned: {result}");
+                        return result;
+                    }
+                }
+
+                _logger.LogWarning("PowerShell function Bind-KFSqlCertificate did not return a valid boolean result.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing PowerShell function: Bind-KFSqlCertificate");
+                return false;
+            }
         }
 
-        public static bool UnBindSQLCertificate(PSHelper psHelper, string SQLInstanceNames)
+        public static bool UnBindSQLCertificate(PSHelper psHelper, string SQLInstanceNames, bool restartSQLService)
         {
-            bool hadError = false;
-            var instances = SQLInstanceNames.Split(",");
+            _logger = LogHandler.GetClassLogger<Management>();
+            _logger.MethodEntry();
 
-            foreach (var instanceName in instances)
+            _logger.LogTrace("Entered method UnBindSQLCertificate");
+            try
             {
                 var parameters = new Dictionary<string, object>
                 {
-                    { "SqlInstanceName", instanceName.Trim() }
+                    { "SQLInstanceNames", SQLInstanceNames.Trim() } // Send full list at once
                 };
 
-                try
+                if (restartSQLService)
                 {
-                    _results = psHelper.ExecutePowerShell("UnBind-KFSqlServerCertificate", parameters);
-                    _logger.LogTrace("Returned from executing PS function (UnBind-KFSqlServerCertificate)");
+                    parameters["RestartService"] = restartSQLService;
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
-                    hadError = true;
-                }
-            }
 
-            if (hadError) return false;
-            else return true;
+                _results = psHelper.ExecutePowerShell("Unbind-KFSqlCertificate", parameters);
+                if (_results != null && _results.Count > 0)
+                {
+                    if (bool.TryParse(_results[0]?.BaseObject?.ToString(), out bool result))
+                    {
+                        _logger.LogTrace($"PowerShell function Unbind-KFSqlCertificate returned: {result}");
+                        return result;
+                    }
+                }
+
+                _logger.LogWarning("PowerShell function Unbind-KFSqlCertificate did not return a valid boolean result.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while unbinding certificate(s) from SQL instance(s)");
+                return false;
+            }
         }
     }
 }

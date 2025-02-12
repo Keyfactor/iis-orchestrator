@@ -144,9 +144,7 @@ function Get-KFIISBoundCertificates {
     }
 }
 
-
-function Add-KFCertificateToStore
-{
+function Add-KFCertificateToStore{
     param (
         [Parameter(Mandatory = $true)]
         [string]$Base64Cert,
@@ -258,8 +256,7 @@ function Add-KFCertificateToStore
     }
 }
 
-function Remove-KFCertificateFromStore 
-{
+function Remove-KFCertificateFromStore {
     param (
         [string]$Thumbprint,
         [string]$StorePath,
@@ -312,9 +309,106 @@ function Remove-KFCertificateFromStore
     return $isSuccessful
 }
 
+function New-KFIISSiteBinding{
+    param (
+        [Parameter(Mandatory = $True)]   $SiteName,        # The name of the IIS site
+        [Parameter(Mandatory = $True)]   $IPAddress,       # The IP Address for the binding
+        [Parameter(Mandatory = $True)]   $Port,            # The port number for the binding
+        [Parameter(Mandatory = $False)]  $Hostname,        # Host name for the binding (if any)
+        [Parameter(Mandatory = $True)]   $Protocol,        # Protocol (e.g., HTTP, HTTPS)
+        [Parameter(Mandatory = $True)]   $Thumbprint,      # Certificate thumbprint for HTTPS bindings
+        [Parameter(Mandatory = $True)]   $StoreName,       # Certificate store location (e.g., ""My"" for personal certs)
+        [Parameter(Mandatory = $True)]   $SslFlags         # SSL flags (if any)
+    )
 
-function New-KFIISSiteBinding
-{
+    Write-Debug "Attempting to import modules WebAdministration and IISAdministration"
+    try {
+        Import-Module WebAdministration -ErrorAction Stop
+    }
+    catch {
+        throw "Failed to load the WebAdministration module. Ensure it is installed and available."
+    }
+
+    # Check if the IISAdministration module is already loaded
+    if (-not (Get-Module -Name IISAdministration )) {
+        try {
+            # Attempt to import the IISAdministration module
+            Import-Module IISAdministration -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to load the IISAdministration module. This function requires IIS Develpment and SCripting tools.  Please ensure these tools have been installed on the IIS Server."
+        }
+    }
+        
+    Write-Debug "Finished importing required modules"
+    
+    Write-Verbose "INFO:  Entered New-KFIISSiteBinding."
+    Write-Verbose "SiteName: $SiteName"
+    Write-Verbose "IPAddress: $IPAddress"
+    Write-Verbose "Port: $Port"
+    Write-Verbose "HostName: $HostName"
+    Write-Verbose "Protocol: $Protocol"
+    Write-Verbose "Thumbprint:  $Thumbprint"
+    Write-Verbose "Store Path: $StoreName"
+    Write-Verbose "SslFlags: $SslFlags"
+
+    # Retrieve the existing binding information
+    $myBinding = "${IPAddress}:${Port}:${Hostname}"  #*:443:MyHostName1   :   *:443:ManualHostName
+    Write-Verbose "Formatted binding information: $myBinding"
+
+    # Check if the binding exists (NOTE: Bindings always occurr using https)
+    try {
+        Write-Verbose "Attempting to get binding information for Site: '$SiteName' with bindings: $myBinding"
+        $existingBinding = Get-IISSiteBinding -Name $SiteName -Protocol $Protocol        
+    }
+    catch {
+        Write-Verbose "Error occurred while attempting to get the bindings for: '$SiteName'"
+        Write-Verbose $_
+        throw $_
+    }
+
+    if ($null -ne $existingBinding) {
+        Write-Verbose "A binding for: $myBinding was found."
+
+        $currentThumbprint = ($existingBinding.CertificateHash | ForEach-Object { $_.ToString("X2") }) -join ""
+        if ($thumbprint -eq $currentThumbprint)
+        {
+            Write-Verbose "The existing binding's thumbprint matches the new thumbprint - skipping."
+            Write-Information "The thumbprint for this binding is the same as the new one."
+            Write-Information "Since they are the same thumbprint, thins binding will be skipped."
+            return
+        }
+        Write-Verbose "Current thumbprint: $currentThumbprint"
+        Write-Verbose "Will remove the existing binding prior to replacing it with new thumbprint."
+        
+        # Remove the existing binding
+        Remove-IISSiteBinding -Name $SiteName -BindingInformation $existingBinding.BindingInformation -Protocol $existingBinding.Protocol -Confirm:$false
+        Write-Verbose "Removed existing binding: $($existingBinding.BindingInformation)"
+    }else{
+        Write-Verbose "No binding was found for: $myBinding."
+    }
+
+    # Create the new binding with modified properties
+    try
+    {
+        Write-Verbose "Attempting to add IISSiteBinding"
+        New-IISSiteBinding -Name $SiteName `
+            -BindingInformation $myBinding `
+            -Protocol $Protocol `
+            -CertificateThumbprint $Thumbprint `
+            -CertStoreLocation $StoreName `
+            -SslFlag $SslFlags
+
+        Write-Verbose "New Site Binding for '$SiteName' has been created with bindings: $myBinding and thumbprint: $thumbprint."
+    }
+    catch {
+        throw $_
+    };
+
+    return $True
+}
+
+function New-KFIISSiteBindingOLD{
     param (
         [Parameter(Mandatory = $true)]
         [string]$Thumbprint,
@@ -344,6 +438,7 @@ function New-KFIISSiteBinding
 
     Write-Information "Attempting to load WebAdministration"
     Import-Module WebAdministration -ErrorAction Stop
+
     Write-Information "Web Administration module has been loaded and will be used"
 
     try {
@@ -384,8 +479,64 @@ function New-KFIISSiteBinding
     }
 }
 
-function Remove-KFIISBinding 
-{
+function Remove-KFIISSiteBinding{
+    param (
+        [Parameter(Mandatory=$true)]    $SiteName,        # The name of the IIS website
+        [Parameter(Mandatory=$true)]    $IPAddress,       # The IP address of the binding
+        [Parameter(Mandatory=$true)]    $Port,            # The port number (e.g., 443 for HTTPS)
+        [Parameter(Mandatory=$false)]   $Hostname         # The hostname (empty string for binding without hostname)
+    )
+
+    Write-Debug "Attempting to import modules WebAdministration and IISAdministration"
+    try {
+        Import-Module WebAdministration -ErrorAction Stop
+    }
+    catch {
+        throw "Failed to load the WebAdministration module. Ensure it is installed and available."
+    }
+ 
+    # Check if the IISAdministration module is already loaded
+    if (-not (Get-Module -Name IISAdministration )) {
+        try {
+            # Attempt to import the IISAdministration module
+            Import-Module IISAdministration -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to load the IISAdministration module. This function requires IIS Develpment and SCripting tools.  Please ensure these tools have been installed on the IIS Server."
+        }
+    }
+        
+    Write-Debug "Finished importing required modules"
+
+    try {
+        # Construct the binding information string correctly
+        $bindingInfo = if ($HostName) { "$IPAddress`:$Port`:$HostName" } else { "$IPAddress`:$Port`:" }
+        Write-Verbose "Checking for existing binding: $bindingInfo"
+
+        # Get the existing binding based on the constructed binding information
+        $bindings = Get-IISSiteBinding -Name $SiteName -Protocol "https" | Where-Object { $_.BindingInformation -eq $bindingInfo }
+
+        if ($bindings) {
+            Write-Verbose "Found binding: $bindingInfo for site: '$SiteName'. Removing..."
+            
+            # Remove the binding
+            Remove-IISSiteBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol "https" -Confirm:$false
+            
+            Write-Verbose "Successfully removed binding: $bindingInfo"
+            return $true
+        }else{
+            Write-Verbose "No binding was found for: $bindingInfo."
+            return $false
+        }
+
+    } catch {
+        Write-Error "An error occurred while attempting to remove bindings for site: $SiteName"
+        Write-Error $_
+        throw $_
+    }
+}
+
+function Remove-KFIISBindingOLD{
     param (
         [Parameter(Mandatory=$true)]
         [string]$SiteName,        # The name of the IIS website
@@ -508,9 +659,82 @@ function GET-KFSQLInventory {
     return $myBoundCerts  | ConvertTo-Json
 }
 
+function Set-SQLCertificateAclOLD {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Thumbprint,
 
-function GET-KFSQLInventoryOLD
-{
+        [Parameter(Mandatory = $true)]
+        [string]$SqlServiceUser
+    )
+
+    Write-Information "Entered Set-SQLCertificateAcl"
+
+    # Get the certificate from the LocalMachine\My store
+    try {
+        $certificate = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { $_.Thumbprint -eq $Thumbprint }
+    } catch {
+        Write-Error "Error retrieving certificate: $_"
+        return
+    }
+
+    if (-not $certificate) {
+        Write-Error "Certificate with thumbprint $Thumbprint not found in LocalMachine\My store."
+        return
+    }
+
+    Write-Information "Obtained the certificate"
+
+    # Retrieve the private key information
+    try {
+        if (-not $certificate.HasPrivateKey) {
+            throw "Certificate does not have a private key."
+        }
+
+        # Use new method to retrieve the private key container name if needed
+        $privKey = $certificate.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
+        if (-not $privKey) {
+            throw "Failed to retrieve private key container name."
+        }
+    } catch {
+        Write-Error "Error retrieving private key: $_"
+        return
+    }
+
+    Write-Information "Private Key: '$privKey'"
+
+    # Determine the key path
+    $keyPath = "$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\"
+    $privKeyPath = "$keyPath$privKey"
+
+    if (-not (Test-Path $privKeyPath)) {
+        Write-Error "Private key file does not exist at path: $privKeyPath"
+        return
+    }
+
+    Write-Information "Private Key Path is: $privKeyPath"
+
+    # Retrieve the current ACL for the private key
+    try {
+        $Acl = Get-Acl -Path $privKeyPath
+        $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule($SqlServiceUser, "Read", "Allow")
+
+        # Add the new access rule
+        Write-Information "Attempting to add new Access Rule"
+        $Acl.SetAccessRule($Ar)
+        Write-Information "Access Rule has been added"
+
+        # Set the new ACL on the private key file
+        Write-Information "Attaching the ACL on the private key file"
+        Set-Acl -Path $privKeyPath -AclObject $Acl
+
+        Write-Output "ACL updated successfully for the private key."
+    } catch {
+        Write-Error "Error updating ACL: $_"
+    }
+}
+
+function GET-KFSQLInventoryOLD{
     # Get all SQL Server instances
     $sqlInstances = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server").InstalledInstances
     Write-Information "There are $sqlInstances.Count instances that will be checked for certificates."
@@ -563,9 +787,7 @@ function GET-KFSQLInventoryOLD
     }
 }
 
-
-
-function Set-SQLCertificateAcl {
+function Set-SQLCertificateAclOLD {
     param (
         [Parameter(Mandatory = $true)]
         [string]$Thumbprint,
@@ -607,47 +829,55 @@ function Set-SQLCertificateAcl {
     Write-Output "ACL updated successfully for the private key."
 }
 
-function Bind-CertificateToSqlInstance {
+function Bind-CertificateToSqlInstanceOLD {
     param (
         [Parameter(Mandatory = $true)]
         [string]$Thumbprint,            # Thumbprint of the certificate to bind
         [Parameter(Mandatory = $true)]
         [string]$SqlInstanceName,       # Name of the SQL Server instance (e.g., 'MSSQLSERVER' or 'SQLInstanceName')
         [string]$StoreName = "My",      # Certificate store name (default is 'My')
-        [ValidateSet("LocalMachine", "CurrentUser")]
-        [string]$StoreLocation = "LocalMachine", # Store location (default is 'LocalMachine')
         [Parameter(Mandatory = $false)]
         [switch]$RestartService         # Optional, restart sql instance if set to true
     )
+    Write-Information "Starting Bind-CertificateToSqlInstance for SQL Instance: $SqlInstanceName"
+    $store = $null
 
     try {
-        Write-Information "Entered Bind-CertificateToSqlInstance"
-
         # Open the certificate store
-        $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($StoreName, [System.Security.Cryptography.X509Certificates.StoreLocation]::$StoreLocation)
+        $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($StoreName, [System.Security.Cryptography.X509Certificates.StoreLocation]::"LocalMachine")
         $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
 
         # Find the certificate by thumbprint
         $certificate = $store.Certificates | Where-Object { $_.Thumbprint -eq $Thumbprint }
-        Write-Information "Obtained Certificate using thumbprint: $Thumbprint"
-
-        if (-not $certificate) {
-            throw "Certificate with thumbprint $Thumbprint not found in store $StoreLocation\$StoreName."
+        if (-not $certificate){
+            throw "Certificate with thumbprint $Thumbprint not found in store LocalMachine\$StoreName"
         }
 
+        Write-Information "Found Certificate using thumbprint: $Thumbprint"
 
         # Get the SQL Full Instance Name
         $fullInstanceName = Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $SqlInstanceName
+        if (-not $fullInstanceName) {
+            throw "Count not retrieve the SQL Full Instance Name for $SqlInstanceName."
+        }
+
         Write-Information "Obtained SQL Full Instance Name: $fullInstanceName"
 
+        #Determine SQL Service name and user
         $SQLServiceName = Get-SQLServiceName $fullInstanceName
-
-        # Update ACL for the private key, giving the SQL service user read access
         $SQLServiceUser = Get-SQLServiceUser $SQLServiceName
+        if (-not $SQLServiceName -or -not $SQLServiceUser) {
+            throw "Failed to determine SQL Server service details."
+        }
+
+        Write-Information "SQL Service Name: $SQLServiceName"
+        Write-Information "SQL Service User: $SQLServiceUser"
+
+        # Update ACL for private key access
         Set-SQLCertificateAcl -Thumbprint $Thumbprint -SQLServiceUser $SQLServiceUser
         Write-Information "Updated ACL For SQL Service User: $SQLServiceUser"
         
-        # Get the SQL Server instance registry path
+        # Locate the SQL Server instance registry path
         $regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\${fullInstanceName}\MSSQLServer\SuperSocketNetLib"
         if (-not (Test-Path $regPath)) {
             throw "Could not find registry path for SQL instance: $fullInstanceName."
@@ -655,14 +885,7 @@ function Bind-CertificateToSqlInstance {
 
         # Set the certificate thumbprint in SQL Server's registry
         Set-ItemProperty -Path $regPath -Name "Certificate" -Value $Thumbprint
-        Write-Information "Certificate thumbprint $Thumbprint successfully bound to SQL Server instance $SqlInstanceName."
-
-        # Close the certificate store
-        $store.Close()
-        Write-Information "Store Closed"
-
-        # Restart SQL Server for changes to take effect
-        Write-Information "Checking if restart has been authorized"
+        Write-Information "Bound certificate to SQL Server instance $SqlInstanceName."
 
         if ($RestartService.IsPresent) {
             Write-Information "Attempting to restart SQL Service Name: $SQLServiceName"
@@ -673,14 +896,225 @@ function Bind-CertificateToSqlInstance {
         }
 
     } catch {
-        Write-Error "An error occurred: $_"
+        Write-Error "SQL Binding error: $_"
+    } finally {
+        if ($store) {
+            # Close the certificate store
+            $store.Close()
+            Write-Information "Closed certificate store."
+        }
     }
+
+}
+
+function Bind-KFSqlCertificate { 
+    param (
+        [string]$SQLInstance,
+        [string]$RenewalThumbprint,
+        [string]$NewThumbprint,
+        [switch]$RestartService = $false
+    )
+
+    function Get-SqlCertRegistryLocation($InstanceName) {
+        return "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$InstanceName\MSSQLServer\SuperSocketNetLib"
+    }
+
+    $bindingSuccess = $true  # Track success/failure
+
+    try {
+        $SQLInstances = $SQLInstance -split ',' | ForEach-Object { $_.Trim() }
+
+        foreach ($instance in $SQLInstances) {
+            try {
+                $fullInstance = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $instance -ErrorAction Stop
+                $regLocation = Get-SqlCertRegistryLocation -InstanceName $fullInstance
+
+                if (-not (Test-Path $regLocation)) {
+                    Write-Error "Registry location not found: $regLocation"
+                    $bindingSuccess = $false
+                    continue
+                }
+                Write-Verbose "Instance: $instance"
+                Write-Verbose "Full Instance: $fullInstance"
+                Write-Verbose "Registry Location: $regLocation"
+                Write-Verbose "Current Thumbprint: $currentThumbprint"
+
+                $currentThumbprint = Get-ItemPropertyValue -Path $regLocation -Name "Certificate" -ErrorAction SilentlyContinue
+
+                if ($RenewalThumbprint -and $RenewalThumbprint -contains $currentThumbprint) {
+                    Write-Information "Renewal thumbprint matches for instance: $fullInstance"
+                    $result = Set-KFCertificateBinding -InstanceName $instance -NewThumbprint $NewThumbprint -RestartService:$RestartService
+                } elseif (-not $RenewalThumbprint) {
+                    Write-Information "No renewal thumbprint provided. Binding certificate to instance: $fullInstance"
+                    $result = Set-KFCertificateBinding -InstanceName $instance -NewThumbprint $NewThumbprint -RestartService:$RestartService
+                }
+
+                if (-not $result) {
+                    Write-Error "Failed to bind certificate for instance: $instance"
+                    $bindingSuccess = $false
+                }
+            }
+            catch {
+                Write-Error "Error processing instance '$instance': $($_.Exception.Message)"
+                $bindingSuccess = $false
+            }
+        }
+    } 
+    catch {
+        Write-Error "An unexpected error occurred: $($_.Exception.Message)"
+        return $false
+    }
+
+    return $bindingSuccess
+}
+
+function Set-KFCertificateBinding {
+    param (
+        [string]$InstanceName,
+        [string]$NewThumbprint,
+        [switch]$RestartService
+    )
+
+    Write-Information "Binding certificate with thumbprint $NewThumbprint to instance $InstanceName..."
+
+    try {
+        # Get the full SQL instance name from the registry
+        $fullInstance = Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $InstanceName -ErrorAction Stop
+        $RegistryPath = Get-SqlCertRegistryLocation -InstanceName $fullInstance
+
+        Write-Verbose "Full instance: $fullInstance"
+        Write-Verbose "Registry Path: $RegistryPath"
+
+        # Attempt to update the registry
+        try {
+            Set-ItemProperty -Path $RegistryPath -Name "Certificate" -Value $NewThumbprint -ErrorAction Stop
+            Write-Information "Updated registry for instance $InstanceName with new thumbprint."
+        }
+        catch {
+            Write-Error "Failed to update registry at {$RegistryPath}: $_"
+            throw $_  # Rethrow the error to ensure it's caught at a higher level
+        }
+
+        # Retrieve SQL Server service user
+        $serviceName = Get-SqlServiceName -InstanceName $InstanceName
+        $serviceInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'" -ErrorAction Stop
+        $SqlServiceUser = $serviceInfo.StartName
+
+        if (-not $SqlServiceUser) {
+            throw "Unable to retrieve service account for SQL Server instance: $InstanceName"
+        }
+
+        Write-Verbose "Service Name: $serviceName"
+        Write-Verbose "SQL Service User: $SqlServiceUser"
+        Write-Information "SQL Server service account for ${InstanceName}: $SqlServiceUser"
+
+        # Retrieve the certificate
+        $Cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Thumbprint -eq $NewThumbprint }
+        if (-not $Cert) {
+            throw "Certificate with thumbprint $NewThumbprint not found in LocalMachine\My store."
+        }
+
+        # Retrieve private key path
+        $privKey = $Cert.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
+        $keyPath = "$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\"
+        $privKeyPath = Get-Item "$keyPath\$privKey" -ErrorAction Stop
+        Write-Information "Private Key Path is: $privKeyPath"
+
+        try {
+            # Set ACL for the certificate private key
+            $Acl = Get-Acl -Path $privKeyPath -ErrorAction Stop
+            $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule($SqlServiceUser, "Read", "Allow")
+            $Acl.SetAccessRule($Ar)
+        
+            Set-Acl -Path $privKeyPath.FullName -AclObject $Acl -ErrorAction Stop
+            Write-Information "Updated ACL for private key at $privKeyPath."
+        }
+        catch {
+            Write-Error "Failed to update ACL on the private key: $_"
+            throw $_
+        }
+
+        # Optionally restart the SQL Server service
+        if ($RestartService) {
+            try {
+                Write-Information "Restarting SQL Server service: $serviceName..."
+                Restart-Service -Name $serviceName -Force -ErrorAction Stop
+                Write-Information "SQL Server service restarted successfully."
+            }
+            catch {
+                Write-Error "Failed to restart SQL Server service: $_"
+                throw $_
+            }
+        }
+
+        Write-Information "Certificate binding completed for instance $InstanceName."
+    }
+    catch {
+        Write-Error "An error occurred: $_"
+        return $false
+    }
+
+    return $true
+}
+
+function Unbind-KFSqlCertificate {
+    param (
+        [string]$SQLInstanceNames,   # Comma-separated list of SQL instances
+        [switch]$RestartService      # Restart SQL Server after unbinding
+    )
+
+    $unBindingSuccess = $true  # Track success/failure
+
+    try {
+        
+        $instances = $SQLInstanceNames -split ',' | ForEach-Object { $_.Trim() }
+
+        foreach ($instance in $instances) {
+            try {
+                # Resolve full instance name from registry
+                $fullInstance = Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $instance
+                $regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$fullInstance\MSSQLServer\SuperSocketNetLib"
+
+                # Get current thumbprint
+                $certificateThumbprint = Get-ItemPropertyValue -Path $regPath -Name "Certificate" -ErrorAction SilentlyContinue
+
+                if ($certificateThumbprint) {
+                    Write-Information "Unbinding certificate from SQL Server instance: $instance (Thumbprint: $certificateThumbprint)"
+                
+                    # Instead of deleting, set to an empty string to prevent SQL startup issues
+                    Set-ItemProperty -Path $regPath -Name "Certificate" -Value ""
+
+                    Write-Information "Successfully unbound certificate from SQL Server instance: $instance."
+                } else {
+                    Write-Warning "No certificate bound to SQL Server instance: $instance."
+                }
+
+                # Restart service if required
+                if ($RestartService) {
+                    $serviceName = Get-SqlServiceName -InstanceName $instance
+                    Write-Information "Restarting SQL Server service: $serviceName..."
+                    Restart-Service -Name $serviceName -Force
+                    Write-Information "SQL Server service restarted successfully."
+                }
+            }
+            catch {
+                Write-Error "Failed to unbind certificate from instance: $instance. Error: $_"
+                $unBindingSuccess = $false
+            }
+        }
+    }
+    catch {
+        Write-Error "An unexpected error occurred: $($_.Exception.Message)"
+        return $false
+    }
+
+    return $unBindingSuccess
 }
 
 # Example usage:
 # Bind-CertificateToSqlInstance -Thumbprint "123ABC456DEF" -SqlInstanceName "MSSQLSERVER"
 
-function UnBind-KFSqlServerCertificate {
+function UnBind-KFSqlServerCertificateOLD {
     param (
         [Parameter(Mandatory = $true)]
         [string]$SqlInstanceName       # Name of the SQL Server instance (e.g., 'MSSQLSERVER' or 'SQLInstanceName')
@@ -719,8 +1153,18 @@ function UnBind-KFSqlServerCertificate {
 # Example usage:
 # Clear-SqlServerCertificate -SqlInstanceName "MSSQLSERVER"
 
-function Get-SQLServiceName
-{
+function Get-SqlServiceName {
+    param (
+        [string]$InstanceName
+    )
+    if ($InstanceName -eq "MSSQLSERVER") {
+        return "MSSQLSERVER" # Default instance
+    } else {
+        return "MSSQL`$$InstanceName" # Named instance (escape $ for PowerShell strings)
+    }
+}
+
+function Get-SQLServiceNameOLD{
     param (
         [Parameter(Mandatory = $true)]
         [string]$SQLInstanceName
@@ -912,8 +1356,6 @@ function Import-SignedCertificate {
 }
 #####
 
-
-
 # Shared Functions
 # Function to get SAN (Subject Alternative Names) from a certificate
 function Get-KFSAN($cert) 
@@ -983,6 +1425,7 @@ function Get-CertificateCSP
 }
 
 # This function returns a certificate object based upon the store and thumbprint received
+# NOT BEING USED
 function Get-KFCertificateByThumbprint 
 {
     param (
