@@ -125,7 +125,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             {
                 ps.Initialize();
 
-                results = ps.ExecutePowerShell("Get-KFIISBoundCertificates");
+                if (ps.IsLocalMachine)
+                {
+                    _logger.LogTrace("Executing function locally");
+                    results = ps.ExecutePowerShell("Get-KFIISBoundCertificates");
+                }
+                else
+                {
+                    _logger.LogTrace("Executing function remotely");
+                    results = ps.InvokeFunction("Get-KFIISBoundCertificates");
+                }
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)

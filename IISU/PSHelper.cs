@@ -28,8 +28,10 @@ using System.Management.Automation.Remoting;
 using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Xml.Serialization;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -129,6 +131,24 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             {
                 InitializeLocalSession();
             }
+
+            // Display Hosting information
+            string psInfo = @"
+                    $psVersion = $PSVersionTable.PSVersion
+                    $os = [System.Environment]::OSVersion
+                    $hostName = [System.Net.Dns]::GetHostName()
+
+                    [PSCustomObject]@{
+                        PowerShellVersion = $psVersion
+                        OperatingSystem   = $os
+                        HostName          = $hostName
+                    } | ConvertTo-Json
+                ";
+            var results = ExecutePowerShellScript(psInfo);
+            foreach (var result in results)
+            {
+                _logger.LogTrace($"{result}");
+            }
         }
 
         private void InitializeRemoteSession()
@@ -148,26 +168,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     throw new Exception("Error while creating temporary KeyFilePath.");
                 }
 
-
                 Hashtable options = new Hashtable
                 {
                     { "StrictHostKeyChecking", "No" },
-                    { "UserKnownHostsFile", "/dev/null" }
+                    { "UserKnownHostsFile", "/dev/null" },
                 };
 
                 PS.AddCommand("New-PSSession")
-                    .AddParameter("Options", options)
                     .AddParameter("HostName", ClientMachineName)
-                    .AddParameter("UserName", serverUserName);
-
-                // TODO: THIS IS FOR TESTING ONLY <REMOVE THIS AFTER TESTING>
-                if (serverPassword != null)
-                {
-                    // TODO:  Need to write out to file and pass file name.  For right now, the password is the filename.
-                    _logger.LogTrace($"Current KeyFilePath: {tempKeyFilePath}");
-                    PS.AddParameter("KeyFilePath", tempKeyFilePath);
-                }
-
+                    .AddParameter("UserName", serverUserName)
+                    .AddParameter("KeyFilePath", tempKeyFilePath)
+                    .AddParameter("ConnectingTimeout", 10000)
+                    .AddParameter("Options", options);
             }
             else
             {
@@ -188,6 +200,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 .AddParameter("SessionOption", sessionOption);
             }
 
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
             _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
             _PSSession = PS.Invoke();
 
@@ -203,6 +217,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 var results = PS.Invoke();
                 CheckErrors();
+                _logger.LogTrace("Script loaded into remote session successfully.");
             }
             else
             {
@@ -241,9 +256,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             PS.Commands.Clear();
             if (PS != null)
             {
-                PS.AddCommand("Remove-PSSession").AddParameter("Session", _PSSession);
-                PS.Invoke();
-                CheckErrors();
+                try
+                {
+                    PS.AddCommand("Remove-PSSession").AddParameter("Session", _PSSession);
+                    PS.Invoke();
+                    CheckErrors();
+                }
+                catch (Exception)
+                {
+                }
             }
 
             if (File.Exists(tempKeyFilePath))
@@ -275,67 +296,152 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return ExecutePowerShell(functionName);
         }
 
-        public Collection<PSObject>? ExecutePowerShell(string commandName, Dictionary<string, object>? parameters = null)
+        public Collection<PSObject>? InvokeFunction(string functionName, Dictionary<string, Object>? parameters = null)
         {
-            using (PowerShell PS = PowerShell.Create())
+            PS.Commands.Clear();
+
+            // Prepare the command
+            PS.AddCommand("Invoke-Command")
+              .AddParameter("ScriptBlock", ScriptBlock.Create(functionName));
+
+            if (!isLocalMachine)
             {
-                try
+                PS.AddParameter("Session", _PSSession);
+            }
+
+            // Add parameters
+            if (parameters != null)
+            {
+                PS.AddParameter("ArgumentList", parameters.Values.ToArray());
+            }
+
+            _logger.LogTrace($"Attempting to InvokeFunction: {functionName}");
+            var results = PS.Invoke();
+
+            if (PS.HadErrors)
+            {
+                string errorMessages = string.Join("; ", PS.Streams.Error.Select(e => e.ToString()));
+                throw new Exception($"Error executing function '{functionName}': {errorMessages}");
+            }
+
+            return results;
+        }
+
+        public Collection<PSObject> ExecutePowerShellScript(string script)
+        {
+            PS.AddScript(script);
+            return PS.Invoke();
+        }
+
+
+        public Collection<PSObject>? ExecutePowerShell(string commandOrScript, Dictionary<string, object>? parameters = null, bool isScript = false)
+        {
+            try
+            {
+                PS.Commands.Clear();
+
+                // Handle Local or Remote Execution
+                if (isLocalMachine)
                 {
-                    string scriptBlock;
-
-                    if (parameters != null && parameters.Count > 0)
+                    if (isScript)
                     {
-                        _logger.LogTrace("Creating script block with parameters.");
-                        string paramBlock = string.Join(", ", parameters.Select(p => $"[{p.Value.GetType().Name}] ${p.Key}"));
-                        string paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
-
-                        scriptBlock = $@"
-                    param({paramBlock})
-                    {commandName} {paramUsage}
-                ";
+                        // Add script content directly for local execution
+                        PS.AddScript(commandOrScript);
                     }
                     else
                     {
-                        _logger.LogTrace("Creating script block with no parameters.");
-                        scriptBlock = commandName;
+                        // Add command for local execution
+                        PS.AddCommand(commandOrScript);
                     }
+                }
+                else
+                {
+                    // For remote execution, use Invoke-Command
+                    var scriptBlock = isScript
+                        ? ScriptBlock.Create(commandOrScript) // Use the script as a ScriptBlock
+                        : ScriptBlock.Create($"& {{ {commandOrScript} }}"); // Wrap commands in ScriptBlock
 
                     PS.AddCommand("Invoke-Command")
-                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock));
-
-                    if (!isLocalMachine)
-                    {
-                        PS.AddParameter("Session", _PSSession);
-                    }
-
-                    if (parameters != null && parameters.Count > 0)
-                    {
-                        PS.AddParameter("ArgumentList", parameters.Values.ToArray());
-                    }
-
-                    _logger.LogTrace($"Executing script block:\n{scriptBlock}");
-
-                    var results = PS.Invoke();
-
-                    if (PS.HadErrors)
-                    {
-                        string errorMessages = string.Join("; ", PS.Streams.Error.Select(e => e.ToString()));
-                        _logger.LogError($"{errorMessages}");
-                        throw new Exception($"PowerShell execution errors: {errorMessages}");
-                    }
-
-                    return results;
+                      .AddParameter("Session", _PSSession)
+                      .AddParameter("ScriptBlock", scriptBlock);
                 }
-                catch (Exception ex)
+
+                // Add Parameters if provided
+                if (parameters != null)
                 {
-                    _logger.LogError($"Error while executing script: {ex.Message}");
-                    throw new Exception($"An error occurred while attempting to execute the PowerShell script: {ex.Message}.");
+                    if (isLocalMachine || isScript)
+                    {
+                        foreach (var param in parameters)
+                        {
+                            PS.AddParameter(param.Key, param.Value);
+                        }
+                    }
+                    else
+                    {
+                        // Remote execution: Use ArgumentList for parameters
+                        var paramBlock = string.Join(", ", parameters.Select(p => $"[{p.Value.GetType().Name}] ${p.Key}"));
+                        var paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
+
+                        string scriptBlockWithParams = $@"
+                    param({paramBlock})
+                    {commandOrScript} {paramUsage}
+                ";
+
+                        PS.Commands.Clear(); // Clear previous commands
+                        PS.AddCommand("Invoke-Command")
+                          .AddParameter("Session", _PSSession)
+                          .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlockWithParams))
+                          .AddParameter("ArgumentList", parameters.Values.ToArray());
+                    }
                 }
-                finally
+
+                // Log and execute
+                _logger.LogTrace($"Executing PowerShell: {commandOrScript}");
+                var results = PS.Invoke();
+
+                // Check for errors
+                if (PS.HadErrors)
                 {
-                    PS.Commands.Clear();
+                    string errorMessages = string.Join("; ", PS.Streams.Error.Select(e => e.ToString()));
+                    throw new Exception($"PowerShell execution errors: {errorMessages}");
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error executing PowerShell: {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                PS.Commands.Clear();
+            }
+        }
+
+
+        public Collection<PSObject>? ExecutePowerShellV3(string commandName, Dictionary<string, object>? parameters = null)
+        {
+            PS.Commands.Clear();
+            PS.AddCommand(commandName);
+
+            if (parameters != null)
+            {
+                foreach (var param in parameters)
+                {
+                    PS.AddParameter(param.Key, param.Value);
                 }
             }
+
+            if (!isLocalMachine)
+            {
+                PS.AddParameter("Session", _PSSession);
+            }
+
+            var results = PS.Invoke();
+            CheckErrors();
+
+            return results;
         }
 
 
@@ -343,64 +449,68 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         {
             try
             {
-                if (!isLocalMachine)
+                string scriptBlock;
+
+                if (parameters != null && parameters.Count > 0)
                 {
-                    string scriptBlock;
+                    _logger.LogTrace("Creating script block with parameters.");
+                    string paramBlock = string.Join(", ", parameters.Select(p => $"[{p.Value.GetType().Name}] ${p.Key}"));
+                    string paramValues = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
 
-                    if (parameters != null && parameters.Count > 0)
-                    {
-                        _logger.LogTrace("Creating script block with parameters.");
-                        string paramBlock = string.Join(", ", parameters.Keys.Select(key => $"[{parameters[key].GetType().Name}] ${key}"));
-                        string paramUsage = string.Join(" ", parameters.Keys.Select(key => $"-{key} ${key}"));
+                    //scriptBlock = $@"
+                    //    param({paramBlock})
+                    //    {commandName} {paramUsage}
+                    //";
 
-                        scriptBlock = $@"
-                            param({paramBlock})
-                            {commandName} {paramUsage}
-                        ";
-                        }
-                    else
-                    {
-                        _logger.LogTrace("Creating script block with no parameters.");
-                        scriptBlock = $@"
-                            {commandName}
-                        ";
-                    }
-
-
-                    PS.AddCommand("Invoke-Command")
-                        .AddParameter("Session", _PSSession) // send session only when necessary (remote)
-                        .AddParameter("ScriptBlock", ScriptBlock.Create(commandName));
-
-                    if (parameters != null && parameters.Count > 0)
-                    {
-                        PS.AddParameter("ArgumentList", parameters.Values.ToArray());
-                    }
+                    scriptBlock = $@"
+                        param({paramBlock})
+                        {paramValues}
+                        {commandName} {string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"))}
+                    ";
                 }
                 else
                 {
-                    PS.AddCommand(commandName);
-
-                    if (parameters != null)
-                    {
-                        foreach (var parameter in parameters)
-                        {
-                            PS.AddParameter(parameter.Key, parameter.Value);
-                        }
-                    }
+                    _logger.LogTrace("Creating script block with no parameters.");
+                    scriptBlock = commandName;
                 }
 
-                bool hadErrors = false;
-                string errorList = string.Empty;
-                _logger.LogTrace($"Script block:\n{commandName}");
+                //PS.AddCommand("Invoke-Command")
+                //    .AddParameter("ScriptBlock", scriptBlock);
+
+                //.AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock));
+
+                if (!isLocalMachine)
+                {
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
+                        .AddParameter("Session", _PSSession);
+                }
+                else
+                {
+                    PS.AddScript(scriptBlock);
+                }
+
+                if (parameters != null && parameters.Count > 0)
+                {
+                    PS.AddParameter("ArgumentList", parameters.Values.ToArray());
+                }
+
+                _logger.LogTrace($"Executing script block:\n{scriptBlock}");
 
                 var results = PS.Invoke();
-                CheckErrors();
+
+                if (PS.HadErrors)
+                {
+                    string errorMessages = string.Join("; ", PS.Streams.Error.Select(e => e.ToString()));
+                    _logger.LogError($"{errorMessages}");
+                    throw new Exception($"PowerShell execution errors: {errorMessages}");
+                }
 
                 return results;
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error while executing script: {ex.Message}");
+                _logger.LogError(ex.Message);
                 throw new Exception(ex.Message);
             }
             finally
@@ -408,6 +518,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 PS.Commands.Clear();
             }
         }
+
 
         [Obsolete]
         public Collection<PSObject>? ExecuteCommand(string scriptBlock, Dictionary<string, object> parameters = null)
@@ -694,7 +805,26 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 _logger.LogTrace($"Changing permissions on Windows temp file: {tmpFile}.");
-                File.SetAttributes(tmpFile, FileAttributes.ReadOnly);
+
+                // Create a FileInfo object for the file
+                FileInfo fileInfo = new FileInfo(tmpFile);
+
+                // Get the current access control settings of the file
+                FileSecurity fileSecurity = fileInfo.GetAccessControl();
+
+                // Remove existing permissions
+                fileSecurity.RemoveAccessRuleAll(new FileSystemAccessRule("Everyone", FileSystemRights.FullControl, AccessControlType.Allow));
+
+                // Grant read permissions to the current user
+                string currentUser = Environment.UserName;
+                fileSecurity.AddAccessRule(new FileSystemAccessRule(currentUser, FileSystemRights.Read, AccessControlType.Allow));
+
+                // Deny all access to others (this is optional, depending on your use case)
+                fileSecurity.AddAccessRule(new FileSystemAccessRule("Everyone", FileSystemRights.Read, AccessControlType.Deny));
+
+                // Apply the modified permissions to the file
+                fileInfo.SetAccessControl(fileSecurity);
+                //File.SetAttributes(tmpFile, FileAttributes.ReadOnly);
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {

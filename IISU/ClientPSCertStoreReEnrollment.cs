@@ -106,7 +106,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     catch (Exception ex)
                     {
                         _logger.LogError($"Error while attempting to create the CSR: {ex.Message}");
-                        throw new Exception("Unable to create the CSR file.  Check the Orchestrator Logs for more information");
+                        throw new Exception($"Unable to create the CSR file.  {ex.Message}");
                     }
 
                     _logger.LogTrace($"CSR Contents: '{csr}'");
@@ -115,7 +115,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     {
                         // Submit and Sign the CSR in Command
                         _logger.LogTrace("Attempting to sign CSR");
-                        X509Certificate2 myCert = submitReenrollment.Invoke(csr.ToString());
+                        X509Certificate2 myCert = submitReenrollment.Invoke(csr);
+
+                        if (myCert == null) { throw new Exception("Command was unable to sign the CSR."); }
 
                         // Import the certificate
                         string thumbprint = ImportCertificate(myCert.RawData, storePath);

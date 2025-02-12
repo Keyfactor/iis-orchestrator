@@ -169,7 +169,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                 try
                                 {
                                     // Unbind the certificates
-                                    if (WinSqlBinding.UnBindSQLCertificate(_psHelper, SQLInstanceNames))
+                                    _logger.LogTrace($"SQL Instance Names: {SQLInstanceNames}");
+                                    _logger.LogTrace("Attempting to unbind certificates.");
+                                    if (WinSqlBinding.UnBindSQLCertificate(_psHelper, SQLInstanceNames, RestartSQLService))
                                     {
                                         // Remove the certificate from the cert store
                                         complete = RemoveCertificate(config.JobCertificate.Alias);
