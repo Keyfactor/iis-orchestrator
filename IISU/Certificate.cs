@@ -11,12 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -51,30 +51,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     var singleObject = JsonConvert.DeserializeObject<T>(jsonResults);
                     return new List<T> { singleObject };
                 }
-            }
-
-            public static string FormatSAN(string san)
-            {
-                // Use regular expression to extract key-value pairs
-                var regex = new Regex(@"(?<key>DNS Name|Email|IP Address)=(?<value>[^=,\s]+)");
-                var matches = regex.Matches(san);
-
-                // Format matches into the desired format  
-                string result = string.Join("&", matches.Cast<Match>()
-                    .Select(m => $"{NormalizeKey(m.Groups["key"].Value)}={m.Groups["value"].Value}"));
-
-                return result;
-            }
-
-            private static string NormalizeKey(string key)
-            {
-                return key.ToLower() switch
-                {
-                    "dns name" => "dns",
-                    "email" => "email",
-                    "ip address" => "ip",
-                    _ => key.ToLower() // For other types, keep them as-is
-                };
             }
         }
     }

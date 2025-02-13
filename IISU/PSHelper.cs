@@ -1,4 +1,4 @@
-﻿// Copyright 2022 Keyfactor
+﻿// Copyright 2025 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using Keyfactor.Logging;
-using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections;
@@ -29,10 +29,7 @@ using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
-using System.Xml.Serialization;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -118,8 +115,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogDebug($"isLocalMachine flag set to: {isLocalMachine}");
             _logger.LogDebug($"Protocol is set to: {protocol}");
 
-            scriptFileLocation = FindPSLocation(AppDomain.CurrentDomain.BaseDirectory, "WinCertFull.ps1");
-            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script file: WinCertFull.ps1"); }
+            scriptFileLocation = FindPSLocation(AppDomain.CurrentDomain.BaseDirectory, "WinCertScripts.ps1");
+            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script file: WinCertScripts.ps1"); }
 
             _logger.LogTrace($"Script file located here: {scriptFileLocation}");
 
@@ -144,7 +141,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         HostName          = $hostName
                     } | ConvertTo-Json
                 ";
-            var results = ExecutePowerShellScript(psInfo);
+            var results = ExecutePowerShell(psInfo,isScript:true);
             foreach (var result in results)
             {
                 _logger.LogTrace($"{result}");
@@ -250,7 +247,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             PS.Commands.Clear();  // Clear commands after loading functions
         }
 
-
         public void Terminate()
         {
             PS.Commands.Clear();
@@ -289,11 +285,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
 
             PS.Dispose();
-        }
-
-        public Collection<PSObject>? ExecuteFunction(string functionName)
-        {
-            return ExecutePowerShell(functionName);
         }
 
         public Collection<PSObject>? InvokeFunction(string functionName, Dictionary<string, Object>? parameters = null)
@@ -416,147 +407,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             finally
             {
                 PS.Commands.Clear();
-            }
-        }
-
-
-        public Collection<PSObject>? ExecutePowerShellV3(string commandName, Dictionary<string, object>? parameters = null)
-        {
-            PS.Commands.Clear();
-            PS.AddCommand(commandName);
-
-            if (parameters != null)
-            {
-                foreach (var param in parameters)
-                {
-                    PS.AddParameter(param.Key, param.Value);
-                }
-            }
-
-            if (!isLocalMachine)
-            {
-                PS.AddParameter("Session", _PSSession);
-            }
-
-            var results = PS.Invoke();
-            CheckErrors();
-
-            return results;
-        }
-
-
-        public Collection<PSObject>? ExecutePowerShellV2(string commandName, Dictionary<string, object>? parameters = null)
-        {
-            try
-            {
-                string scriptBlock;
-
-                if (parameters != null && parameters.Count > 0)
-                {
-                    _logger.LogTrace("Creating script block with parameters.");
-                    string paramBlock = string.Join(", ", parameters.Select(p => $"[{p.Value.GetType().Name}] ${p.Key}"));
-                    string paramValues = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
-
-                    //scriptBlock = $@"
-                    //    param({paramBlock})
-                    //    {commandName} {paramUsage}
-                    //";
-
-                    scriptBlock = $@"
-                        param({paramBlock})
-                        {paramValues}
-                        {commandName} {string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"))}
-                    ";
-                }
-                else
-                {
-                    _logger.LogTrace("Creating script block with no parameters.");
-                    scriptBlock = commandName;
-                }
-
-                //PS.AddCommand("Invoke-Command")
-                //    .AddParameter("ScriptBlock", scriptBlock);
-
-                //.AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock));
-
-                if (!isLocalMachine)
-                {
-                    PS.AddCommand("Invoke-Command")
-                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
-                        .AddParameter("Session", _PSSession);
-                }
-                else
-                {
-                    PS.AddScript(scriptBlock);
-                }
-
-                if (parameters != null && parameters.Count > 0)
-                {
-                    PS.AddParameter("ArgumentList", parameters.Values.ToArray());
-                }
-
-                _logger.LogTrace($"Executing script block:\n{scriptBlock}");
-
-                var results = PS.Invoke();
-
-                if (PS.HadErrors)
-                {
-                    string errorMessages = string.Join("; ", PS.Streams.Error.Select(e => e.ToString()));
-                    _logger.LogError($"{errorMessages}");
-                    throw new Exception($"PowerShell execution errors: {errorMessages}");
-                }
-
-                return results;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message);
-                throw new Exception(ex.Message);
-            }
-            finally
-            {
-                PS.Commands.Clear();
-            }
-        }
-
-
-        [Obsolete]
-        public Collection<PSObject>? ExecuteCommand(string scriptBlock, Dictionary<string, object> parameters = null)
-        {
-            _logger.LogTrace("Executing PowerShell Script");
-
-            using (PS)
-            {
-                PS.AddCommand("Invoke-Command")
-                  .AddParameter("Session", _PSSession) // send session only when necessary (remote)
-                  .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock));
-
-                // Add parameters to the script block
-                if (parameters != null)
-                {
-                    foreach (var parameter in parameters)
-                    {
-                        PS.AddParameter("ArgumentList", parameters.Values.ToArray());
-                    }
-                }
-
-                try
-                {
-                    _logger.LogTrace("Ready to invoke the script");
-                    var results = PS.Invoke();
-                    CheckErrors();
-
-                    var jsonResults = results[0].ToString();
-                    var certInfoList = JsonSerializer.Deserialize<List<CertificateInfo>>(jsonResults);
-
-                    return results;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Exception: {ex.Message}");
-                    return null;
-                }
-
             }
         }
 
@@ -689,112 +539,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
-
-        // Code below is ORIGINAL
-        public static Runspace GetClientPsRunspace(string winRmProtocol, string clientMachineName, string winRmPort, bool includePortInSpn, string serverUserName, string serverPassword)
-        {
-            _logger = LogHandler.GetClassLogger<PSHelper>();
-            _logger.MethodEntry();
-
-            // 2.4 - Client Machine Name now follows the naming conventions of {clientMachineName}|{localMachine}
-            // If the clientMachineName is just 'localhost', it will maintain that as locally only (as previously)
-            // If there is no 2nd part to the clientMachineName, a remote PowerShell session will be created
-
-            // Break the clientMachineName into parts
-            string[] parts = clientMachineName.Split('|');
-
-            // Extract the client machine name and arguments based upon the number of parts
-            string machineName = parts.Length > 1 ? parts[0] : clientMachineName;
-            string argument = parts.Length > 1 ? parts[1] : null;
-
-            // Determine if this is truly a local connection
-            bool isLocal = (machineName.ToLower() == "localhost") || (argument != null && argument.ToLower() == "localmachine");
-
-            _logger.LogInformation($"Full clientMachineName={clientMachineName} | machineName={machineName} | argument={argument} | isLocal={isLocal}");
-
-            if (isLocal)
-            {
-#if NET6_0
-                PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-                Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
-                return rs;
-#elif NET8_0_OR_GREATER
-                try 
-	            {	        
-                    InitialSessionState iss = InitialSessionState.CreateDefault();
-                    Runspace rs = RunspaceFactory.CreateRunspace(iss);
-                    return rs;
-	            }
-	            catch (global::System.Exception)
-	            {
-                    throw new Exception($"An error occurred while attempting to create the PowerShell instance.  This version requires .Net8 and PowerShell SDK 7.2 or greater.  Please verify the version of .Net8 and PowerShell installed on your machine.");
-	            }
-#endif
-            }
-            else
-            {
-                var connInfo = new WSManConnectionInfo(new Uri($"{winRmProtocol}://{clientMachineName}:{winRmPort}/wsman"));
-                connInfo.IncludePortInSPN = includePortInSpn;
-
-                _logger.LogTrace($"Creating remote session at: {connInfo.ConnectionUri}");
-
-                if (!string.IsNullOrEmpty(serverUserName))
-                {
-                    _logger.LogTrace($"Credentials Specified");
-                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                    connInfo.Credential = new PSCredential(serverUserName, pw);
-                }
-                return RunspaceFactory.CreateRunspace(connInfo);
-            }
-        }
-
-        public static IEnumerable<string> GetCSPList(Runspace myRunspace)
-        {
-            _logger.LogTrace("Getting the list of Crypto Service Providers");
-
-            using var ps = PowerShell.Create();
-
-            ps.Runspace = myRunspace;
-
-            var certStoreScript = $@"
-                                $certUtilOutput = certutil -csplist
-
-                                $cspInfoList = @()
-                                foreach ($line in $certUtilOutput) {{
-                                    if ($line -match ""Provider Name:"") {{
-                                        $cspName = ($line -split "":"")[1].Trim()
-                                        $cspInfoList += $cspName
-                                    }}
-                                }}
-
-                                $cspInfoList";
-
-            ps.AddScript(certStoreScript);
-
-            foreach (var result in ps.Invoke())
-            {
-                var cspName = result?.BaseObject?.ToString();
-                if (cspName != null) { yield return cspName; }
-            }
-
-            _logger.LogInformation("No Crypto Service Providers were found");
-            yield return null;
-        }
-
-        public static bool IsCSPFound(IEnumerable<string> cspList, string userCSP)
-        {
-            foreach (var csp in cspList)
-            {
-                if (string.Equals(csp, userCSP, StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger.LogTrace($"CSP found: {csp}");
-                    return true;
-                }
-            }
-            _logger.LogTrace($"CSP: {userCSP} was not found");
-            return false;
-        }
-
         private string createPrivateKeyFile()
         {
             string tmpFile = Path.GetTempFileName();  // "logs/AdminFile";
@@ -860,33 +604,5 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             return privateKey.Replace($" {keyType} PRIVATE ", "^^^").Replace(" ", System.Environment.NewLine).Replace("^^^", $" {keyType} PRIVATE ") + System.Environment.NewLine;
         }
-
-        //private string formatPrivateKey(string privateKey)
-        //{
-        //    // Identify the markers in the private key
-        //    string beginMarker = "-----BEGIN OPENSSH PRIVATE KEY-----";
-        //    string endMarker = "-----END OPENSSH PRIVATE KEY-----";
-
-        //    // Locate the positions of the markers
-        //    int beginIndex = privateKey.IndexOf(beginMarker);
-        //    int endIndex = privateKey.IndexOf(endMarker);
-
-        //    // Split the string into three parts: before, key content, and after
-        //    string beforeKey = privateKey.Substring(0, beginIndex + beginMarker.Length);
-        //    string keyContent = privateKey.Substring(beginIndex + beginMarker.Length, endIndex - beginIndex - beginMarker.Length);
-        //    string afterKey = privateKey.Substring(endIndex);
-
-        //    // Replace spaces with actual carriage return and line feed in key content
-        //    keyContent = keyContent.Replace(" ", "\r\n");
-
-        //    // Construct the final string with the correctly formatted key
-        //    string replacedFile = beforeKey + keyContent + afterKey + "\r\n";
-
-        //    // Log the modified string
-        //    _logger.LogTrace(replacedFile);
-
-        //    return replacedFile;
-        //}
-
     }
 }

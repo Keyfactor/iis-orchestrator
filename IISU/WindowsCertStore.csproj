@@ -40,7 +40,7 @@
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="PowerShellScripts\WinCertFull.ps1">
+    <None Update="PowerShellScripts\WinCertScripts.ps1">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

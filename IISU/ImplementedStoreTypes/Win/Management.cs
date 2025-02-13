@@ -14,7 +14,7 @@
 
 // Ignore Spelling: Keyfactor
 
-// 021225 rcp   Cleaned up and removed unnecessary code
+// 021225 rcp   2.6.0   Cleaned up and verified code
 
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -26,8 +26,6 @@ using System.Management.Automation;
 using Keyfactor.Logging;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using System.Management.Automation.Runspaces;
-using System.Security.Cryptography.X509Certificates;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {

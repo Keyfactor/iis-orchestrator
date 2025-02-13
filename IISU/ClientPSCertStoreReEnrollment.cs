@@ -24,13 +24,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
-using System.Management.Automation.Remoting;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using System.Linq;
-using System.IO;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql;
 
@@ -146,8 +143,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             }
 
                         }
-
-
 
                         jobResult = new JobResult
                         {

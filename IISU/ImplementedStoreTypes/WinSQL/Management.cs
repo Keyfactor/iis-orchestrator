@@ -14,20 +14,16 @@
 
 // Ignore Spelling: thumbprint Keyfactor sql
 
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Drawing.Text;
-using System.IO;
 using System.Management.Automation;
-using System.Management.Automation.Runspaces;
-using System.Numerics;
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -310,95 +306,5 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                 throw new Exception(failureMessage);
             }
         }
-
-        //private JobResult BindSQLCertificate(string newThumbprint, string renewalThumbprint)
-        //{
-        //    bool hadError = false;
-        //    var instances = SQLInstanceNames.Split(",");
-
-        //    foreach (var instanceName in instances)
-        //    {
-        //        var parameters = new Dictionary<string, object>
-        //        {
-        //            { "Thumbprint", newThumbprint },
-        //            { "SqlInstanceName", instanceName.Trim() },
-        //            { "StoreName", _storePath },
-        //            { "RestartService", RestartSQLService }
-        //        };
-
-        //        try
-        //        {
-        //            _results = _psHelper.ExecutePowerShell("Bind-CertificateToSqlInstance", parameters);
-        //            _logger.LogTrace("Return from executing PS function (Bind-CertificateToSqlInstance)");
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
-        //            hadError= true;
-        //        }
-        //    }
-
-        //    if (hadError)
-        //    {
-        //        return new JobResult
-        //        {
-        //            Result = OrchestratorJobStatusJobResult.Failure,
-        //            JobHistoryId = _jobHistoryID,
-        //            FailureMessage = "Unable to bind one or more certificates to the SQL Instances."
-        //        };
-        //    } else 
-        //    {
-        //        return new JobResult
-        //        {
-        //            Result = OrchestratorJobStatusJobResult.Success,
-        //            JobHistoryId = _jobHistoryID,
-        //            FailureMessage = ""
-        //        };
-        //    }
-        //}
-
-        //private JobResult UnBindSQLCertificate()
-        //{
-        //    bool hadError = false;
-        //    var instances = SQLInstanceNames.Split(",");
-
-        //    foreach (var instanceName in instances)
-        //    {
-        //        var parameters = new Dictionary<string, object>
-        //        {
-        //            { "SqlInstanceName", instanceName.Trim() }
-        //        };
-
-        //        try
-        //        {
-        //            _results = _psHelper.ExecutePowerShell("UnBind-KFSqlServerCertificate", parameters);
-        //            _logger.LogTrace("Returned from executing PS function (UnBind-KFSqlServerCertificate)");
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            _logger.LogError($"Error occurred while binding certificate to SQL Instance {instanceName}", ex);
-        //            hadError = true;
-        //        }
-        //    }
-
-        //    if (hadError)
-        //    {
-        //        return new JobResult
-        //        {
-        //            Result = OrchestratorJobStatusJobResult.Failure,
-        //            JobHistoryId = _jobHistoryID,
-        //            FailureMessage = "Unable to unbind one or more certificates from the SQL Instances."
-        //        };
-        //    }
-        //    else
-        //    {
-        //        return new JobResult
-        //        {
-        //            Result = OrchestratorJobStatusJobResult.Success,
-        //            JobHistoryId = _jobHistoryID,
-        //            FailureMessage = ""
-        //        };
-        //    }
-        //}
     }
 }
