@@ -14,6 +14,8 @@
 
 // Ignore Spelling: Keyfactor Sql
 
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -24,7 +26,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
-using System.Security.Cryptography.X509Certificates;
 
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
@@ -164,117 +165,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             }
 
             return Inventory;
-        }
-
-
-        private JobResult PerformInventory(InventoryJobConfiguration config, SubmitInventoryUpdate submitInventory)
-        {
-            try
-            {
-                var inventoryItems = new List<CurrentInventoryItem>();
-
-                string myConfig = config.ToString();
-
-                _logger.LogTrace(JobConfigurationParser.ParseInventoryJobConfiguration(config));
-
-                string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
-                string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
-
-                // Deserialize specific job properties
-                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-                string protocol = jobProperties.WinRmProtocol;
-                string port = jobProperties.WinRmPort;
-                bool IncludePortInSPN = jobProperties.SpnPortFlag;
-                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
-                string storePath = config.CertificateStoreDetails.StorePath;
-
-                if (storePath != null)
-                {
-                    // Create the remote connection class to pass to Inventory Class
-                    RemoteSettings settings = new();
-                    settings.ClientMachineName = config.CertificateStoreDetails.ClientMachine;
-                    settings.Protocol = jobProperties.WinRmProtocol;
-                    settings.Port = jobProperties.WinRmPort;
-                    settings.IncludePortInSPN = jobProperties.SpnPortFlag;
-                    settings.ServerUserName = serverUserName;
-                    settings.ServerPassword = serverPassword;
-
-                    //SQLServerInventory sqlInventory = new SQLServerInventory(_logger);
-                    //inventoryItems = sqlInventory.GetInventoryItems(myRunspace, config);
-
-
-
-                    //
-                    _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                    using var myRunspace = PSHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
-                    myRunspace.Open();
-
-                    _logger.LogTrace("Runspace is now open");
-                    _logger.LogTrace($"Attempting to read bound SQL Server certificates from cert store: {storePath}");
-
-                    SQLServerInventory sqlInventory = new SQLServerInventory(_logger);
-                    inventoryItems = sqlInventory.GetInventoryItems(myRunspace, config);
-                    if (inventoryItems != null)
-                    {
-                        _logger.LogTrace($"A total of {inventoryItems.Count} were found");
-                        _logger.LogTrace("Closing runspace...");
-                        myRunspace.Close();
-
-                        _logger.LogTrace("Invoking Inventory..");
-                        submitInventory.Invoke(inventoryItems);
-                        _logger.LogTrace($"Inventory Invoked... {inventoryItems.Count} Items");
-
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Success,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage = ""
-                        };
-                    }
-                    else
-                    {
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage = "Inventory Items was null, ensure sql server is installed on the machine."
-                        };
-                    }
-                }
-
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Warning,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"No certificates were found in the Certificate Store Path: {storePath} on server: {clientMachineName}"
-                };
-            }
-            catch (CertificateStoreException psEx)
-            {
-                _logger.LogTrace(psEx.Message);
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Unable to open remote certificate store: {LogHandler.FlattenException(psEx)}"
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogTrace(LogHandler.FlattenException(ex));
-
-                var failureMessage = $"Inventory job failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
-                _logger.LogWarning(failureMessage);
-
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = failureMessage
-                };
-            }
         }
     }
 }

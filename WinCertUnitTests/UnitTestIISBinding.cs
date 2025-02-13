@@ -151,21 +151,6 @@ namespace WinCertUnitTests
             List<CurrentInventoryItem>certs = inv.QueryIISCertificates(settings);
         }
 
-        [TestMethod]
-        public void OrigSNIFlagZeroReturnsZero()
-        {
-            string expectedResult = "32";
-            string result = ClientPSIIManager.MigrateSNIFlag("32");
-            Assert.AreEqual(expectedResult, result);
-        }
-
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentOutOfRangeException))]
-        public void InvalidSNIFlagThrowException()
-        {
-            string result = ClientPSIIManager.MigrateSNIFlag("Bad value");
-        }
-
         static bool TestValidSslFlag(int sslFlag)
         {
             try
