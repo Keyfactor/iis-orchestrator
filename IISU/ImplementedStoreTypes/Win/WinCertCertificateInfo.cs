@@ -1,4 +1,4 @@
-﻿// Copyright 2025 Keyfactor
+﻿// Copyright 2023 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,19 +14,18 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
-using Keyfactor.Orchestrators.Extensions.Interfaces;
-
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
-    public abstract class WinCertJobTypeBase
+    public class WinCertCertificateInfo
     {
-        public IPAMSecretResolver _resolver;
-    }
-
-    public enum CertStoreBindingTypeENUM
-    {
-        None,
-        WinIIS,
-        WinSQL
+        public string StoreName { get; set; }
+        public string Certificate { get; set; }
+        public string  ExpiryDate { get; set; }
+        public string Issuer { get; set; }
+        public string Thumbprint { get; set; }
+        public bool HasPrivateKey { get; set; }
+        public string SAN { get; set; }
+        public string ProviderName { get; set; }
+        public string Base64Data { get; set; }
     }
 }

@@ -14,30 +14,34 @@
 
 // Ignore Spelling: Keyfactor
 
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Management.Automation.Runspaces;
 using System.Management.Automation;
-using System.Net;
 using Keyfactor.Logging;
-using System.IO;
+using System.Collections.ObjectModel;
+using System.Collections.Generic;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
+        public string ExtensionName => "WinCertManagement";
         private ILogger _logger;
 
-        public string ExtensionName => "WinCertManagement";
+        private PSHelper _psHelper;
+        private Collection<PSObject>? _results = null;
 
-        private Runspace myRunspace;
-
-        private string _thumbprint = string.Empty;
+        // Function wide config values
+        private string _clientMachineName = string.Empty;
+        private string _storePath = string.Empty;
+        private long _jobHistoryID = 0;
+        private CertStoreOperationType _operationType;
 
         public Management(IPAMSecretResolver resolver)
         {
@@ -48,6 +52,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         {
             try
             {
+                // Do some setup stuff
                 _logger = LogHandler.GetClassLogger<Management>();
                 _logger.MethodEntry();
 
@@ -60,146 +65,172 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     _logger.LogTrace(e.Message);
                 }
 
-                string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
-                string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
-
-                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
-                string protocol = jobProperties.WinRmProtocol;
-                string port = jobProperties.WinRmPort;
-                bool IncludePortInSPN = jobProperties.SpnPortFlag;
-                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
-                string storePath = config.CertificateStoreDetails.StorePath;
-                long JobHistoryID = config.JobHistoryId;
-
-                _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
-
                 var complete = new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
                     JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        "Invalid Management Operation"
+                    FailureMessage = "Invalid Management Operation"
                 };
 
-                switch (config.OperationType)
+                // Start parsing config information and establishing PS Session
+                _jobHistoryID = config.JobHistoryId;
+                _storePath = config.CertificateStoreDetails.StorePath;
+                _clientMachineName = config.CertificateStoreDetails.ClientMachine;
+                _operationType = config.OperationType;
+
+                string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
+                string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
+
+                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                
+                string protocol = jobProperties?.WinRmProtocol;
+                string port = jobProperties?.WinRmPort;
+                bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
+
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+
+                switch (_operationType)
                 {
                     case CertStoreOperationType.Add:
                         {
-                            myRunspace.Open();
-                            _logger.LogTrace("runSpace Opened");
+                            string certificateContents = config.JobCertificate.Contents;
+                            string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+                            string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
 
-                            complete = performAddition(config);
-
-                            myRunspace.Close();
-                            _logger.LogTrace($"RunSpace was closed...");
+                            complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
+                            _logger.LogTrace($"Completed adding the certificate to the store");
 
                             break;
                         }
                     case CertStoreOperationType.Remove:
                         {
-                            myRunspace.Open();
-                            _logger.LogTrace("runSpace Opened");
+                            string thumbprint = config.JobCertificate.Alias;
 
-                            complete = performRemove(config);
-
-                            myRunspace.Close();
-                            _logger.LogTrace($"RunSpace was closed...");
+                            complete = RemoveCertificate(thumbprint);
+                            _logger.LogTrace($"Completed removing the certificate from the store");
 
                             break;
                         }
                 }
 
+                _logger.MethodExit();
                 return complete;
             }
 
-            catch (Exception e)
+            catch (Exception ex)
             {
-                _logger.LogError($"Error Occurred in Management.PerformManagement: {e.Message}");
-                throw;
-            }
-        }
+                _logger.LogTrace(LogHandler.FlattenException(ex));
 
-        private JobResult performAddition(ManagementJobConfiguration config)
-        {
-            try
-            {
-#nullable enable
-                string certificateContents = config.JobCertificate.Contents;
-                string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
-                string storePath = config.CertificateStoreDetails.StorePath;
-                long jobNumber = config.JobHistoryId;
-                string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
-#nullable disable
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogWarning(failureMessage);
 
-                // If a crypto provider was provided, check to see if it exists
-                if (cryptoProvider !=  null)
-                {
-                    _logger.LogInformation($"Checking the server for the crypto provider: {cryptoProvider}");
-                    if (!PsHelper.IsCSPFound(PsHelper.GetCSPList(myRunspace), cryptoProvider))
-                        { throw new Exception($"The Crypto Provider: {cryptoProvider} was not found.  Please check the spelling and accuracy of the Crypto Provider Name provided.  If unsure which provider to use, leave the field blank and the default crypto provider will be used."); }
-                }
-
-                if (storePath != null)
-                {
-                    _logger.LogInformation($"Attempting to add WinCert certificate to cert store: {storePath}");
-
-                    ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, jobNumber);
-
-                    // Write the certificate contents to a temporary file on the remote computer, returning the filename.
-                    _logger.LogTrace($"Creating temporary pfx file.");
-                    string filePath = manager.CreatePFXFile(certificateContents, privateKeyPassword);
-
-                    // Using certutil on the remote computer, import the pfx file using a supplied csp if any.
-                    _logger.LogTrace($"Importing temporary PFX File: {filePath}.");
-                    JobResult result = manager.ImportPFXFile(filePath, privateKeyPassword, cryptoProvider, storePath);
-
-                    // Delete the temporary file
-                    _logger.LogTrace($"Deleting temporary PFX File: {filePath}.");
-                    manager.DeletePFXFile(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath));
-
-                    return result;
-                }
-                else
-                {
-                    throw new Exception($"The store path is empty or null.");
-                }
-            }
-            catch (Exception e)
-            {
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Management/Add {e.Message}"
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = failureMessage
                 };
             }
         }
 
-        private JobResult performRemove(ManagementJobConfiguration config)
+        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
         {
             try
             {
-                _logger.LogTrace($"Removing Certificate with Alias: {config.JobCertificate.Alias}");
-                ClientPSCertStoreManager manager = new ClientPSCertStoreManager(_logger, myRunspace, config.JobHistoryId);
-                manager.RemoveCertificate(config.JobCertificate.Alias, config.CertificateStoreDetails.StorePath);
-                _logger.LogTrace($"Removed Certificate with Alias: {config.JobCertificate.Alias}");
+                using (_psHelper)
+                {
+                    _psHelper.Initialize();
+
+                    _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
+
+                    // Mandatory parameters
+                    var parameters = new Dictionary<string, object>
+                    {
+                        { "Base64Cert", certificateContents },
+                        { "StoreName", _storePath },
+                    };
+
+                    // Optional parameters
+                    if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
+                    if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
+
+                    _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
+                    _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+
+                    // This should return the thumbprint of the certificate
+                    if (_results != null && _results.Count > 0)
+                    {
+                        var thumbprint = _results[0].ToString();
+                        _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {thumbprint}");
+                    }
+                    else
+                    {
+                        _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
+                    }
+                    _psHelper.Terminate();
+                }
 
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Success,
-                    JobHistoryId = config.JobHistoryId,
+                    JobHistoryId = _jobHistoryID,
                     FailureMessage = ""
                 };
+
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogWarning(failureMessage);
+
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage = $"Error Occurred while attempting to remove certificate: {LogHandler.FlattenException(e)}"
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = failureMessage
+                };
+            }
+        }
+
+        public JobResult RemoveCertificate(string thumbprint)
+        {
+            try
+            {
+                using (_psHelper)
+                {
+                    _psHelper.Initialize();
+
+                    _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
+
+                    var parameters = new Dictionary<string, object>()
+                    {
+                        { "Thumbprint", thumbprint },
+                        { "StorePath", _storePath }
+                    };
+
+                    _psHelper.ExecutePowerShell("Remove-KFCertificateFromStore", parameters);
+                    _logger.LogTrace("Returned from executing PS function (Remove-KFCertificateFromStore)");
+                    
+                    _psHelper.Terminate();
+                }
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Success,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = ""
+                };
+            }
+            catch (Exception ex)
+            {
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                _logger.LogWarning(failureMessage);
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = failureMessage
                 };
             }
         }
