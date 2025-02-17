@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
@@ -23,7 +25,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
     {
         private ILogger _logger;
 
-        public string ExtensionName => string.Empty;
+        public string ExtensionName => "WinSqlReEnrollment";
 
         public ReEnrollment(IPAMSecretResolver resolver)
         {
@@ -36,7 +38,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
 
             ClientPSCertStoreReEnrollment myReEnrollment = new ClientPSCertStoreReEnrollment(_logger, _resolver);
 
-            // SQL ReEnrollment performs a different type of binding.  Set the bindcertificate to false and call SQL Binding
+            // SQL ReEnrollment performs a different type of binding.  Set the bind certificate to false and call SQL Binding
             return myReEnrollment.PerformReEnrollment(config, submitReEnrollmentUpdate, CertStoreBindingTypeENUM.WinSQL);
         }
     }

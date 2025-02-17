@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Ignore Spelling: Keyfactor Sql
+
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -20,6 +24,8 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Management.Automation;
 
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
@@ -27,8 +33,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
     public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {
         private ILogger _logger;
+        public string ExtensionName => "WinSqlInventory";
 
-        public string ExtensionName => string.Empty;
+        Collection<PSObject>? results = null;
+
+        public Inventory()
+        {
+                
+        }
 
         public Inventory(IPAMSecretResolver resolver)
         {
@@ -40,103 +52,119 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             _logger = LogHandler.GetClassLogger<Inventory>();
             _logger.MethodEntry();
 
-
-            return PerformInventory(jobConfiguration, submitInventoryUpdate);
-        }
-
-        private JobResult PerformInventory(InventoryJobConfiguration config, SubmitInventoryUpdate submitInventory)
-        {
             try
             {
                 var inventoryItems = new List<CurrentInventoryItem>();
 
-                string myConfig = config.ToString();
+                _logger.LogTrace(JobConfigurationParser.ParseInventoryJobConfiguration(jobConfiguration));
 
-                _logger.LogTrace(JobConfigurationParser.ParseInventoryJobConfiguration(config));
-
-                string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", config.ServerUsername);
-                string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", config.ServerPassword);
+                string serverUserName = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server UserName", jobConfiguration.ServerUsername);
+                string serverPassword = PAMUtilities.ResolvePAMField(_resolver, _logger, "Server Password", jobConfiguration.ServerPassword);
 
                 // Deserialize specific job properties
-                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+                var jobProperties = JsonConvert.DeserializeObject<JobProperties>(jobConfiguration.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
                 string protocol = jobProperties.WinRmProtocol;
                 string port = jobProperties.WinRmPort;
                 bool IncludePortInSPN = jobProperties.SpnPortFlag;
-                string clientMachineName = config.CertificateStoreDetails.ClientMachine;
-                string storePath = config.CertificateStoreDetails.StorePath;
+                string clientMachineName = jobConfiguration.CertificateStoreDetails.ClientMachine;
+                string storePath = jobConfiguration.CertificateStoreDetails.StorePath;
 
                 if (storePath != null)
                 {
-                    _logger.LogTrace($"Establishing runspace on client machine: {clientMachineName}");
-                    using var myRunspace = PsHelper.GetClientPsRunspace(protocol, clientMachineName, port, IncludePortInSPN, serverUserName, serverPassword);
-                    myRunspace.Open();
+                    // Create the remote connection class to pass to Inventory Class
+                    RemoteSettings settings = new();
+                    settings.ClientMachineName = jobConfiguration.CertificateStoreDetails.ClientMachine;
+                    settings.Protocol = jobProperties.WinRmProtocol;
+                    settings.Port = jobProperties.WinRmPort;
+                    settings.IncludePortInSPN = jobProperties.SpnPortFlag;
+                    settings.ServerUserName = serverUserName;
+                    settings.ServerPassword = serverPassword;
 
-                    _logger.LogTrace("Runspace is now open");
                     _logger.LogTrace($"Attempting to read bound SQL Server certificates from cert store: {storePath}");
+                    inventoryItems = QuerySQLCertificates(settings, storePath);
 
-                    SQLServerInventory sqlInventory = new SQLServerInventory(_logger);
-                    inventoryItems = sqlInventory.GetInventoryItems(myRunspace, config);
-                    if (inventoryItems != null)
+                    _logger.LogTrace("Invoking submitInventory..");
+                    submitInventoryUpdate.Invoke(inventoryItems);
+                    _logger.LogTrace($"submitInventory Invoked... {inventoryItems.Count} Items");
+
+                    return new JobResult
                     {
-                        _logger.LogTrace($"A total of {inventoryItems.Count} were found");
-                        _logger.LogTrace("Closing runspace...");
-                        myRunspace.Close();
-
-                        _logger.LogTrace("Invoking Inventory..");
-                        submitInventory.Invoke(inventoryItems);
-                        _logger.LogTrace($"Inventory Invoked... {inventoryItems.Count} Items");
-
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Success,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage = ""
-                        };
-                    }
-                    else
-                    {
-                        return new JobResult
-                        {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage = "Inventory Items was null, ensure sql server is installed on the machine."
-                        };
-                    }
+                        Result = OrchestratorJobStatusJobResult.Success,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = ""
+                    };
                 }
 
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Warning,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"No certificates were found in the Certificate Store Path: {storePath} on server: {clientMachineName}"
+                    JobHistoryId = jobConfiguration.JobHistoryId,
+                    FailureMessage = $"No certificates were found in the Certificate Store Path: {storePath} on server: {clientMachineName}"
                 };
             }
-            catch (CertificateStoreException psEx)
-            {
-                _logger.LogTrace(psEx.Message);
-                return new JobResult
-                {
-                    Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
-                    FailureMessage =
-                        $"Unable to open remote certificate store: {LogHandler.FlattenException(psEx)}"
-                };
-            }
+
             catch (Exception ex)
             {
                 _logger.LogTrace(LogHandler.FlattenException(ex));
 
-                var failureMessage = $"Inventory job failed for Site '{config.CertificateStoreDetails.StorePath}' on server '{config.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
+                var failureMessage = $"SQL Inventory job failed for Site '{jobConfiguration.CertificateStoreDetails.StorePath}' on server '{jobConfiguration.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Failure,
-                    JobHistoryId = config.JobHistoryId,
+                    JobHistoryId = jobConfiguration.JobHistoryId,
                     FailureMessage = failureMessage
                 };
             }
+        }
+
+        public List<CurrentInventoryItem> QuerySQLCertificates(RemoteSettings settings, string storeName)
+        {
+            List<CurrentInventoryItem> Inventory = new();
+
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            {
+                ps.Initialize();
+
+                var parameters = new Dictionary<string, object>
+                {
+                    { "StoreName", storeName }
+                };
+
+                results = ps.ExecutePowerShell("GET-KFSQLInventory", parameters);
+
+                // If there are certificates, deserialize the results and send them back to command
+                if (results != null && results.Count > 0)
+                {
+                    var jsonResults = results[0].ToString();
+                    var certInfoList = Certificate.Utilities.DeserializeCertificates<WinSQLCertificateInfo>(jsonResults); // JsonConvert.DeserializeObject<List<IISCertificateInfo>>(jsonResults);
+
+                    foreach (WinSQLCertificateInfo cert in certInfoList)
+                    {
+                        var siteSettingsDict = new Dictionary<string, object>
+                                {
+                                    { "InstanceName", cert.Parameters.InstanceName},
+                                    { "ProviderName", cert.Parameters.ProviderName}
+                                };
+
+                        Inventory.Add(
+                            new CurrentInventoryItem
+                            {
+                                Certificates = new[] { cert.Certificates },
+                                Alias = cert.Alias,
+                                PrivateKeyEntry = cert.PrivateKeyEntry,
+                                UseChainLevel = false,
+                                ItemStatus = OrchestratorInventoryItemStatus.Unknown,
+                                Parameters = siteSettingsDict
+                            }
+                        );
+                    }
+                }
+                ps.Terminate();
+            }
+
+            return Inventory;
         }
     }
 }

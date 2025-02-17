@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
+using Newtonsoft.Json;
 using System;
-using System.Linq;
-using System.Text.RegularExpressions;
+using System.Collections.Generic;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -29,30 +31,27 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         public class Utilities
         {
-            public static string FormatSAN(string san)
+            public static List<T> DeserializeCertificates<T>(string jsonResults)
             {
-                // Use regular expression to extract key-value pairs
-                var regex = new Regex(@"(?<key>DNS Name|Email|IP Address)=(?<value>[^=,\s]+)");
-                var matches = regex.Matches(san);
-
-                // Format matches into the desired format  
-                string result = string.Join("&", matches.Cast<Match>()
-                    .Select(m => $"{NormalizeKey(m.Groups["key"].Value)}={m.Groups["value"].Value}"));
-
-                return result;
-            }
-
-            private static string NormalizeKey(string key)
-            {
-                return key.ToLower() switch
+                if (string.IsNullOrEmpty(jsonResults))
                 {
-                    "dns name" => "dns",
-                    "email" => "email",
-                    "ip address" => "ip",
-                    _ => key.ToLower() // For other types, keep them as-is
-                };
-            }
+                    // Handle no objects returned
+                    return new List<T>();
+                }
 
+                // Determine if the JSON is an array or a single object
+                if (jsonResults.TrimStart().StartsWith("["))
+                {
+                    // It's an array, deserialize as list
+                    return JsonConvert.DeserializeObject<List<T>>(jsonResults);
+                }
+                else
+                {
+                    // It's a single object, wrap it in a list
+                    var singleObject = JsonConvert.DeserializeObject<T>(jsonResults);
+                    return new List<T> { singleObject };
+                }
+            }
         }
     }
 }
