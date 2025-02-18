@@ -12,17 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// 021225 rcp   2.6.0   Cleaned up and verified code
+
 using Keyfactor.Orchestrators.Extensions;
-using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Configuration.Internal;
-using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Management.Automation.Remoting;
-using System.Net;
-using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
