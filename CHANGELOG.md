@@ -1,3 +1,8 @@
+2.6.0
+* Added the ability to run the extension in a Linux environment.  To utilize this change, for each Cert Store Types (WinCert/WinIIS/WinSQL), add ssh to the Custom Field <b>WinRM Protocol</b>.  When using ssh as a protocol, make sure to enter the appropriate ssh port number under WinRM Port.
+* NOTE: For legacy purposes the Display names WinRM Protocol and WinRM Port are maintained although the type of protocols now includes ssh.
+* Moved all inventory and management jobs to external PowerShell script file .\PowerShellScripts\WinCertScripts.ps1
+
 2.5.1
 * Fixed WinSQL service name when InstanceID differs from InstanceName
 
