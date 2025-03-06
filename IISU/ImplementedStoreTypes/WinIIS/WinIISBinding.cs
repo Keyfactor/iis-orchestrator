@@ -72,7 +72,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
         public static bool UnBindCertificate(PSHelper psHelper, IISBindingInfo bindingInfo)
         {
-            _logger.LogTrace("Attempting to UnBind and execute PS function (Remove-KFIISBinding)");
+            _logger = LogHandler.GetClassLogger(typeof(WinIISBinding));
+            _logger.LogTrace("Attempting to UnBind and execute PS function (Remove-KFIISSiteBinding)");
 
             // Mandatory parameters
             var parameters = new Dictionary<string, object>
@@ -90,8 +91,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
             try
             {
-                var results = psHelper.ExecutePowerShell("Remove-KFIISBinding", parameters);
-                _logger.LogTrace("Returned from executing PS function (Remove-KFIISBinding)");
+                var results = psHelper.ExecutePowerShell("Remove-KFIISSiteBinding", parameters);
+                _logger.LogTrace("Returned from executing PS function (Remove-KFIISSiteBinding)");
 
                 if (results == null || results.Count == 0)
                 {
