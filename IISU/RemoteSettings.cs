@@ -1,4 +1,4 @@
-﻿// Copyright 2022 Keyfactor
+﻿// Copyright 2025 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,28 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.Runtime.Serialization;
+// 021225 rcp   2.6.0   Cleaned up and verified code
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    [Serializable]
-    public class CertificateStoreException : Exception
+    public class RemoteSettings
     {
-        public CertificateStoreException()
-        {
-        }
+        public string ClientMachineName { get; set; }
+        public string Protocol{ get; set; }
+        public string Port { get; set; }
+        public bool IncludePortInSPN { get; set; }
 
-        public CertificateStoreException(string message) : base(message)
-        {
-        }
+        public string ServerUserName { get; set; }
+        public string ServerPassword { get; set; }
 
-        public CertificateStoreException(string message, Exception innerException) : base(message, innerException)
-        {
-        }
-
-        protected CertificateStoreException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-        }
     }
+
 }
