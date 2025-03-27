@@ -102,6 +102,8 @@ The IISU store type represents the IIS servers and their certificate bindings. I
 #### Limitations and Areas of Confusion
 
 - **Caveats:** It's important to ensure that the Windows Remote Management (WinRM) is properly configured on the target server. The orchestrator relies on WinRM to perform its tasks, such as manipulating the Windows Certificate Stores. Misconfiguration of WinRM may lead to connection and permission issues.
+<br><br>When performing <b>Inventory</b>, all bound certificates <i>regardless</i> to their store location will be returned.
+<br><br>When executing an Add or Renew Management job, the Store Location will be considered and place the certificate in that location.
 
 - **Limitations:** Users should be aware that for this store type to function correctly, certain permissions are necessary. While some advanced users successfully use non-administrator accounts with specific permissions, it is officially supported only with Local Administrator permissions. Complexities with interactions between Group Policy, WinRM, User Account Control, and other environmental factors may impede operations if not properly configured.
 
@@ -155,6 +157,9 @@ Before installing the Windows Certificate Universal Orchestrator extension, we r
 
 Please consult with your company's system administrator for more information on configuring SSH or WinRM in your environment.
 
+### PowerShell Requirements
+PowerShell is extensively used to inventory and manage certificates across each Certificate Store Type.  Windows Desktop and Server includes PowerShell 5.1 that is capable of running all or most PowerShell functions.  If the Orchestrator is to run in a Linux environment using SSH as their communication protocol, PowerShell 6.1 or greater is required (7.4 or greater is recommended).  
+In addition to PowerShell, IISU requires additional PowerShell modules to be installed and available.  These modules include:  WebAdministration and IISAdministration, versions 1.1.
 
 ### Security and Permission Considerations
 
