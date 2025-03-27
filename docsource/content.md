@@ -56,6 +56,9 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 Please consult with your company's system administrator for more information on configuring SSH or WinRM in your environment.
 
+### PowerShell Requirements
+PowerShell is extensively used to inventory and manage certificates across each Certificate Store Type.  Windows Desktop and Server includes PowerShell 5.1 that is capable of running all or most PowerShell functions.  If the Orchestrator is to run in a Linux environment using SSH as their communication protocol, PowerShell 6.1 or greater is required (7.4 or greater is recommended).  
+In addition to PowerShell, IISU requires additional PowerShell modules to be installed and available.  These modules include:  WebAdministration and IISAdministration, versions 1.1.
 
 ### Security and Permission Considerations
 
