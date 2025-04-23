@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Compile Remove="ImplementedStoreTypes\WinIIS\IISManager.cs" />
+    <Compile Remove="ImplementedStoreTypes\Win\WinInventory.cs" />
     <Compile Remove="PowerShellCertRequest.cs" />
   </ItemGroup>
 
@@ -40,12 +41,8 @@
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="PowerShellScripts\WinCertScripts.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="System.Management.Automation">
-      <Version>7.4.5</Version>
-    </PackageReference>
-  </ItemGroup>
-
 </Project>
