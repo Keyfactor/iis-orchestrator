@@ -1,3 +1,6 @@
+2.6.1
+* documentation updates for the 2.6 release
+
 2.6.0
 * Added the ability to run the extension in a Linux environment.  To utilize this change, for each Cert Store Types (WinCert/WinIIS/WinSQL), add ssh to the Custom Field <b>WinRM Protocol</b>.  When using ssh as a protocol, make sure to enter the appropriate ssh port number under WinRM Port.
 * NOTE: For legacy purposes the Display names WinRM Protocol and WinRM Port are maintained although the type of protocols now includes ssh.
