@@ -50,22 +50,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             if (isLocal)
             {
-#if NET6_0
+                _logger.LogTrace("Establishing a local RunSpace.");
                 PowerShellProcessInstance instance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
                 Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), instance);
                 return rs;
-#elif NET8_0_OR_GREATER
-                try 
-	            {	        
-                    InitialSessionState iss = InitialSessionState.CreateDefault();
-                    Runspace rs = RunspaceFactory.CreateRunspace(iss);
-                    return rs;
-	            }
-	            catch (global::System.Exception)
-	            {
-                    throw new Exception($"An error occurred while attempting to create the PowerShell instance.  This version requires .Net8 and PowerShell SDK 7.2 or greater.  Please verify the version of .Net8 and PowerShell installed on your machine.");
-	            }
-#endif
             }
             else
             {
