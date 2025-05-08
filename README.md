@@ -28,7 +28,7 @@
     <b>Related Integrations</b>
   </a>
 </p>
-
+ 
 ## Overview
 
 The WinCertStore Orchestrator remotely manages certificates in a Windows Server local machine certificate store.  Users are able to determine which store they wish to place certificates in by entering the correct store path.  For a complete list of local machine cert stores you can execute the PowerShell command:
