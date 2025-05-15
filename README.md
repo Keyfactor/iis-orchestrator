@@ -145,7 +145,7 @@ For customers wishing to use something other than the local administrator accoun
     -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
 
 
-## Create Certificate Store Types
+## Certificate Store Types
 
 To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your usecase. This only needs to happen _once_ per Keyfactor Command instance.
 
@@ -154,7 +154,20 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 <details><summary>Windows Certificate (WinCert)</summary>
 
 
-### Using kfutil:
+
+### Supported Operations
+
+| Operation    | Is Supported                                                                                                           |
+|--------------|------------------------------------------------------------------------------------------------------------------------|
+| Add          | ✅ Checked        |
+| Remove       | ✅ Checked     |
+| Discovery    | 🔲 Unchecked  |
+| Reenrollment | ✅ Checked |
+| Create       | 🔲 Unchecked     |
+
+### Creation Using kfutil:
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to created certificate store types.
+For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
 
 #### Using online definition from GitHub:
 This will reach out to GitHub and pull the latest store-type definition
@@ -165,11 +178,15 @@ kfutil store-types create WinCert
 
 #### Offline creation using integration-manifest file:
 If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+You would first download the [integration-manifest.json](./integration-manifest.json) and then run the following command
+in your offline environment.
 ```shell
 kfutil store-types create --from-file integration-manifest.json
 ```
 
-### Manually
+### Manual Creation
+If you do not wish to use the `kfutil` CLI then certificate store types can be creating in the web UI as described below.
+
 * **Create WinCert manually in the Command UI**:
     <details><summary>Create WinCert manually in the Command UI</summary>
 
@@ -225,8 +242,6 @@ kfutil store-types create --from-file integration-manifest.json
 
     ![WinCert Custom Fields Tab](docsource/images/WinCert-custom-fields-store-type-dialog.png)
 
-
-
     #### Entry Parameters Tab
 
     | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
@@ -246,7 +261,20 @@ kfutil store-types create --from-file integration-manifest.json
 <details><summary>IIS Bound Certificate (IISU)</summary>
 
 
-### Using kfutil:
+
+### Supported Operations
+
+| Operation    | Is Supported                                                                                                           |
+|--------------|------------------------------------------------------------------------------------------------------------------------|
+| Add          | ✅ Checked        |
+| Remove       | ✅ Checked     |
+| Discovery    | 🔲 Unchecked  |
+| Reenrollment | ✅ Checked |
+| Create       | 🔲 Unchecked     |
+
+### Creation Using kfutil:
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to created certificate store types.
+For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
 
 #### Using online definition from GitHub:
 This will reach out to GitHub and pull the latest store-type definition
@@ -257,11 +285,15 @@ kfutil store-types create IISU
 
 #### Offline creation using integration-manifest file:
 If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+You would first download the [integration-manifest.json](./integration-manifest.json) and then run the following command
+in your offline environment.
 ```shell
 kfutil store-types create --from-file integration-manifest.json
 ```
 
-### Manually
+### Manual Creation
+If you do not wish to use the `kfutil` CLI then certificate store types can be creating in the web UI as described below.
+
 * **Create IISU manually in the Command UI**:
     <details><summary>Create IISU manually in the Command UI</summary>
 
@@ -317,8 +349,6 @@ kfutil store-types create --from-file integration-manifest.json
 
     ![IISU Custom Fields Tab](docsource/images/IISU-custom-fields-store-type-dialog.png)
 
-
-
     #### Entry Parameters Tab
 
     | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
@@ -344,7 +374,20 @@ kfutil store-types create --from-file integration-manifest.json
 <details><summary>WinSql (WinSql)</summary>
 
 
-### Using kfutil:
+
+### Supported Operations
+
+| Operation    | Is Supported                                                                                                           |
+|--------------|------------------------------------------------------------------------------------------------------------------------|
+| Add          | ✅ Checked        |
+| Remove       | ✅ Checked     |
+| Discovery    | 🔲 Unchecked  |
+| Reenrollment | 🔲 Unchecked |
+| Create       | 🔲 Unchecked     |
+
+### Creation Using kfutil:
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to created certificate store types.
+For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
 
 #### Using online definition from GitHub:
 This will reach out to GitHub and pull the latest store-type definition
@@ -355,11 +398,15 @@ kfutil store-types create WinSql
 
 #### Offline creation using integration-manifest file:
 If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+You would first download the [integration-manifest.json](./integration-manifest.json) and then run the following command
+in your offline environment.
 ```shell
 kfutil store-types create --from-file integration-manifest.json
 ```
 
-### Manually
+### Manual Creation
+If you do not wish to use the `kfutil` CLI then certificate store types can be creating in the web UI as described below.
+
 * **Create WinSql manually in the Command UI**:
     <details><summary>Create WinSql manually in the Command UI</summary>
 
@@ -415,8 +462,6 @@ kfutil store-types create --from-file integration-manifest.json
     The Custom Fields tab should look like this:
 
     ![WinSql Custom Fields Tab](docsource/images/WinSql-custom-fields-store-type-dialog.png)
-
-
 
     #### Entry Parameters Tab
 
