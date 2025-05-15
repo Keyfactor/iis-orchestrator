@@ -113,7 +113,7 @@ The WinSql Certificate Store Type, referred to by its short name 'WinSql,' is de
 This integration is compatible with Keyfactor Universal Orchestrator version 10.1 and later.
 
 ## Support
-The Windows Certificate Universal Orchestrator extension is supported by Keyfactor for Keyfactor customers. If you have a support issue, please open a support ticket with your Keyfactor representative. If you have a support issue, please open a support ticket via the Keyfactor Support Portal at https://support.keyfactor.com. 
+The Windows Certificate Universal Orchestrator extension If you have a support issue, please open a support ticket by either contacting your Keyfactor representative or via the Keyfactor Support Portal at https://support.keyfactor.com. 
  
 > To report a problem or suggest a new feature, use the **[Issues](../../issues)** tab. If you want to contribute actual bug fixes or proposed enhancements, use the **[Pull requests](../../pulls)** tab.
 
@@ -154,13 +154,22 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 <details><summary>Windows Certificate (WinCert)</summary>
 
 
-* **Create WinCert using kfutil**:
+### Using kfutil:
 
-    ```shell
-    # Windows Certificate
-    kfutil store-types create WinCert
-    ```
+#### Using online definition from GitHub:
+This will reach out to GitHub and pull the latest store-type definition
+```shell
+# Windows Certificate
+kfutil store-types create WinCert
+```
 
+#### Offline creation using integration-manifest file:
+If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+```shell
+kfutil store-types create --from-file integration-manifest.json
+```
+
+### Manually
 * **Create WinCert manually in the Command UI**:
     <details><summary>Create WinCert manually in the Command UI</summary>
 
@@ -198,6 +207,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
     ![WinCert Advanced Tab](docsource/images/WinCert-advanced-store-type-dialog.png)
 
+    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
+
     #### Custom Fields Tab
     Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed. The following custom fields should be added to the store type:
 
@@ -229,19 +240,28 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
 
 
-    </details>
+
 </details>
 
 <details><summary>IIS Bound Certificate (IISU)</summary>
 
 
-* **Create IISU using kfutil**:
+### Using kfutil:
 
-    ```shell
-    # IIS Bound Certificate
-    kfutil store-types create IISU
-    ```
+#### Using online definition from GitHub:
+This will reach out to GitHub and pull the latest store-type definition
+```shell
+# IIS Bound Certificate
+kfutil store-types create IISU
+```
 
+#### Offline creation using integration-manifest file:
+If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+```shell
+kfutil store-types create --from-file integration-manifest.json
+```
+
+### Manually
 * **Create IISU manually in the Command UI**:
     <details><summary>Create IISU manually in the Command UI</summary>
 
@@ -278,6 +298,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     The Advanced tab should look like this:
 
     ![IISU Advanced Tab](docsource/images/IISU-advanced-store-type-dialog.png)
+
+    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
 
     #### Custom Fields Tab
     Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed. The following custom fields should be added to the store type:
@@ -316,19 +338,28 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
 
 
-    </details>
+
 </details>
 
 <details><summary>WinSql (WinSql)</summary>
 
 
-* **Create WinSql using kfutil**:
+### Using kfutil:
 
-    ```shell
-    # WinSql
-    kfutil store-types create WinSql
-    ```
+#### Using online definition from GitHub:
+This will reach out to GitHub and pull the latest store-type definition
+```shell
+# WinSql
+kfutil store-types create WinSql
+```
 
+#### Offline creation using integration-manifest file:
+If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+```shell
+kfutil store-types create --from-file integration-manifest.json
+```
+
+### Manually
 * **Create WinSql manually in the Command UI**:
     <details><summary>Create WinSql manually in the Command UI</summary>
 
@@ -366,6 +397,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
     ![WinSql Advanced Tab](docsource/images/WinSql-advanced-store-type-dialog.png)
 
+    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
+
     #### Custom Fields Tab
     Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed. The following custom fields should be added to the store type:
 
@@ -399,7 +432,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
 
 
-    </details>
+
 </details>
 
 
@@ -408,6 +441,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 1. **Download the latest Windows Certificate Universal Orchestrator extension from GitHub.** 
 
     Navigate to the [Windows Certificate Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/iis-orchestrator/releases/latest). Refer to the compatibility matrix below to determine whether the `net6.0` or `net8.0` asset should be downloaded. Then, click the corresponding asset to download the zip archive.
+
     | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `iis-orchestrator` .NET version to download |
     | --------- | ----------- | ----------- | ----------- |
     | Older than `11.0.0` | | | `net6.0` |
@@ -437,8 +471,14 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     Refer to [Starting/Restarting the Universal Orchestrator service](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/StarttheService.htm).
 
 
+6. **(optional) PAM Integration** 
 
-> The above installation steps can be supplimented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/CustomExtensions.htm?Highlight=extensions).
+    The Windows Certificate Universal Orchestrator extension is compatible with all supported Keyfactor PAM extensions to resolve PAM-eligible secrets. PAM extensions running on Universal Orchestrators enable secure retrieval of secrets from a connected PAM provider.
+
+    To configure a PAM provider, [reference the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam) to select an extension, and follow the associated instructions to install it on the Universal Orchestrator (remote).
+
+
+> The above installation steps can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/CustomExtensions.htm?Highlight=extensions).
 
 
 
@@ -448,6 +488,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
 <details><summary>Windows Certificate (WinCert)</summary>
 
+
+### Store Creation
 
 * **Manually with the Command UI**
 
@@ -460,6 +502,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     2. **Add a Certificate Store.**
 
         Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
+
         | Attribute | Description |
         | --------- | ----------- |
         | Category | Select "Windows Certificate" or the customized certificate store name from the previous step. |
@@ -473,11 +516,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
         | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
         | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
         | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
-
-
-        
-
     </details>
+
 
 * **Using kfutil**
     
@@ -491,6 +531,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     2. **Populate the generated CSV file**
 
         Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
+
         | Attribute | Description |
         | --------- | ----------- |
         | Category | Select "Windows Certificate" or the customized certificate store name from the previous step. |
@@ -504,24 +545,37 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
         | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
         | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
         | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
-
-
-        
-
-    3. **Import the CSV file to create the certificate stores** 
+    3. **Import the CSV file to create the certificate stores**
 
         ```shell
         kfutil stores import csv --store-type-name WinCert --file WinCert.csv
         ```
+
+* **PAM Provider Eligible Fields**
+    <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
+
+    If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
+
+    | Attribute | Description |
+    | --------- | ----------- |
+    | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
+    | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
+
+    Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
+
+    > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
     </details>
 
-> The content in this section can be supplimented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+> The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
 
 
 </details>
 
 <details><summary>IIS Bound Certificate (IISU)</summary>
 
+
+### Store Creation
 
 * **Manually with the Command UI**
 
@@ -534,6 +588,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     2. **Add a Certificate Store.**
 
         Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
+
         | Attribute | Description |
         | --------- | ----------- |
         | Category | Select "IIS Bound Certificate" or the customized certificate store name from the previous step. |
@@ -547,11 +602,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
         | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
         | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
         | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
-
-
-        
-
     </details>
+
 
 * **Using kfutil**
     
@@ -565,6 +617,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     2. **Populate the generated CSV file**
 
         Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
+
         | Attribute | Description |
         | --------- | ----------- |
         | Category | Select "IIS Bound Certificate" or the customized certificate store name from the previous step. |
@@ -578,24 +631,37 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
         | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
         | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
         | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
-
-
-        
-
-    3. **Import the CSV file to create the certificate stores** 
+    3. **Import the CSV file to create the certificate stores**
 
         ```shell
         kfutil stores import csv --store-type-name IISU --file IISU.csv
         ```
+
+* **PAM Provider Eligible Fields**
+    <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
+
+    If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
+
+    | Attribute | Description |
+    | --------- | ----------- |
+    | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
+    | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
+
+    Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
+
+    > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
     </details>
 
-> The content in this section can be supplimented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+> The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
 
 
 </details>
 
 <details><summary>WinSql (WinSql)</summary>
 
+
+### Store Creation
 
 * **Manually with the Command UI**
 
@@ -608,6 +674,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     2. **Add a Certificate Store.**
 
         Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
+
         | Attribute | Description |
         | --------- | ----------- |
         | Category | Select "WinSql" or the customized certificate store name from the previous step. |
@@ -622,11 +689,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
         | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
         | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
         | RestartService | Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation. |
-
-
-        
-
     </details>
+
 
 * **Using kfutil**
     
@@ -640,6 +704,7 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
     2. **Populate the generated CSV file**
 
         Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
+
         | Attribute | Description |
         | --------- | ----------- |
         | Category | Select "WinSql" or the customized certificate store name from the previous step. |
@@ -654,18 +719,29 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
         | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
         | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
         | RestartService | Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation. |
-
-
-        
-
-    3. **Import the CSV file to create the certificate stores** 
+    3. **Import the CSV file to create the certificate stores**
 
         ```shell
         kfutil stores import csv --store-type-name WinSql --file WinSql.csv
         ```
+
+* **PAM Provider Eligible Fields**
+    <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
+
+    If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
+
+    | Attribute | Description |
+    | --------- | ----------- |
+    | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
+    | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
+
+    Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
+
+    > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
     </details>
 
-> The content in this section can be supplimented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+> The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
 
 
 </details>
