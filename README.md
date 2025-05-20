@@ -31,17 +31,32 @@
 
 ## Overview
 
-The WinCertStore Orchestrator remotely manages certificates in a Windows Server local machine certificate store.  Users are able to determine which store they wish to place certificates in by entering the correct store path.  For a complete list of local machine cert stores you can execute the PowerShell command:
+The Windows Certificate Orchestrator Extension is a multi-purpose integration that can remotely manage certificates on a Windows Server's Local Machine Store.  This extension currently manages certificates for the current store types:
+* WinCert - Certificates defined by path set for the Certificate Store
+* WinIIS - IIS Bound certificates 
+* WinSQL - Certificates that are bound to the specified SQL Instances
+
+By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
+For a complete list of local machine cert stores you can execute the PowerShell command:
 
 	Get-ChildItem Cert:\LocalMachine
 
 The returned list will contain the actual certificate store name to be used when entering store location.
 
-By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
-
 This extension implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
 
-WinRM is used to remotely manage the certificate stores and IIS bindings.  WinRM must be properly configured to allow the orchestrator on the server to manage the certificates.  Setting up WinRM is not in the scope of this document.
+The Keyfactor Universal Orchestrator (UO) and WinCert Extension can be installed on either Windows or Linux operating systems.  A UO service managing certificates on remote servers is considered to be acting as an Orchestrator, while a UO Service managing local certificates on the same server running the service is considered an Agent.  When acting as an Orchestrator, connectivity from the orchestrator server hosting the WinCert extension to the orchestrated server hosting the certificate stores(s) being managed is achieved via either an SSH (for Linux orchestrated servers) or WinRM (for Windows orchestrated servers) connection.  When acting as an agent (Windows only), WinRM may still be used, OR the certificate store can be configured to bypass a WinRM connection and instead directly access the orchestrator server's certificate stores.
+
+![](images/orchestrator-agent.png)
+
+Please refer to the READMEs for each supported store type for more information on proper configuration and setup for these different stores.  The supported configurations of Universal Orchestrator hosts and managed orchestrated servers are detailed below:
+
+| | UO Installed on Windows | UO Installed on Linux |
+|-----|-----|------|
+|Orchestrated Server hosting certificate store(s) on remote Windows server|WinRM connection | SSH connection |
+|Certificate store(s) on same server as orchestrator service (Agent)| WinRM connection or local file system | Not Supported |  
+
+WinRM is used to remotely manage the certificate stores and IIS bindings on Windows machines only.  WinRM must be properly configured to allow the orchestrator on the server to manage the certificates.  Setting up WinRM is not in the scope of this document.
 
 **Note:**
 In version 2.0 of the IIS Orchestrator, the certificate store type has been renamed and additional parameters have been added. Prior to 2.0 the certificate store type was called “IISBin” and as of 2.0 it is called “IISU”. If you have existing certificate stores of type “IISBin”, you have three options:
@@ -55,7 +70,6 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 The Windows Certificate Universal Orchestrator extension implements 3 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
 
-- [Windows Certificate](#WinCert)
 
 - [IIS Bound Certificate](#IISU)
 
@@ -75,6 +89,28 @@ The Windows Certificate Universal Orchestrator extension If you have a support i
 
 Before installing the Windows Certificate Universal Orchestrator extension, we recommend that you install [kfutil](https://github.com/Keyfactor/kfutil). Kfutil is a command-line tool that simplifies the process of creating store types, installing extensions, and instantiating certificate stores in Keyfactor Command.
 
+
+<details>
+<summary><b>Using the WinCert Extension on Linux servers:</b></summary>
+
+1. General SSH Setup Information: PowerShell 6 or higher and SSH must be installed on all computers.  Install SSH, including ssh server, that's appropriate for your platform.  You also need to install PowerShell from GitHub to get the SSH remoting feature.  The SSH server must be configured to create a SSH subsysten to host a PowerShell process on the remote computer.  It is suggested to turn off password authentication as this extension uses key-based authentication.  
+
+2. SSH Authentication: When creating a Keyfactor certificate store for the WinCert orchestrator extension, the only protocol supported to communicate with Windows servers is ssh.  When providing the user id and password, the connection is attempted by creating a temporary private key file using the contents in the Password textbox. Therefore, the password field must contain the full SSH Private key.  
+
+</details>
+
+<details>
+<summary><b>Using the WinCert Extension on Windows servers:</b></summary>
+
+1. When orchestrating management of external (and potentially local) certificate stores, the WinCert Orchestrator Extension makes use of WinRM to connect to external certificate store servers.  The security context used is the user id entered in the Keyfactor Command certificate store.  Make sure that WinRM is set up on the orchestrated server and that the WinRM port (by convention, 5585 for HTTP and 5586 for HTTPS) is part of the certificate store path when setting up your certificate stores jobs.  If running as an agent, managing local certificate stores, local commands are run under the security context of the user account running the Keyfactor Universal Orchestrator Service.
+
+</details>
+
+Please consult with your company's system administrator for more information on configuring SSH or WinRM in your environment.
+
+### PowerShell Requirements
+PowerShell is extensively used to inventory and manage certificates across each Certificate Store Type.  Windows Desktop and Server includes PowerShell 5.1 that is capable of running all or most PowerShell functions.  If the Orchestrator is to run in a Linux environment using SSH as their communication protocol, PowerShell 6.1 or greater is required (7.4 or greater is recommended).  
+In addition to PowerShell, IISU requires additional PowerShell modules to be installed and available.  These modules include:  WebAdministration and IISAdministration, versions 1.1.
 
 ### Security and Permission Considerations
 
@@ -192,7 +228,6 @@ the Keyfactor Command Portal
    | Private Key Handling | Optional | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
    | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
 
-   The Advanced tab should look like this:
 
    ![WinCert Advanced Tab](docsource/images/WinCert-advanced-store-type-dialog.png)
 
@@ -309,8 +344,6 @@ the Keyfactor Command Portal
    | Supports Entry Password | 🔲 Unchecked | Determines if an individual entry within a store can have a password. |
 
    The Basic tab should look like this:
-
-   ![IISU Basic Tab](docsource/images/IISU-basic-store-type-dialog.png)
 
    ##### Advanced Tab
    | Attribute | Value | Description |
@@ -446,8 +479,6 @@ the Keyfactor Command Portal
    | Private Key Handling | Optional | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
    | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
 
-   The Advanced tab should look like this:
-
    ![WinSql Advanced Tab](docsource/images/WinSql-advanced-store-type-dialog.png)
 
    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
@@ -575,9 +606,6 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 #### Using kfutil CLI
 
 <details><summary>Click to expand details</summary>
-
-1. **Generate a CSV template for the WinCert certificate store**
-
     ```shell
     kfutil stores import generate-template --store-type-name WinCert --outpath WinCert.csv
     ```
@@ -613,11 +641,6 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
 If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
 
-   | Attribute | Description |
-   | --------- | ----------- |
-   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
-   | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
-
 Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
 > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
 
@@ -647,52 +670,7 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
     Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
 
-   | Attribute | Description |
-   | --------- | ----------- |
-   | Category | Select "IIS Bound Certificate" or the customized certificate store name from the previous step. |
-   | Container | Optional container to associate certificate store with. |
-   | Client Machine | Hostname of the Windows Server containing the IIS certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.  For more information, see [Client Machine](#note-regarding-client-machine). |
-   | Store Path | Windows certificate store path to manage. Choose 'My' for the Personal store or 'WebHosting' for the Web Hosting store. |
-   | Orchestrator | Select an approved orchestrator capable of managing `IISU` certificates. Specifically, one with the `IISU` capability. |
-   | spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
-   | WinRM Protocol | Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication. |
-   | WinRM Port | String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP. |
-   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
-   | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
-   | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
 
-</details>
-
-
-
-#### Using kfutil CLI
-
-<details><summary>Click to expand details</summary>
-
-1. **Generate a CSV template for the IISU certificate store**
-
-    ```shell
-    kfutil stores import generate-template --store-type-name IISU --outpath IISU.csv
-    ```
-2. **Populate the generated CSV file**
-
-    Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
-
-   | Attribute | Description |
-   | --------- | ----------- |
-   | Category | Select "IIS Bound Certificate" or the customized certificate store name from the previous step. |
-   | Container | Optional container to associate certificate store with. |
-   | Client Machine | Hostname of the Windows Server containing the IIS certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.  For more information, see [Client Machine](#note-regarding-client-machine). |
-   | Store Path | Windows certificate store path to manage. Choose 'My' for the Personal store or 'WebHosting' for the Web Hosting store. |
-   | Orchestrator | Select an approved orchestrator capable of managing `IISU` certificates. Specifically, one with the `IISU` capability. |
-   | Properties.spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
-   | Properties.WinRM Protocol | Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication. |
-   | Properties.WinRM Port | String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP. |
-   | Properties.ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
-   | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
-   | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
-
-3. **Import the CSV file to create the certificate stores**
 
     ```shell
     kfutil stores import csv --store-type-name IISU --file IISU.csv
@@ -706,10 +684,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
 
-   | Attribute | Description |
-   | --------- | ----------- |
-   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
-   | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
 
 Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
 > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
@@ -763,31 +737,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 <details><summary>Click to expand details</summary>
 
-1. **Generate a CSV template for the WinSql certificate store**
-
-    ```shell
-    kfutil stores import generate-template --store-type-name WinSql --outpath WinSql.csv
-    ```
-2. **Populate the generated CSV file**
-
-    Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
-
-   | Attribute | Description |
-   | --------- | ----------- |
-   | Category | Select "WinSql" or the customized certificate store name from the previous step. |
-   | Container | Optional container to associate certificate store with. |
-   | Client Machine | Hostname of the Windows Server containing the SQL Server Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine). |
-   | Store Path | Fixed string value 'My' indicating the Personal store on the Local Machine. This denotes the Windows certificate store to be managed for SQL Server. |
-   | Orchestrator | Select an approved orchestrator capable of managing `WinSql` certificates. Specifically, one with the `WinSql` capability. |
-   | Properties.spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
-   | Properties.WinRM Protocol | Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication. |
-   | Properties.WinRM Port | String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP. |
-   | Properties.ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
-   | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
-   | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
-   | Properties.RestartService | Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation. |
-
-3. **Import the CSV file to create the certificate stores**
 
     ```shell
     kfutil stores import csv --store-type-name WinSql --file WinSql.csv
@@ -801,10 +750,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
 
-   | Attribute | Description |
-   | --------- | ----------- |
-   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. |
-   | ServerPassword | Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'. |
 
 Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
 > Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
@@ -820,11 +765,10 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 
 
-## Note Regarding Client Machine
+## Client Machine Instructions
+Prior to version 2.6, this extension would only run in the Windows environment.  Version 2.6 and greater is capable of running on Linux, however, only the SSH protocol is supported.
 
-If running as an agent (accessing stores on the server where the Universal Orchestrator Services is installed ONLY), the Client Machine can be entered, OR you can bypass a WinRM connection and access the local file system directly by adding "|LocalMachine" to the end of your value for Client Machine, for example "1.1.1.1|LocalMachine".  In this instance the value to the left of the pipe (|) is ignored.  It is important to make sure the values for Client Machine and Store Path together are unique for each certificate store created, as Keyfactor Command requires the Store Type you select, along with Client Machine, and Store Path together must be unique.  To ensure this, it is good practice to put the full DNS or IP Address to the left of the | character when setting up a certificate store that will be accessed without a WinRM connection.  
-
-Here are the settings required for each Store Type previously configured.
+If running as an agent (accessing stores on the server where the Universal Orchestrator Services is installed ONLY), the Client Machine can be entered, OR you can bypass a WinRM connection and access the local file system directly by adding "|LocalMachine" to the end of your value for Client Machine, for example "1.1.1.1|LocalMachine".  In this instance the value to the left of the pipe (|) is ignored.  It is important to make sure the values for Client Machine and Store Path together are unique for each certificate store created, as Keyfactor Command requires the Store Type you select, along with Client Machine, and Store Path together must be unique.  To ensure this, it is good practice to put the full DNS or IP Address to the left of the | character when setting up a certificate store that will be accessed without a WinRM connection.
 
 
 ## License
