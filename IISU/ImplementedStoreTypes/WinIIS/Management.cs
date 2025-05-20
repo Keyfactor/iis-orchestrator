@@ -103,12 +103,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 {
                                     string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
                                     _logger.LogTrace($"Completed adding the certificate to the store");
+                                    _logger.LogTrace($"New thumbprint: {newThumbprint}");
 
                                     // Bind Certificate to IIS Site
                                     if (newThumbprint != null)
                                     {
                                         IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
                                         WinIISBinding.BindCertificate(_psHelper, bindingInfo, newThumbprint, "", _storePath);
+
+                                        _logger.LogTrace("Returned after binding certificate to store");
 
                                         complete = new JobResult
                                         {
