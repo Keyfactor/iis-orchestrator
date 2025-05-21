@@ -369,12 +369,11 @@ function New-KFIISSiteBinding{
         }
 
         # Step 4: Bind SSL Certificate to site
-        $binding = Get-WebBinding -Protocol "https"
+        $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol
         $binding.AddSslCertificate($Thumbprint, $StoreName)
 
         Write-Verbose "New binding added successfully for $SiteName"
         return $true
-
     }
 }
 

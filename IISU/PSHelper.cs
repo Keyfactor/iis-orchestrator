@@ -102,6 +102,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         public void Initialize()
         {
             _logger.LogTrace("Entered PSHelper.Initialize()");
+            _logger.LogTrace($"PowerShell SDK Location: {typeof(System.Management.Automation.PowerShell).Assembly.Location}");
+            _logger.LogTrace($".NET Runtime Version: {RuntimeInformation.FrameworkDescription}");
 
             PS = PowerShell.Create();
 

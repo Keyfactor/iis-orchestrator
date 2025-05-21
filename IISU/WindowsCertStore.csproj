@@ -3,8 +3,9 @@
   <PropertyGroup>
     <RootNamespace>Keyfactor.Extensions.Orchestrator.WindowsCertStore</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-	<TargetFrameworks>NET6.0;NET8.0</TargetFrameworks>
+	<TargetFramework>net8.0</TargetFramework>
     <PlatformTarget>AnyCPU</PlatformTarget>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -32,9 +33,7 @@
   <ItemGroup>
     <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
     <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
-	  
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.19" Condition="'$(TargetFramework)' == 'net6.0'" />
-	<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.5" Condition="'$(TargetFramework)' == 'net8.0'" />
+	<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.5" />
   </ItemGroup>
 
   <ItemGroup>
