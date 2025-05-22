@@ -26,10 +26,10 @@
             "linux": {
                 "supportsCreateStore": false,
                 "supportsDiscovery": false,
-                "supportsManagementAdd": false,
-                "supportsManagementRemove": false,
-                "supportsReenrollment": false,
-                "supportsInventory": false,
+                "supportsManagementAdd": true,
+                "supportsManagementRemove": true,
+                "supportsReenrollment": true,
+                "supportsInventory": true,
                 "platformSupport": "Unused"
             },
             "store_types": [
@@ -55,24 +55,24 @@
                             "Required": false,
                             "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
                         },
-                        {
-                            "Name": "WinRM Protocol",
-                            "DisplayName": "WinRM Protocol",
-                            "Type": "MultipleChoice",
-                            "DependsOn": "",
-                            "DefaultValue": "https,http",
-                            "Required": true,
-                            "Description": "Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication."
-                        },
-                        {
-                            "Name": "WinRM Port",
-                            "DisplayName": "WinRM Port",
-                            "Type": "String",
-                            "DependsOn": "",
-                            "DefaultValue": "5986",
-                            "Required": true,
-                            "Description": "String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP."
-                        },
+                      {
+                        "Name": "WinRM Protocol",
+                        "DisplayName": "WinRM Protocol",
+                        "Type": "MultipleChoice",
+                        "DependsOn": "",
+                        "DefaultValue": "https,http,ssh",
+                        "Required": true,
+                        "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
+                      },
+                      {
+                        "Name": "WinRM Port",
+                        "DisplayName": "WinRM Port",
+                        "Type": "String",
+                        "DependsOn": "",
+                        "DefaultValue": "5986",
+                        "Required": true,
+                        "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+                      },
                         {
                             "Name": "ServerUsername",
                             "DisplayName": "Server Username",
@@ -82,15 +82,15 @@
                             "Required": false,
                             "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
                         },
-                        {
-                            "Name": "ServerPassword",
-                            "DisplayName": "Server Password",
-                            "Type": "Secret",
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Required": false,
-                            "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
-                        },
+                      {
+                        "Name": "ServerPassword",
+                        "DisplayName": "Server Password",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                      },
                         {
                             "Name": "ServerUseSsl",
                             "DisplayName": "Use SSL",
@@ -174,9 +174,9 @@
                             "DisplayName": "WinRM Protocol",
                             "Type": "MultipleChoice",
                             "DependsOn": "",
-                            "DefaultValue": "https,http",
+                            "DefaultValue": "https,http,ssh",
                             "Required": true,
-                            "Description": "Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication."
+                            "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
                         },
                         {
                             "Name": "WinRM Port",
@@ -185,7 +185,7 @@
                             "DependsOn": "",
                             "DefaultValue": "5986",
                             "Required": true,
-                            "Description": "String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP."
+                            "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
                         },
                         {
                             "Name": "ServerUsername",
@@ -196,15 +196,15 @@
                             "Required": false,
                             "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
                         },
-                        {
-                            "Name": "ServerPassword",
-                            "DisplayName": "Server Password",
-                            "Type": "Secret",
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Required": false,
-                            "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
-                        },
+                      {
+                        "Name": "ServerPassword",
+                        "DisplayName": "Server Password",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                      },
                         {
                             "Name": "ServerUseSsl",
                             "DisplayName": "Use SSL",
@@ -373,24 +373,24 @@
                             "Required": false,
                             "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
                         },
-                        {
-                            "Name": "WinRM Protocol",
-                            "DisplayName": "WinRM Protocol",
-                            "Type": "MultipleChoice",
-                            "DependsOn": "",
-                            "DefaultValue": "https,http",
-                            "Required": true,
-                            "Description": "Multiple choice value specifying the protocol (https or http) that the target server's WinRM listener is using. Example: 'https' to use secure communication."
-                        },
-                        {
-                            "Name": "WinRM Port",
-                            "DisplayName": "WinRM Port",
-                            "Type": "String",
-                            "DependsOn": "",
-                            "DefaultValue": "5986",
-                            "Required": true,
-                            "Description": "String value specifying the port number that the target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP."
-                        },
+                      {
+                        "Name": "WinRM Protocol",
+                        "DisplayName": "WinRM Protocol",
+                        "Type": "MultipleChoice",
+                        "DependsOn": "",
+                        "DefaultValue": "https,http,ssh",
+                        "Required": true,
+                        "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
+                      },
+                      {
+                        "Name": "WinRM Port",
+                        "DisplayName": "WinRM Port",
+                        "Type": "String",
+                        "DependsOn": "",
+                        "DefaultValue": "5986",
+                        "Required": true,
+                        "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+                      },
                         {
                             "Name": "ServerUsername",
                             "DisplayName": "Server Username",
@@ -400,15 +400,15 @@
                             "Required": false,
                             "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
                         },
-                        {
-                            "Name": "ServerPassword",
-                            "DisplayName": "Server Password",
-                            "Type": "Secret",
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Required": false,
-                            "Description": "Password corresponding to the Server Username used to log into the target server for establishing the WinRM session. Example: 'P@ssw0rd123'."
-                        },
+                      {
+                        "Name": "ServerPassword",
+                        "DisplayName": "Server Password",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                      },
                         {
                             "Name": "ServerUseSsl",
                             "DisplayName": "Use SSL",
@@ -479,9 +479,6 @@
                     },
                     "StorePathValue": "My",
                     "PrivateKeyAllowed": "Optional",
-                    "JobProperties": [
-                        "InstanceName"
-                    ],
                     "ServerRequired": true,
                     "PowerShell": false,
                     "BlueprintAllowed": true,
