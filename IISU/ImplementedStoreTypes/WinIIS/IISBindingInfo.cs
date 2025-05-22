@@ -42,13 +42,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
         private string MigrateSNIFlag(string input)
         {
-            // Check if the input is numeric, if so, just return it as an integer
             if (int.TryParse(input, out int numericValue))
             {
                 return numericValue.ToString();
             }
 
-            if (string.IsNullOrEmpty(input)) { throw new ArgumentNullException("SNI/SSL Flag", "The SNI or SSL Flag flag must not be empty or null."); }
+            if (string.IsNullOrEmpty(input))
+                throw new ArgumentNullException("SNI/SSL Flag", "The SNI or SSL Flag must not be empty or null.");
+
+            // Normalize input
+            var trimmedInput = input.Trim().ToLowerInvariant();
+
+            // Handle boolean values
+            if (trimmedInput == "true")
+                return "1";
+            if (trimmedInput == "false")
+                return "0";
 
             // Handle the string cases
             switch (input.ToLower())
