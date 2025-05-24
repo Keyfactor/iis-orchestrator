@@ -144,8 +144,8 @@ The Windows Certificate Universal Orchestrator extension implements 3 Certificat
 
 ### WinCert
 
-
 <details><summary>Click to expand details</summary>
+
 
 The Windows Certificate Certificate Store Type, known by its short name 'WinCert,' enables the management of certificates within the Windows local machine certificate stores. This store type is a versatile option for general Windows certificate management and supports functionalities including inventory, add, remove, and reenrollment of certificates.
 
@@ -262,15 +262,13 @@ the Keyfactor Command Portal
 
    ![WinCert Entry Parameters Tab](docsource/images/WinCert-entry-parameters-store-type-dialog.png)
 
-
-
    </details>
 </details>
 
 ### IISU
 
-
 <details><summary>Click to expand details</summary>
+
 
 The IIS Bound Certificate Certificate Store Type, identified by its short name 'IISU,' is designed for the management of certificates bound to IIS (Internet Information Services) servers. This store type allows users to automate and streamline the process of adding, removing, and reenrolling certificates for IIS sites, making it significantly easier to manage web server certificates.
 
@@ -397,15 +395,13 @@ the Keyfactor Command Portal
 
    ![IISU Entry Parameters Tab](docsource/images/IISU-entry-parameters-store-type-dialog.png)
 
-
-
    </details>
 </details>
 
 ### WinSql
 
-
 <details><summary>Click to expand details</summary>
+
 
 The WinSql Certificate Store Type, referred to by its short name 'WinSql,' is designed for the management of certificates used by SQL Server instances. This store type allows users to automate the process of adding, removing, reenrolling, and inventorying certificates associated with SQL Server, thereby simplifying the management of SSL/TLS certificates for database servers.
 
@@ -519,8 +515,6 @@ the Keyfactor Command Portal
    The Entry Parameters tab should look like this:
 
    ![WinSql Entry Parameters Tab](docsource/images/WinSql-entry-parameters-store-type-dialog.png)
-
-
 
    </details>
 </details>
@@ -667,6 +661,8 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
 
 
+
+
 </details>
 
 <details><summary>IIS Bound Certificate (IISU)</summary>
@@ -758,6 +754,8 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+
 
 
 </details>
@@ -853,6 +851,8 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+
 
 
 </details>
