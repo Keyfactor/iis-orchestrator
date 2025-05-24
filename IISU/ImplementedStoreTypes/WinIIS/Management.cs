@@ -103,12 +103,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 {
                                     string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
                                     _logger.LogTrace($"Completed adding the certificate to the store");
+                                    _logger.LogTrace($"New thumbprint: {newThumbprint}");
 
                                     // Bind Certificate to IIS Site
                                     if (newThumbprint != null)
                                     {
                                         IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
                                         WinIISBinding.BindCertificate(_psHelper, bindingInfo, newThumbprint, "", _storePath);
+
+                                        _logger.LogTrace("Returned after binding certificate to store");
 
                                         complete = new JobResult
                                         {
@@ -136,12 +139,21 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             {
                                 // Removing a certificate involves two steps: UnBind the certificate, then delete the cert from the store
 
+                                IISBindingInfo thisBinding = IISBindingInfo.ParseAliaseBindingString(config.JobCertificate.Alias);
                                 string thumbprint = config.JobCertificate.Alias.Split(':')[0];
                                 try
                                 {
-                                    if (WinIISBinding.UnBindCertificate(_psHelper, new IISBindingInfo(config.JobProperties)))
+                                    if (WinIISBinding.UnBindCertificate(_psHelper, thisBinding))
                                     {
-                                        complete = RemoveCertificate(thumbprint);
+                                        // This function will only remove the certificate from the store if not used by any other sites
+                                        RemoveIISCertificate(thisBinding.Thumbprint);
+
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = ""
+                                        };
                                     }
                                 }
                                 catch (Exception ex)
@@ -225,8 +237,21 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 throw new Exception (failureMessage);
             }
 }
+        public void RemoveIISCertificate(string thumbprint)
+        {
+            _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
 
-        public JobResult RemoveCertificate(string thumbprint)
+            var parameters = new Dictionary<string, object>()
+                    {
+                        { "Thumbprint", thumbprint },
+                        { "StoreName", _storePath }
+                    };
+
+            _psHelper.ExecutePowerShell("Remove-KFIISCertificateIfUnused", parameters);
+
+        }
+
+        public JobResult RemoveCertificateORIG(string thumbprint)
         {
             try
             {

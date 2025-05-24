@@ -49,25 +49,39 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             // Optional parameters
             if (!string.IsNullOrEmpty(bindingInfo.HostName)) { parameters.Add("HostName", bindingInfo.HostName); }
 
-            _results = psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);      // returns true if successful
-            _logger.LogTrace("Returned from executing PS function (New-KFIISSiteBinding)");
-
-            // This should return the thumbprint of the certificate
-            if (_results != null && _results.Count > 0)
+            try
             {
-                bool success = _results[0].BaseObject is bool value && value;
-                if (success)
+                _results = psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);      // returns true if successful
+                _logger.LogTrace("Returned from executing PS function (New-KFIISSiteBinding)");
+
+                if (_results != null && _results.Count > 0)
                 {
-                    _logger.LogTrace($"Bound certificate with the thumbprint: '{thumbprint}' to site: '{bindingInfo.SiteName}' successfully.");
-                    return;
+                    var baseObject = _results[0]?.BaseObject;
+                    if (baseObject is bool value)
+                    {
+                        if (value)
+                        {
+                            _logger.LogTrace($"Bound certificate with the thumbprint: '{thumbprint}' to site: '{bindingInfo.SiteName}' successfully.");
+                        }
+                        else
+                        {
+                            _logger.LogTrace("Something happened and the binding failed.");
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Unexpected result type returned from script: " + baseObject?.GetType().Name);
+                    }
                 }
                 else
                 {
-                    _logger.LogTrace("Something happened and the binding failed.");
+                    _logger.LogWarning("PowerShell script returned no results.");
                 }
             }
-
-            throw new Exception($"An unknown error occurred while attempting to bind thumbprint: {thumbprint} to site: '{bindingInfo.SiteName}'. \nCheck the UO Logs for more information.");
+            catch (Exception ex)
+            {
+                throw new Exception($"An unknown error occurred while attempting to bind thumbprint: {thumbprint} to site: '{bindingInfo.SiteName}'. \n{ex.Message}");
+            }
         }
 
         public static bool UnBindCertificate(PSHelper psHelper, IISBindingInfo bindingInfo)
@@ -102,7 +116,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                 if (results[0].BaseObject is bool success)
                 {
-                    _logger.LogTrace($"Returned from unbinding as {success}.");
                     return success;
                 }
                 else

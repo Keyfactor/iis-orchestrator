@@ -16,8 +16,10 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+using Markdig.Syntax;
 using System;
 using System.Collections.Generic;
+using System.Web.Services.Description;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
@@ -29,6 +31,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         public string Port { get; set; }
         public string? HostName { get; set; }
         public string SniFlag { get; set; }
+        public string Thumbprint { get; private set; }
+
+        public IISBindingInfo()
+        {
+                
+        }
 
         public IISBindingInfo(Dictionary<string, object> bindingInfo)
         {
@@ -40,15 +48,44 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             SniFlag = MigrateSNIFlag(bindingInfo["SniFlag"].ToString());
         }
 
+        public static IISBindingInfo ParseAliaseBindingString(string alias)
+        {
+            if (string.IsNullOrWhiteSpace(alias))
+                throw new ArgumentException("Alias cannot be null or empty.", nameof(alias));
+
+            var parts = alias.Split(':');
+            if (parts.Length < 4 || parts.Length > 5)
+                throw new FormatException("Alias must be in the format of Thumbprint:IPAddress:Port[:Hostname]");
+
+            return new IISBindingInfo
+            {
+                Thumbprint = parts[0],
+                SiteName = parts[1],
+                IPAddress = parts[2],
+                Port = parts[3],
+                HostName = parts.Length == 5 ? parts[4] : null
+            };
+        }
+
+
         private string MigrateSNIFlag(string input)
         {
-            // Check if the input is numeric, if so, just return it as an integer
             if (int.TryParse(input, out int numericValue))
             {
                 return numericValue.ToString();
             }
 
-            if (string.IsNullOrEmpty(input)) { throw new ArgumentNullException("SNI/SSL Flag", "The SNI or SSL Flag flag must not be empty or null."); }
+            if (string.IsNullOrEmpty(input))
+                throw new ArgumentNullException("SNI/SSL Flag", "The SNI or SSL Flag must not be empty or null.");
+
+            // Normalize input
+            var trimmedInput = input.Trim().ToLowerInvariant();
+
+            // Handle boolean values
+            if (trimmedInput == "true")
+                return "1";
+            if (trimmedInput == "false")
+                return "0";
 
             // Handle the string cases
             switch (input.ToLower())
