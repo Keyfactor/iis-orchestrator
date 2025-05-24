@@ -242,11 +242,8 @@ function Add-KFCertificateToStore{
     )
 
     try {
-
-        Write-Information "Base64Cert: $Base64Cert"
-        Write-Information "PrivateKeyPassword: $PrivateKeyPassword"
-        Write-Information "StoreName: $StoreName"
-        Write-Information "CryptoServiceProvider: $CryptoServiceProvider"
+        Write-Information "Entering PowerShell Script Add-KFCertificate"
+        Write-Verbose "Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
 
         $thumbprint = $null
 
@@ -406,15 +403,8 @@ function New-KFIISSiteBinding {
         [int]$SslFlags = 0
     )
 
-    Write-Verbose "INFO: Entered New-KFIISSiteBinding"
-    Write-Verbose "SiteName: $SiteName"
-    Write-Verbose "IPAddress: $IPAddress"
-    Write-Verbose "Port: $Port"
-    Write-Verbose "HostName: $Hostname"
-    Write-Verbose "Protocol: $Protocol"
-    Write-Verbose "Thumbprint: $Thumbprint"
-    Write-Verbose "Store Path: $StoreName"
-    Write-Verbose "SslFlags: $SslFlags"
+    Write-Information "Entering PowerShell Script: New-KFIISSiteBinding"
+    Write-Verbose "Entered New-KFIISSiteBinding with values SiteName: '$SiteName', IPAddress: '$IPAddress', Port: $Port, HostName: '$Hostname', Protocol: '$Protocol', Thumbprint: '$Thumbprint', Store Path: '$StoreName', SslFlags: '$SslFlags'"
 
     $searchBindings = "${IPAddress}:${Port}:${Hostname}"
     $hasIISDrive = Ensure-IISDrive
@@ -423,7 +413,7 @@ function New-KFIISSiteBinding {
     if ($hasIISDrive) {
         $sitePath = "IIS:\Sites\$SiteName"
         if (-not (Test-Path $sitePath)) {
-            Write-Error "Site '$SiteName' not found in IIS drive." -ForegroundColor Red
+            Write-Error "Site '$SiteName' not found in IIS drive."
             return
         }
 
@@ -435,10 +425,10 @@ function New-KFIISSiteBinding {
         # Step 2: Remove existing binding(s)
         foreach ($binding in $httpsBindings) {
             try {
-                Write-Verbose "Removing existing binding: $($binding.bindingInformation)"
+                Write-Verbose "Calling Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false"
                 Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false
             } catch {
-                Write-Information "Error removing binding '$($binding.bindingInformation)'"
+                Write-Warning "Error removing binding '$($binding.bindingInformation)'"
                 Write-Verbose $_
                 throw $_
             }
@@ -446,22 +436,26 @@ function New-KFIISSiteBinding {
 
         # Step 3: Add new binding
         try {
-            Write-Verbose "Adding new binding..."
+            Write-Verbose "Calling New-WebBinding -Name $SiteName -Protocol $Protocol -IPAddress $IPAddress -Port $Port -HostHeader '$Hostname' -SslFlags $SslFlags"
             New-WebBinding -Name $SiteName -Protocol $Protocol -IPAddress $IPAddress -Port $Port -HostHeader $Hostname -SslFlags $SslFlags
         } catch {
-            Write-Information "Error adding binding to $SiteName"
+            Write-Warning "Error adding binding to $SiteName"
             Write-Verbose $_
             throw $_
         }
 
         # Step 4: Bind SSL certificate
+        Write-Verbose "Getting Web Binding: $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol, Where BindingInformation equals '$searchBindings'"
         $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol | Where-Object {
             $_.bindingInformation -eq $searchBindings
         }
 
         if ($binding) {
+            Write-Verbose "Getting ready to Add SSL Certificate with Thumbprint: '$Thumbprint' in store: '$StoreName'"
             $binding.AddSslCertificate($Thumbprint, $StoreName)
             Write-Verbose "Certificate bound successfully."
+        } else {
+            Write-Warning "No bindings were found for: $SearchBindings"
         }
 
         return $true
@@ -473,7 +467,7 @@ function New-KFIISSiteBinding {
         $site = $iis.Sites[$SiteName]
 
         if ($null -eq $site) {
-            Write-Error "Site '$SiteName' not found in ServerManager." -ForegroundColor Red
+            Write-Error "Site '$SiteName' not found in ServerManager."
             return
         }
 
@@ -520,133 +514,6 @@ function New-KFIISSiteBinding {
     }
 }
 
-
-function New-KFIISSiteBindingORIG{
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$SiteName,        # The name of the IIS site
-        $IPAddress,       # The IP Address for the binding
-        $Port,            # The port number for the binding
-        $Hostname,        # Hostname for the binding (if any)
-        $Protocol,        # Protocol (e.g., HTTP, HTTPS)
-        $Thumbprint,      # Certificate thumbprint for HTTPS bindings
-        $StoreName,       # Certificate store location (e.g., ""My"" for personal certs)
-        $SslFlags         # SSL flags (if any)
-    )
-
-    Write-Verbose "INFO:  Entered New-KFIISSiteBinding."
-    Write-Verbose "SiteName: $SiteName"
-    Write-Verbose "IPAddress: $IPAddress"
-    Write-Verbose "Port: $Port"
-    Write-Verbose "HostName: $HostName"
-    Write-Verbose "Protocol: $Protocol"
-    Write-Verbose "Thumbprint:  $Thumbprint"
-    Write-Verbose "Store Path: $StoreName"
-    Write-Verbose "SslFlags: $SslFlags"
-
-    $searchBindings = "${IPAddress}:${Port}:${Hostname}" 
-
-    $hasIISDrive = Ensure-IISDrive
-    Write-Verbose "IIS Drive is availble: $hasIISDrive"
-
-    if ($hasIISDrive -eq $true) {
-        $sitePath = "IIS:\Sites\$SiteName"
-        if (Test-Path $sitePath) {
-            $site = Get-Item $sitePath
-
-            $httpsBindings = $site.Bindings.Collection | Where-Object {
-                $_.bindingInformation -eq $searchBindings -and $_.protocol -eq "https"
-            }
-
-            if (-not $httpsBindings) {
-                Write-Verbose "No matching HTTPS bindings found in IIS drive for site '$SiteName'."
-                return
-            }
-
-        } else {
-            Write-Error "Site '$SiteName' not found." -ForegroundColor Red
-            return
-        }
-
-
-    } else {
-        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
-        $iis = New-Object Microsoft.Web.Administration.ServerManager
-
-        $site = $iis.Sites[$SiteName]
-        if ($null -eq $site) {
-            Write-Error "Site '$SiteName' not found in ServerManager." -ForegroundColor Red
-            return
-        }
-
-        $httpsBindings = $site.Bindings | Where-Object {
-            $_.bindingInformation -eq $searchBindings -and $_.protocol -eq "https"
-        }
-
-        if (-not $httpsBindings) {
-            Write-Verbose "No matching HTTPS bindings found in ServerManager for site '$SiteName'."
-            return
-        }
-    }
-
-    # Step 2: Remove existing web binding if exists
-    foreach ($binding in $httpsBindings) {
-        $thisProtocol = $binding.protocol
-        $thisBindingInformation = $binding.bindingInformation
-        $thisSslFlags = $binding.sslFlags
-        $thisIPAddress = ($thisBindingInformation -split ':')[0]
-
-        try {
-            Write-Verbose "Removing existing binding $thisBindingInformation"
-            Remove-WebBinding -Name $SiteName -BindingInformation $thisBindingInformation -Protocol $thisProtocol -Confirm:$false
-        } catch {
-            Write-Information "Error occurred while attempting to remove binding: '$thisBindingInformation'"
-            Write-Verbose $_
-            throw $_
-        }
-    }
-
-    if ($hasIISDrive -eq $true) {
-        # Step 3: Add new Web Binding
-        try {
-            Write-Verbose "Attempting to add new web binding"
-            New-WebBinding -Name $SiteName -Protocol $Protocol -IPAddress $IPAddress -Port $Port -HostHeader $Hostname -SslFlags $SslFlags
-        }
-        catch {
-            Write-Information "Error occurred while attempting to add new web binding to $SiteName"
-            Write-Verbose $_
-            throw $_
-        }
-
-        # Step 4: Bind SSL Certificate to site
-        $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol
-        $binding.AddSslCertificate($Thumbprint, $StoreName)
-
-        Write-Verbose "New binding added successfully for $SiteName"
-        return $true
-    }
-    else {
-        # Step 3: Create binding using ServerManager
-        if (-not $existingBinding) {
-            $newBinding = $site.Bindings.Add($thisBindingInformation, $Protocol)
-        } else {
-            $newBinding = $httpsBindings
-        }
-
-        # Step 4: Bind SSL Certificate manually
-        if ($Protocol -eq "https") {
-            $newBinding.CertificateStoreName = $StoreName
-            $newBinding.CertificateHash = [byte[]]::Parse($Thumbprint -replace '([a-fA-F0-9]{2})', '$1 ').Trim()
-            $newBinding.SetAttributeValue("sslFlags", 0)  # Optional: set to 1 for SNI, 2 for Centralized SSL, etc.
-            Write-Verbose "SSL Certificate assigned using ServerManager."
-        }
-
-        $iis.CommitChanges()
-    }
-
-}
-
-
 function Ensure-IISDrive {
     [CmdletBinding()]
     param ()
@@ -680,6 +547,8 @@ function Remove-KFIISSiteBinding {
         [Parameter(Mandatory = $false)] [string] $Hostname
     )
 
+    Write-Verbose "Entering PowerShell Scrip Remove-KFIISiteBinding with arguments Sitename: '$SiteName', IP Address: '$IPAddress', Port: $Port, Hostname: '$Hostname'"
+
     try {
         Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
     } catch {
@@ -691,11 +560,13 @@ function Remove-KFIISSiteBinding {
         $site = $serverManager.Sites | Where-Object { $_.Name -eq $SiteName }
 
         if (-not $site) {
-            Write-Error "Site '$SiteName' not found."
-            return $false
+            Write-Information "Site '$SiteName' not found."
+            return $true
         }
 
         $searchBindingInfo = if ($HostName) { "$IPAddress`:$Port`:$HostName" } else { "$IPAddress`:$Port`:" }
+
+        Write-Verbose "Searching Site for bindings: $searchBindingInfo"
         $httpsBinding = $site.Bindings | Where-Object { $_.bindingInformation -eq $searchBindingInfo -and $_.protocol -eq 'https' }
 
         if ($httpsBinding)
@@ -703,12 +574,13 @@ function Remove-KFIISSiteBinding {
             $site.Bindings.Remove($httpsBinding)
             $serverManager.CommitChanges()
             Write-Verbose "Removed binding $httpsBinding from site '$SiteName'."
+
             return $true
         }
         else
         {
-            Write-Verbose "No matching binding found for $searchBindingInfo in site '$SiteName'."
-            return $false
+            Write-Information "No matching binding found for $searchBindingInfo in site '$SiteName'."
+            return $true
         }
     } catch {
         Write-Error "An error occurred while removing the binding."
@@ -717,63 +589,66 @@ function Remove-KFIISSiteBinding {
     }
 }
 
-
-function Remove-KFIISSiteBindingORIG{
+function Remove-KFIISCertificateIfUnused {
     param (
-        [Parameter(Mandatory=$true)]    $SiteName,        # The name of the IIS website
-        [Parameter(Mandatory=$true)]    $IPAddress,       # The IP address of the binding
-        [Parameter(Mandatory=$true)]    $Port,            # The port number (e.g., 443 for HTTPS)
-        [Parameter(Mandatory=$false)]   $Hostname         # The hostname (empty string for binding without hostname)
+        [Parameter(Mandatory = $true)]
+        [string]$Thumbprint,
+
+        [Parameter(Mandatory = $false)]
+        [string]$StoreName = "My"  # Default to the personal store
+
     )
 
-    Write-Debug "Attempting to import modules WebAdministration and IISAdministration"
     try {
-        Import-Module WebAdministration -ErrorAction Stop
+        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
+    } catch {
+        throw "Failed to load Microsoft.Web.Administration. Ensure IIS is installed on the remote server."
     }
-    catch {
-        throw "Failed to load the WebAdministration module. Ensure it is installed and available."
-    }
- 
-    # Check if the IISAdministration module is already loaded
-    if (-not (Get-Module -Name IISAdministration )) {
-        try {
-            # Attempt to import the IISAdministration module
-            Import-Module IISAdministration -ErrorAction Stop
-        }
-        catch {
-            throw "Failed to load the IISAdministration module. This function requires IIS Develpment and SCripting tools.  Please ensure these tools have been installed on the IIS Server."
-        }
-    }
-        
-    Write-Debug "Finished importing required modules"
+
+    # Normalize thumbprint (remove spaces and make uppercase)
+    $thumbprint = $Thumbprint -replace '\s', '' | ForEach-Object { $_.ToUpperInvariant() }
 
     try {
-        # Construct the binding information string correctly
-        $bindingInfo = if ($HostName) { "$IPAddress`:$Port`:$HostName" } else { "$IPAddress`:$Port`:" }
-        Write-Verbose "Checking for existing binding: $bindingInfo"
+        $serverManager = New-Object Microsoft.Web.Administration.ServerManager
 
-        # Get the existing binding based on the constructed binding information
-        $bindings = Get-IISSiteBinding -Name $SiteName -Protocol "https" | Where-Object { $_.BindingInformation -eq $bindingInfo }
+        $bindings = @()
 
-        if ($bindings) {
-            Write-Verbose "Found binding: $bindingInfo for site: '$SiteName'. Removing..."
-            
-            # Remove the binding
-            Remove-IISSiteBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol "https" -Confirm:$false
-            
-            Write-Verbose "Successfully removed binding: $bindingInfo"
-            return $true
-        }else{
-            Write-Verbose "No binding was found for: $bindingInfo."
-            return $false
+        foreach ($site in $serverManager.Sites) {
+            foreach ($binding in $site.Bindings) {
+                if ($binding.Protocol -eq 'https' -and $binding.CertificateHash) {
+                    $bindingThumbprint = ($binding.CertificateHash | ForEach-Object { $_.ToString("X2") }) -join ""
+                    if ($bindingThumbprint -eq $thumbprint) {
+                        $bindings += [PSCustomObject]@{
+                            SiteName  = $site.Name
+                            Binding   = $binding.BindingInformation
+                        }
+                    }
+                }
+            }
         }
+
+        if ($bindings.Count -gt 0) {
+            Write-Warning "The certificate with thumbprint $thumbprint is still used by the following bindings:"
+            $bindings | Format-Table -AutoSize
+            return
+        }
+
+        # Certificate is not used in any bindings
+        $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName" | Where-Object { $_.Thumbprint -eq $thumbprint }
+
+        if (-not $cert) {
+            Write-Warning "Certificate with thumbprint $thumbprint not found in Cert:\LocalMachine\$StoreName"
+            return
+        }
+
+        Remove-Item -Path $cert.PSPath -Force
+        Write-Information "Certificate $thumbprint has been removed from the store."
 
     } catch {
-        Write-Error "An error occurred while attempting to remove bindings for site: $SiteName"
-        Write-Error $_
-        throw $_
+        Write-Error "An error occurred while attempting to delete IIS Certificate: $_"
     }
 }
+
 
 # Function to get certificate information for a SQL Server instance
 function GET-KFSQLInventory {

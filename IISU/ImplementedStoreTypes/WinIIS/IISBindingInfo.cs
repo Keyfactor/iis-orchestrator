@@ -16,8 +16,10 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+using Markdig.Syntax;
 using System;
 using System.Collections.Generic;
+using System.Web.Services.Description;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
@@ -29,6 +31,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         public string Port { get; set; }
         public string? HostName { get; set; }
         public string SniFlag { get; set; }
+        public string Thumbprint { get; private set; }
+
+        public IISBindingInfo()
+        {
+                
+        }
 
         public IISBindingInfo(Dictionary<string, object> bindingInfo)
         {
@@ -39,6 +47,26 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             HostName = bindingInfo["HostName"]?.ToString();
             SniFlag = MigrateSNIFlag(bindingInfo["SniFlag"].ToString());
         }
+
+        public static IISBindingInfo ParseAliaseBindingString(string alias)
+        {
+            if (string.IsNullOrWhiteSpace(alias))
+                throw new ArgumentException("Alias cannot be null or empty.", nameof(alias));
+
+            var parts = alias.Split(':');
+            if (parts.Length < 4 || parts.Length > 5)
+                throw new FormatException("Alias must be in the format of Thumbprint:IPAddress:Port[:Hostname]");
+
+            return new IISBindingInfo
+            {
+                Thumbprint = parts[0],
+                SiteName = parts[1],
+                IPAddress = parts[2],
+                Port = parts[3],
+                HostName = parts.Length == 5 ? parts[4] : null
+            };
+        }
+
 
         private string MigrateSNIFlag(string input)
         {

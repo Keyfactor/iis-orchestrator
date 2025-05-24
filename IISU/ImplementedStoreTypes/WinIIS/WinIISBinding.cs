@@ -116,7 +116,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                 if (results[0].BaseObject is bool success)
                 {
-                    _logger.LogTrace($"Returned from unbinding as {success}.");
                     return success;
                 }
                 else

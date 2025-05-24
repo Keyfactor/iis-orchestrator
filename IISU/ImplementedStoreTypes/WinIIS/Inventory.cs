@@ -164,7 +164,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             new CurrentInventoryItem
                             {
                                 Certificates = new[] {cert.CertificateBase64 },
-                                Alias = cert.Thumbprint + ":" + cert.Binding?.ToString(),
+                                Alias = cert.Thumbprint + ":" + cert.SiteName + ":" + cert.Binding?.ToString(),
                                 PrivateKeyEntry = cert.HasPrivateKey,
                                 UseChainLevel = false,
                                 ItemStatus = OrchestratorInventoryItemStatus.Unknown,
