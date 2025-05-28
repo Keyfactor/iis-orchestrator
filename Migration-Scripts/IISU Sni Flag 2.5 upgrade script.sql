@@ -37,28 +37,28 @@ BEGIN TRY
     -- perform batch processing on certstoreinventoryitems to alter their EntryParameters to change the SNiFlag value to be a simple character instead of lots of text
     -- replace 0 - No SNI
     UPDATE inventoryitems
-    SET inventoryitems.[EntryParameters] = REPLACE(inventory.[EntryParameters], '0 - No SNI', '0')
+    SET inventoryitems.[EntryParameters] = REPLACE(inventoryitems.[EntryParameters], '0 - No SNI', '0')
     FROM [cms_agents].[CertStoreInventoryItems] AS inventoryitems
         INNER JOIN #InventoryItems ON inventoryitems.[Id] = #InventoryItems.[Id]
     WHERE inventoryitems.[EntryParameters] LIKE '%0 - No SNI%'
 
     -- replace 1 - SNI Enabled
     UPDATE inventoryitems
-    SET inventoryitems.[EntryParameters] = REPLACE(inventory.[EntryParameters], '1 - SNI Enabled', '1')
+    SET inventoryitems.[EntryParameters] = REPLACE(inventoryitems.[EntryParameters], '1 - SNI Enabled', '1')
     FROM [cms_agents].[CertStoreInventoryItems] AS inventoryitems
         INNER JOIN #InventoryItems ON inventoryitems.[Id] = #InventoryItems.[Id]
     WHERE inventoryitems.[EntryParameters] LIKE '%1 - SNI Enabled%'
 
     -- replace 2 - Non SNI Binding
     UPDATE inventoryitems
-    SET inventoryitems.[EntryParameters] = REPLACE(inventory.[EntryParameters], '2 - Non SNI Binding', '2')
+    SET inventoryitems.[EntryParameters] = REPLACE(inventoryitems.[EntryParameters], '2 - Non SNI Binding', '2')
     FROM [cms_agents].[CertStoreInventoryItems] AS inventoryitems
         INNER JOIN #InventoryItems ON inventoryitems.[Id] = #InventoryItems.[Id]
     WHERE inventoryitems.[EntryParameters] LIKE '%2 - Non SNI Binding%'
 
     -- replace 3 - SNI Binding
     UPDATE inventoryitems
-    SET inventoryitems.[EntryParameters] = REPLACE(inventory.[EntryParameters], '3 - SNI Binding', '3')
+    SET inventoryitems.[EntryParameters] = REPLACE(inventoryitems.[EntryParameters], '3 - SNI Binding', '3')
     FROM [cms_agents].[CertStoreInventoryItems] AS inventoryitems
         INNER JOIN #InventoryItems ON inventoryitems.[Id] = #InventoryItems.[Id]
     WHERE inventoryitems.[EntryParameters] LIKE '%3 - SNI Binding%'

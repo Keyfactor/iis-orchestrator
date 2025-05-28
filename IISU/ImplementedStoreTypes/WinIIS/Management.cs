@@ -16,11 +16,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Logging;
+using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
@@ -101,20 +104,72 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 // Add Certificate to Cert Store
                                 try
                                 {
+                                    OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
+                                    string failureMessage = "";
+                                    
                                     string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
                                     _logger.LogTrace($"Completed adding the certificate to the store");
+                                    _logger.LogTrace($"New thumbprint: {newThumbprint}");
 
                                     // Bind Certificate to IIS Site
                                     if (newThumbprint != null)
                                     {
                                         IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
-                                        WinIISBinding.BindCertificate(_psHelper, bindingInfo, newThumbprint, "", _storePath);
+                                        _logger.LogTrace("Returned after binding certificate to store");
+                                        var results = WinIISBinding.BindCertificate(_psHelper, bindingInfo, newThumbprint, "", _storePath);
+                                        if (results != null && results.Count > 0)
+                                        {
+                                            if (results[0] != null && results[0].Properties["Status"] != null)
+                                            {
+                                                string status = results[0].Properties["Status"]?.Value as string ?? string.Empty;
+                                                int code = results[0].Properties["Code"]?.Value is int iCode ? iCode : -1;
+                                                string step = results[0].Properties["Step"]?.Value as string ?? string.Empty;
+                                                string message = results[0].Properties["Message"]?.Value as string ?? string.Empty;
+                                                string errorMessage = results[0].Properties["ErrorMessage"]?.Value as string ?? string.Empty;
+
+                                                switch (status)
+                                                {
+                                                    case "Success":
+                                                        psResult = OrchestratorJobStatusJobResult.Success;
+                                                        _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned successfully with Code: {code}, on Step: {step}");
+                                                        break;
+                                                    case "Skipped":
+                                                        psResult = OrchestratorJobStatusJobResult.Failure;
+                                                        failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} - message:\n {errorMessage}");
+                                                        _logger.LogDebug(failureMessage);
+                                                        break;
+                                                    case "Warning":
+                                                        psResult = OrchestratorJobStatusJobResult.Warning;
+                                                        _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned with a Warning on step: {step} with code: {code} - message: {message}");
+                                                        break;
+                                                    case "Error":
+                                                        psResult = OrchestratorJobStatusJobResult.Failure;
+                                                        failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} with code: {code} - message: {errorMessage}");
+                                                        _logger.LogDebug(failureMessage);
+                                                        break;
+                                                    default:
+                                                        psResult = OrchestratorJobStatusJobResult.Unknown;
+                                                        _logger.LogWarning("Unknown status returned from New-KFIISSiteBinding: " + status);
+                                                        break;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                _logger.LogWarning("Unexpected object returned from PowerShell.");
+                                                psResult = OrchestratorJobStatusJobResult.Unknown;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            _logger.LogWarning("PowerShell script returned with no results.");
+                                            psResult = OrchestratorJobStatusJobResult.Unknown;
+                                        }
 
                                         complete = new JobResult
                                         {
-                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            Result = psResult,
                                             JobHistoryId = _jobHistoryID,
-                                            FailureMessage = ""
+                                            FailureMessage = failureMessage
                                         };
                                     }
                                 }
@@ -136,12 +191,21 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             {
                                 // Removing a certificate involves two steps: UnBind the certificate, then delete the cert from the store
 
+                                IISBindingInfo thisBinding = IISBindingInfo.ParseAliaseBindingString(config.JobCertificate.Alias);
                                 string thumbprint = config.JobCertificate.Alias.Split(':')[0];
                                 try
                                 {
-                                    if (WinIISBinding.UnBindCertificate(_psHelper, new IISBindingInfo(config.JobProperties)))
+                                    if (WinIISBinding.UnBindCertificate(_psHelper, thisBinding))
                                     {
-                                        complete = RemoveCertificate(thumbprint);
+                                        // This function will only remove the certificate from the store if not used by any other sites
+                                        RemoveIISCertificate(thisBinding.Thumbprint);
+
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = ""
+                                        };
                                     }
                                 }
                                 catch (Exception ex)
@@ -225,8 +289,21 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 throw new Exception (failureMessage);
             }
 }
+        public void RemoveIISCertificate(string thumbprint)
+        {
+            _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
 
-        public JobResult RemoveCertificate(string thumbprint)
+            var parameters = new Dictionary<string, object>()
+                    {
+                        { "Thumbprint", thumbprint },
+                        { "StoreName", _storePath }
+                    };
+
+            _psHelper.ExecutePowerShell("Remove-KFIISCertificateIfUnused", parameters);
+
+        }
+
+        public JobResult RemoveCertificateORIG(string thumbprint)
         {
             try
             {

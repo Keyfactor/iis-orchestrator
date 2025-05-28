@@ -1,3 +1,10 @@
+2.6.1
+* documentation updates for the 2.6 release
+* fix a naming typo in the 2.5 migration SQL script
+* update integration-manifest.json
+* Updated the Alias in IIS to also include Site-Name.  NOTE: Inventory will need to be performed prior to any management job to include new Alias format.
+* Added Bindings check when attempting to add bindings that already exist.  NOTE:  If you wish to add multiple bindings with the same IP:Port, Hostname must be included and SNI flag must be set to a minimum of '1'.
+
 2.6.0
 * Added the ability to run the extension in a Linux environment.  To utilize this change, for each Cert Store Types (WinCert/WinIIS/WinSQL), add ssh to the Custom Field <b>WinRM Protocol</b>.  When using ssh as a protocol, make sure to enter the appropriate ssh port number under WinRM Port.
 * NOTE: For legacy purposes the Display names WinRM Protocol and WinRM Port are maintained although the type of protocols now includes ssh.
