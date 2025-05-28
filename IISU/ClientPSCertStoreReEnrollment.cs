@@ -30,6 +30,7 @@ using Keyfactor.Orchestrators.Extensions.Interfaces;
 using System.Linq;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql;
+using System.Numerics;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
@@ -127,10 +128,68 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             switch (bindingType)
                             {
                                 case CertStoreBindingTypeENUM.WinIIS:
+                                    OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
+                                    string failureMessage = "";
+
                                     // Bind Certificate to IIS Site
                                     IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
-                                    WinIISBinding.BindCertificate(_psHelper, bindingInfo, thumbprint, "", storePath);
+                                    var results = WinIISBinding.BindCertificate(_psHelper, bindingInfo, thumbprint, "", storePath);
+                                    if (results != null && results.Count > 0)
+                                    {
+                                        if (results[0] != null && results[0].Properties["Status"] != null)
+                                        {
+                                            string status = results[0].Properties["Status"]?.Value as string ?? string.Empty;
+                                            int code = results[0].Properties["Code"]?.Value is int iCode ? iCode : -1;
+                                            string step = results[0].Properties["Step"]?.Value as string ?? string.Empty;
+                                            string message = results[0].Properties["Message"]?.Value as string ?? string.Empty;
+                                            string errorMessage = results[0].Properties["ErrorMessage"]?.Value as string ?? string.Empty;
+
+                                            switch (status)
+                                            {
+                                                case "Success":
+                                                    psResult = OrchestratorJobStatusJobResult.Success;
+                                                    _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned successfully with Code: {code}, on Step: {step}");
+                                                    break;
+                                                case "Skipped":
+                                                    psResult = OrchestratorJobStatusJobResult.Failure;
+                                                    failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} - message:\n {errorMessage}");
+                                                    _logger.LogDebug(failureMessage);
+                                                    break;
+                                                case "Warning":
+                                                    psResult = OrchestratorJobStatusJobResult.Warning;
+                                                    _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned with a Warning on step: {step} with code: {code} - message: {message}");
+                                                    break;
+                                                case "Error":
+                                                    psResult = OrchestratorJobStatusJobResult.Failure;
+                                                    failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} with code: {code} - message: {errorMessage}");
+                                                    _logger.LogDebug(failureMessage);
+                                                    break;
+                                                default:
+                                                    psResult = OrchestratorJobStatusJobResult.Unknown;
+                                                    _logger.LogWarning("Unknown status returned from New-KFIISSiteBinding: " + status);
+                                                    break;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            _logger.LogWarning("Unexpected object returned from PowerShell.");
+                                            psResult = OrchestratorJobStatusJobResult.Unknown;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("PowerShell script returned with no results.");
+                                        psResult = OrchestratorJobStatusJobResult.Unknown;
+                                    }
+
+                                    jobResult = new JobResult
+                                    {
+                                        Result = psResult,
+                                        JobHistoryId = config.JobHistoryId,
+                                        FailureMessage = failureMessage
+                                    };
                                     break;
+
                                 case CertStoreBindingTypeENUM.WinSQL:
                                     // Bind Certificate to SQL Instance
                                     string sqlInstanceNames = "MSSQLSERVER";
@@ -139,18 +198,26 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                         sqlInstanceNames = config.JobProperties["InstanceName"]?.ToString() ?? "MSSQLSERVER";
                                     }
                                     WinSqlBinding.BindSQLCertificate(_psHelper, sqlInstanceNames, thumbprint, "", storePath, false);
+
+                                    jobResult = new JobResult
+                                    {
+                                        Result = OrchestratorJobStatusJobResult.Success,
+                                        JobHistoryId = config.JobHistoryId,
+                                        FailureMessage = ""
+                                    };
+
                                     break;
                             }
-
                         }
-
-                        jobResult = new JobResult
+                        else
                         {
-                            Result = OrchestratorJobStatusJobResult.Success,
-                            JobHistoryId = config.JobHistoryId,
-                            FailureMessage = ""
-                        };
-
+                            jobResult = new JobResult
+                            {
+                                Result = OrchestratorJobStatusJobResult.Failure,
+                                JobHistoryId = config.JobHistoryId,
+                                FailureMessage = "There was no thumbprint to bind."
+                            };
+                        }
                     }
                     else
                     {

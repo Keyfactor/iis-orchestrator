@@ -29,7 +29,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         private static Collection<PSObject>? _results = null;
         private static PSHelper _helper;
 
-        public static void BindCertificate(PSHelper psHelper, IISBindingInfo bindingInfo, string thumbprint, string renewalThumbprint, string storePath)
+        public static Collection<PSObject> BindCertificate(PSHelper psHelper, IISBindingInfo bindingInfo, string thumbprint, string renewalThumbprint, string storePath)
         {
             _logger = LogHandler.GetClassLogger(typeof(WinIISBinding));
             _logger.LogTrace("Attempting to bind and execute PS function (New-KFIISSiteBinding)");
@@ -51,32 +51,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
             try
             {
-                _results = psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);      // returns true if successful
-                _logger.LogTrace("Returned from executing PS function (New-KFIISSiteBinding)");
-
-                if (_results != null && _results.Count > 0)
-                {
-                    var baseObject = _results[0]?.BaseObject;
-                    if (baseObject is bool value)
-                    {
-                        if (value)
-                        {
-                            _logger.LogTrace($"Bound certificate with the thumbprint: '{thumbprint}' to site: '{bindingInfo.SiteName}' successfully.");
-                        }
-                        else
-                        {
-                            _logger.LogTrace("Something happened and the binding failed.");
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Unexpected result type returned from script: " + baseObject?.GetType().Name);
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("PowerShell script returned no results.");
-                }
+                return psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);      // returns true if successful
             }
             catch (Exception ex)
             {
