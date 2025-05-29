@@ -33,6 +33,7 @@
 	<ItemGroup>
 		<PackageReference Include="Cake.Powershell" Version="4.0.0" />
 		<PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
+		<PackageReference Include="Keyfactor.Orchestrators.Common" Version="3.2.0" />
 		<PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
 		<PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" Condition="'$(TargetFramework)' == 'net6.0'" />
 		<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.5" Condition="'$(TargetFramework)' == 'net8.0'" />
