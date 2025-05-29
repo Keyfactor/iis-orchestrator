@@ -5,6 +5,7 @@
 * Updated the Alias in IIS to also include Site-Name.  NOTE: Inventory will need to be performed prior to any management job to include new Alias format.
 * Added Bindings check when attempting to add bindings that already exist or are ambiguous.  NOTE:  If you wish to add multiple bindings with the same IP:Port, Hostname must be included and SNI flag must be set to a minimum of '1'. Failure to do this can result in failed jobs with a binding conflict error message.
 * Bumped Keyfactor.Orchestrator.Common to 3.2.0 to correct signing issue.
+* Bumped System.IO.Packaging to 6.0.2 & 8.0.1 for .Net vulnerabilities.
 
 2.6.0
 * Added the ability to run the extension in a Linux environment.  To utilize this change, for each Cert Store Types (WinCert/WinIIS/WinSQL), add ssh to the Custom Field <b>WinRM Protocol</b>.  When using ssh as a protocol, make sure to enter the appropriate ssh port number under WinRM Port.
