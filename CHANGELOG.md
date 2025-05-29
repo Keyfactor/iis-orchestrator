@@ -1,16 +1,25 @@
+2.6.1
+* Documentation updates for the 2.6 release
+* Fix a naming typo in the 2.5 migration SQL script
+* Update integration-manifest.json
+* Updated the Alias in IIS to also include Site-Name.  NOTE: Inventory will need to be performed prior to any management job to include new Alias format.
+* Added Bindings check when attempting to add bindings that already exist or are ambiguous.  NOTE:  If you wish to add multiple bindings with the same IP:Port, Hostname must be included and SNI flag must be set to a minimum of '1'. Failure to do this can result in failed jobs with a binding conflict error message.
+* Bumped Keyfactor.Orchestrator.Common to 3.2.0 to correct signing issue.
+
 2.6.0
 * Added the ability to run the extension in a Linux environment.  To utilize this change, for each Cert Store Types (WinCert/WinIIS/WinSQL), add ssh to the Custom Field <b>WinRM Protocol</b>.  When using ssh as a protocol, make sure to enter the appropriate ssh port number under WinRM Port.
 * NOTE: For legacy purposes the Display names WinRM Protocol and WinRM Port are maintained although the type of protocols now includes ssh.
 * Moved all inventory and management jobs to external PowerShell script file .\PowerShellScripts\WinCertScripts.ps1
+* NOTE:  This version was not publicly released.
 
 2.5.1
 * Fixed WinSQL service name when InstanceID differs from InstanceName
 
 2.5.0
 * Added the Bindings to the end of the thumbprint to make the alias unique.
-* Using new IISWebBindings commandlet to use additional SSL flags when binding certificate to website.
+* Using new IISWebBindings cmdlet to use additional SSL flags when binding certificate to website.
 * Added multi-platform support for .Net6 and .Net8.
-* Updated various PowerShell scripts to handle both .Net6 and .Net8 differences (specifically the absense of the WebAdministration module in PS SDK 7.4.x+)
+* Updated various PowerShell scripts to handle both .Net6 and .Net8 differences (specifically the absence of the WebAdministration module in PS SDK 7.4.x+)
 * Fixed issue to update multiple websites when using the same cert.
 * Removed renewal thumbprint logic to update multiple website; each job now updates its own specific certificate.
 
@@ -19,7 +28,7 @@
 * Fix an issue with "Delete" script in the Legacy IIS Migration that did not remove some records from dependent tables
 
 2.4.3
-* Adding Legacy IIS Migration scripting and Readme guide
+* Adding Legacy IIS Migration scripting and ReadMe guide
 
 2.4.2
 * Correct false positive error when completing an IIS inventory job.
@@ -64,7 +73,7 @@
 	* Display name for IISU changed to "IIS Bound Certificate".
 	* Display name for WinCert changed to "Windows Certificate".
 	* Display names for several Store and Entry parameters changed to be more descriptive and UI friendly.
-* Significant readme cleanup
+* Significant ReadMe cleanup
 
 2.1.0
 * Fixed issue that was occurring during renewal when there were bindings outside of http and https like net.tcp
@@ -75,7 +84,7 @@
 * Removed any password references in trace logs and output settings in JSON format
 
 2.0.0
-* Add support for reenrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
+* Add support for re-enrollment jobs (On Device Key Generation) with the ability to specify a cryptographic provider. Specification of cryptographic provider allows HSM (Hardware Security Module) use.
 * Local PAM Support added (requires Universal Orchestrator Framework version 10.1)
 * Certificate store type changed from IISBin to IISU. See README for migration notes.
 
@@ -98,6 +107,6 @@
 * Last release to support Windows Orchestrator (KF8)
 
 1.0.2
-* Remove dependence on Windows.Web.Administration on the orchestrator server.  The agent will now use the local version on the managed server via remote powershell
+* Remove dependence on Windows.Web.Administration on the orchestrator server.  The agent will now use the local version on the managed server via remote PowerShell
 * add support for the IncludePortInSPN flag
 * add support to use credentials from Keyfactor for Add/Remove/Inventory jobs.  
