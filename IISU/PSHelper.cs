@@ -102,6 +102,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         public void Initialize()
         {
             _logger.LogTrace("Entered PSHelper.Initialize()");
+            _logger.LogTrace($"PowerShell SDK Location: {typeof(System.Management.Automation.PowerShell).Assembly.Location}");
+            _logger.LogTrace($".NET Runtime Version: {RuntimeInformation.FrameworkDescription}");
 
             PS = PowerShell.Create();
 
@@ -181,20 +183,28 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             else
             {
                 _logger.LogTrace("Initializing WinRM connection");
-                var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                PSCredential myCreds = new PSCredential(serverUserName, pw);
-
-                // Create the PSSessionOption object
-                var sessionOption = new PSSessionOption
+                try
                 {
-                    IncludePortInSPN = useSPN
-                };
+                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                    PSCredential myCreds = new PSCredential(serverUserName, pw);
 
-                PS.AddCommand("New-PSSession")
-                .AddParameter("ComputerName", ClientMachineName)
-                .AddParameter("Port", port)
-                .AddParameter("Credential", myCreds)
-                .AddParameter("SessionOption", sessionOption);
+                    // Create the PSSessionOption object
+                    var sessionOption = new PSSessionOption
+                    {
+                        IncludePortInSPN = useSPN
+                    };
+
+                    PS.AddCommand("New-PSSession")
+                    .AddParameter("ComputerName", ClientMachineName)
+                    .AddParameter("Port", port)
+                    .AddParameter("Credential", myCreds)
+                    .AddParameter("SessionOption", sessionOption);
+                }
+                catch (Exception)
+                {
+                    throw new Exception("Problems establishing network credentials.  Please check the User name and Password for the Certificate Store");
+                }
+
             }
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
