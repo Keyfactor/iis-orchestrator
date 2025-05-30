@@ -3,8 +3,9 @@
   <PropertyGroup>
     <RootNamespace>Keyfactor.Extensions.Orchestrator.WindowsCertStore</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-	<TargetFrameworks>NET6.0;NET8.0</TargetFrameworks>
+	<TargetFrameworks>net6.0;net8.0</TargetFrameworks>
     <PlatformTarget>AnyCPU</PlatformTarget>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -29,13 +30,16 @@
     <Compile Remove="PowerShellCertRequest.cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
-    <PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
-	  
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.2.19" Condition="'$(TargetFramework)' == 'net6.0'" />
-	<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.5" Condition="'$(TargetFramework)' == 'net8.0'" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Cake.Powershell" Version="4.0.0" />
+		<PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
+		<PackageReference Include="Keyfactor.Orchestrators.Common" Version="3.2.0" />
+		<PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
+		<PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" Condition="'$(TargetFramework)' == 'net6.0'" />
+		<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.5" Condition="'$(TargetFramework)' == 'net8.0'" />
+		<PackageReference Include="System.IO.Packaging" Version="6.0.2"  Condition="'$(TargetFramework)' == 'net6.0'" />
+		<PackageReference Include="System.IO.Packaging" Version="8.0.1"  Condition="'$(TargetFramework)' == 'net8.0'" />
+	</ItemGroup>
 
   <ItemGroup>
     <None Update="manifest.json">
