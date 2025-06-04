@@ -185,9 +185,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _logger.LogTrace("Initializing WinRM connection");
                 try
                 {
-                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                    PSCredential myCreds = new PSCredential(serverUserName, pw);
-
                     // Create the PSSessionOption object
                     var sessionOption = new PSSessionOption
                     {
@@ -197,8 +194,16 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     PS.AddCommand("New-PSSession")
                     .AddParameter("ComputerName", ClientMachineName)
                     .AddParameter("Port", port)
-                    .AddParameter("Credential", myCreds)
                     .AddParameter("SessionOption", sessionOption);
+
+                    if (!string.IsNullOrEmpty(serverUserName))
+                    {
+                        var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                        PSCredential myCreds = new PSCredential(serverUserName, pw);
+
+                        PS.AddParameter("Credential", myCreds);
+                    }
+
                 }
                 catch (Exception)
                 {
@@ -235,19 +240,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private void InitializeLocalSession()
         {
+            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
+            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
+            rs.Open();
+            PS.Runspace = rs;
+
             _logger.LogTrace("Setting Execution Policy to Unrestricted");
             PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
             PS.Invoke();  // Ensure the script is invoked and loaded
             CheckErrors();
 
             PS.Commands.Clear();  // Clear commands after loading functions
-
-            // Trying this to get IISAdministration loaded!!
-            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
-            rs.Open();
-
-            PS.Runspace = rs;
 
             _logger.LogTrace("Setting script file into memory");
             PS.AddScript(". '" + scriptFileLocation + "'");
