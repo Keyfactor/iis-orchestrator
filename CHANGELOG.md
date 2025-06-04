@@ -1,3 +1,8 @@
+2.6.2
+* Fixed error when attempting to connect to remote computer using UO service account
+* Fixed the creation of a certificate when the Cryptographic Service Provider was changed by the user
+* Updated logic when getting the CSP.  Now supports modern CHG and legacy CAPI APIs.  This will allow the CSP to show in the stores inventory.
+
 2.6.1
 * Documentation updates for the 2.6 release
 * Fix a naming typo in the 2.5 migration SQL script

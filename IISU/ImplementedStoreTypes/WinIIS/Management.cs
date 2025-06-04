@@ -104,6 +104,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 // Add Certificate to Cert Store
                                 try
                                 {
+                                    IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
+
                                     OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
                                     string failureMessage = "";
                                     
@@ -112,9 +114,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                     _logger.LogTrace($"New thumbprint: {newThumbprint}");
 
                                     // Bind Certificate to IIS Site
-                                    if (newThumbprint != null)
+                                    if (!string.IsNullOrEmpty(newThumbprint))
                                     {
-                                        IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
                                         _logger.LogTrace("Returned after binding certificate to store");
                                         var results = WinIISBinding.BindCertificate(_psHelper, bindingInfo, newThumbprint, "", _storePath);
                                         if (results != null && results.Count > 0)
@@ -172,6 +173,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                             FailureMessage = failureMessage
                                         };
                                     }
+                                    else
+                                    {
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = $"No thumbprint was returned.  Unable to bind certificate to site: {bindingInfo.SiteName}."
+                                        };                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -183,7 +192,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                     };
                                 }
 
-                                _logger.LogTrace($"Completed adding and binding the certificate to the store");
+                                _logger.LogTrace($"Exiting the Adding of Certificate process.");
 
                                 break;
                             }
