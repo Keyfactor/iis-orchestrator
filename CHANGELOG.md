@@ -2,6 +2,17 @@
 * Fixed error when attempting to connect to remote computer using UO service account
 * Fixed the creation of a certificate when the Cryptographic Service Provider was changed by the user
 * Updated logic when getting the CSP.  Now supports modern CHG and legacy CAPI APIs.  This will allow the CSP to show in the stores inventory.
+* Re-factored code to eliminate warnings
+* Bumped up he following packages to eliminate .net vulnerabilities and obsolete packages:
+	* Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="1.0.0"
+    * Microsoft.PowerShell.SDK" Version="7.4.10" Condition="'$(TargetFramework)' == 'net8.0'"
+    * runtime.linux-arm64.runtime.native.System.IO.Ports" Version="9.0.5"
+    * runtime.osx-arm64.runtime.native.System.IO.Ports" Version="9.0.5"
+    * System.Formats.Asn1" Version="8.0.2" Condition="'$(TargetFramework)' == 'net6.0'"
+	* System.Formats.Asn1" Version="9.0.0" Condition="'$(TargetFramework)' == 'net8.0'"
+    * System.IO.Packaging" Version="6.0.2" Condition="'$(TargetFramework)' == 'net6.0'"
+    * System.IO.Packaging" Version="8.0.1" Condition="'$(TargetFramework)' == 'net8.0'"
+    * System.Text.Json" Version="8.0.5"
 
 2.6.1
 * Documentation updates for the 2.6 release

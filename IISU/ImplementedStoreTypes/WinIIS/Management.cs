@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Ignore Spelling: Keyfactor IISU Crypto
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -34,7 +35,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         private ILogger _logger;
 
         private PSHelper _psHelper;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private Collection<PSObject>? _results = null;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         // Function wide config values
         private string _clientMachineName = string.Empty;
@@ -99,7 +102,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             {
                                 string certificateContents = config.JobCertificate.Contents;
                                 string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
                                 string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
                                 // Add Certificate to Cert Store
                                 try

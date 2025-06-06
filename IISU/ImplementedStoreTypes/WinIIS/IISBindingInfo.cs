@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Ignore Spelling: Keyfactor IISU
+// Ignore Spelling: Keyfactor IISU Sni Aliase
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
@@ -29,7 +29,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         public string Protocol { get; set; }
         public string IPAddress { get; set; }
         public string Port { get; set; }
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public string? HostName { get; set; }
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public string SniFlag { get; set; }
         public string Thumbprint { get; private set; }
 

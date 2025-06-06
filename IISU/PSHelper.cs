@@ -14,6 +14,8 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+// Ignore Spelling: Keyfactor
+
 using Keyfactor.Logging;
 using Microsoft.Extensions.Logging;
 using System;
@@ -47,7 +49,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private string port;
         private bool useSPN;
         private string machineName;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private string? argument;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         private string serverUserName;
         private string serverPassword;
@@ -301,7 +305,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             PS.Dispose();
         }
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public Collection<PSObject>? InvokeFunction(string functionName, Dictionary<string, Object>? parameters = null)
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         {
             PS.Commands.Clear();
 
@@ -339,7 +345,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         }
 
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public Collection<PSObject>? ExecutePowerShell(string commandOrScript, Dictionary<string, object>? parameters = null, bool isScript = false)
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         {
             try
             {
@@ -482,7 +490,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return null;
         }
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public static void ProcessPowerShellScriptEvent(object? sender, DataAddedEventArgs e)
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         {
             if (sender != null)
             {
