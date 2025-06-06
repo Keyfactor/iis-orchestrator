@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Ignore Spelling: Keyfactor IISU Crypto
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -34,7 +35,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         private ILogger _logger;
 
         private PSHelper _psHelper;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private Collection<PSObject>? _results = null;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         // Function wide config values
         private string _clientMachineName = string.Empty;
@@ -99,11 +102,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                             {
                                 string certificateContents = config.JobCertificate.Contents;
                                 string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
                                 string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
                                 // Add Certificate to Cert Store
                                 try
                                 {
+                                    IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
+
                                     OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
                                     string failureMessage = "";
                                     
@@ -112,9 +119,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                     _logger.LogTrace($"New thumbprint: {newThumbprint}");
 
                                     // Bind Certificate to IIS Site
-                                    if (newThumbprint != null)
+                                    if (!string.IsNullOrEmpty(newThumbprint))
                                     {
-                                        IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
                                         _logger.LogTrace("Returned after binding certificate to store");
                                         var results = WinIISBinding.BindCertificate(_psHelper, bindingInfo, newThumbprint, "", _storePath);
                                         if (results != null && results.Count > 0)
@@ -172,6 +178,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                             FailureMessage = failureMessage
                                         };
                                     }
+                                    else
+                                    {
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = $"No thumbprint was returned.  Unable to bind certificate to site: {bindingInfo.SiteName}."
+                                        };                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -183,7 +197,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                     };
                                 }
 
-                                _logger.LogTrace($"Completed adding and binding the certificate to the store");
+                                _logger.LogTrace($"Exiting the Adding of Certificate process.");
 
                                 break;
                             }
