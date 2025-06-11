@@ -138,7 +138,7 @@ For customers wishing to use something other than the local administrator accoun
 
 ## Certificate Store Types
 
-To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your usecase. This only needs to happen _once_ per Keyfactor Command instance.
+To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your use-case. This only needs to happen _once_ per Keyfactor Command instance.
 
 The Windows Certificate Universal Orchestrator extension implements 3 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types.
 
@@ -175,7 +175,7 @@ The store type represents the various certificate stores present on a Windows Se
 #### Store Type Creation
 
 ##### Using kfutil:
-`kfutil` is a custom CLI for the Keyfactor Command API and can be used to created certificate store types.
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
    <details><summary>Click to expand WinCert kfutil details</summary>
 
@@ -304,7 +304,7 @@ The IISU store type represents the IIS servers and their certificate bindings. I
 #### Store Type Creation
 
 ##### Using kfutil:
-`kfutil` is a custom CLI for the Keyfactor Command API and can be used to created certificate store types.
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
    <details><summary>Click to expand IISU kfutil details</summary>
 
@@ -431,7 +431,7 @@ The WinSql Certificate Store Type, referred to by its short name 'WinSql,' is de
 #### Store Type Creation
 
 ##### Using kfutil:
-`kfutil` is a custom CLI for the Keyfactor Command API and can be used to created certificate store types.
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
    <details><summary>Click to expand WinSql kfutil details</summary>
 
