@@ -35,7 +35,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
         private ILogger _logger;
         public string ExtensionName => "WinSqlInventory";
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         Collection<PSObject>? results = null;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         public Inventory()
         {
