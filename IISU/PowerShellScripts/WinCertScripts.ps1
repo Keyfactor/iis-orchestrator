@@ -227,12 +227,13 @@ function Add-KFCertificateToStore{
             try {
                 # Build certutil command to import the certificate with exportable private key and CSP
                 $command = "certutil -f -p `"$PrivateKeyPassword`" -csp `"$CryptoServiceProvider`" -importpfx $StoreName `"$tempPfx`""
+                $traceCommand = "certutil -f -p `"************`" -csp `"$CryptoServiceProvider`" -importpfx $StoreName `"$tempPfx`""
 
-                Write-Verbose "Running: $command"
+                Write-Verbose "Running: $traceCommand"
                 $output = Invoke-Expression $command
 
                 if ($LASTEXITCODE -ne 0) {
-                    throw "certutil failed with code $LASTEXITCODE. Output: $output"
+                    throw "certutil failed with code $LASTEXITCODE. `nOutput: $output `nMake sure there is no cryptographic mismatch and the CSP supports the imported PFX.`n"
                 }
 
                 # Get latest cert with private key in the store
