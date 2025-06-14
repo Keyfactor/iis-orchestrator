@@ -28,7 +28,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
     public class WinSqlBinding
     {
         private static ILogger _logger;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private static Collection<PSObject>? _results = null;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         public WinSqlBinding()
         {

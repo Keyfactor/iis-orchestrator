@@ -14,6 +14,8 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+// Ignore Spelling: Keyfactor IISU
+
 using Keyfactor.Logging;
 using Microsoft.Extensions.Logging;
 using System;
@@ -25,9 +27,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class WinIISBinding
     {
-        private static ILogger _logger;
-        private static Collection<PSObject>? _results = null;
-        private static PSHelper _helper;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+        private static ILogger? _logger;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         public static Collection<PSObject> BindCertificate(PSHelper psHelper, IISBindingInfo bindingInfo, string thumbprint, string renewalThumbprint, string storePath)
         {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Ignore Spelling: thumbprint Keyfactor sql
+// Ignore Spelling: thumbprint Keyfactor sql crypto
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
@@ -35,7 +35,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
         private ILogger _logger;
 
         private PSHelper _psHelper;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private Collection<PSObject>? _results = null;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         // Function wide config values
         private string _clientMachineName = string.Empty;
@@ -172,8 +174,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                         // Remove the certificate from the cert store
                                         complete = RemoveCertificate(config.JobCertificate.Alias);
                                         _logger.LogTrace($"Completed removing the certificate from the store");
-
-                                        break;
                                     }
                                     else
                                     {
@@ -184,7 +184,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                             FailureMessage = "Unable to unbind one or more certificates from the SQL Instances."
                                         };
                                     }
-
                                 }
                                 catch (Exception ex)
                                 {
@@ -195,10 +194,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                         FailureMessage = ex.Message
                                     };
                                 }
-
-                                _logger.LogTrace($"Completed unbinding and removing the certificate from the store");
-                                return complete;
                             }
+                            _logger.LogTrace($"Completed unbinding and removing the certificate from the store");
+                            return complete;
                     }
                 }
 

@@ -14,6 +14,8 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+// Ignore Spelling: Keyfactor
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -31,9 +33,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
     {
         private ILogger _logger;
         public string ExtensionName => "WinCertInventory";
-        
+
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         Collection<PSObject>? results = null;
-        
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+
         public Inventory()
         {
 
