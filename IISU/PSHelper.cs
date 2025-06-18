@@ -200,6 +200,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     .AddParameter("Port", port)
                     .AddParameter("SessionOption", sessionOption);
 
+                    if (protocol == "https")
+                    {
+                        _logger.LogTrace($"Using HTTPS to connect to: {clientMachineName}");
+                        PS.AddParameter("UseSSL");
+                    }
+
                     if (!string.IsNullOrEmpty(serverUserName))
                     {
                         var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
