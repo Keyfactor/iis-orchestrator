@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Ignore Spelling: Keyfactor
+// Ignore Spelling: Keyfactor Reenrollment
 
 // 021225 rcp   Cleaned up and removed unnecessary code
 
@@ -40,7 +40,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private readonly IPAMSecretResolver _resolver;
 
         private PSHelper _psHelper;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private Collection<PSObject>? _results;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         public ClientPSCertStoreReEnrollment(ILogger logger, IPAMSecretResolver resolver)
         {
