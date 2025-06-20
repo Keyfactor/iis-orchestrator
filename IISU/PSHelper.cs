@@ -14,6 +14,8 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+// Ignore Spelling: Keyfactor
+
 using Keyfactor.Logging;
 using Microsoft.Extensions.Logging;
 using System;
@@ -47,7 +49,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private string port;
         private bool useSPN;
         private string machineName;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private string? argument;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         private string serverUserName;
         private string serverPassword;
@@ -185,9 +189,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _logger.LogTrace("Initializing WinRM connection");
                 try
                 {
-                    var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                    PSCredential myCreds = new PSCredential(serverUserName, pw);
-
                     // Create the PSSessionOption object
                     var sessionOption = new PSSessionOption
                     {
@@ -197,8 +198,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     PS.AddCommand("New-PSSession")
                     .AddParameter("ComputerName", ClientMachineName)
                     .AddParameter("Port", port)
-                    .AddParameter("Credential", myCreds)
                     .AddParameter("SessionOption", sessionOption);
+
+                    if (protocol == "https")
+                    {
+                        _logger.LogTrace($"Using HTTPS to connect to: {clientMachineName}");
+                        PS.AddParameter("UseSSL");
+                    }
+
+                    if (!string.IsNullOrEmpty(serverUserName))
+                    {
+                        var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                        PSCredential myCreds = new PSCredential(serverUserName, pw);
+
+                        PS.AddParameter("Credential", myCreds);
+                    }
+
                 }
                 catch (Exception)
                 {
@@ -235,19 +250,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private void InitializeLocalSession()
         {
+            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
+            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
+            rs.Open();
+            PS.Runspace = rs;
+
             _logger.LogTrace("Setting Execution Policy to Unrestricted");
             PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
             PS.Invoke();  // Ensure the script is invoked and loaded
             CheckErrors();
 
             PS.Commands.Clear();  // Clear commands after loading functions
-
-            // Trying this to get IISAdministration loaded!!
-            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
-            rs.Open();
-
-            PS.Runspace = rs;
 
             _logger.LogTrace("Setting script file into memory");
             PS.AddScript(". '" + scriptFileLocation + "'");
@@ -297,7 +311,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             PS.Dispose();
         }
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public Collection<PSObject>? InvokeFunction(string functionName, Dictionary<string, Object>? parameters = null)
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         {
             PS.Commands.Clear();
 
@@ -335,7 +351,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         }
 
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public Collection<PSObject>? ExecutePowerShell(string commandOrScript, Dictionary<string, object>? parameters = null, bool isScript = false)
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         {
             try
             {
@@ -478,7 +496,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return null;
         }
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public static void ProcessPowerShellScriptEvent(object? sender, DataAddedEventArgs e)
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         {
             if (sender != null)
             {

@@ -34,11 +34,16 @@
 		<PackageReference Include="Cake.Powershell" Version="4.0.0" />
 		<PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
 		<PackageReference Include="Keyfactor.Orchestrators.Common" Version="3.2.0" />
-		<PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="0.7.0" />
+		<PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="1.0.0" />
 		<PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" Condition="'$(TargetFramework)' == 'net6.0'" />
-		<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.5" Condition="'$(TargetFramework)' == 'net8.0'" />
-		<PackageReference Include="System.IO.Packaging" Version="6.0.2"  Condition="'$(TargetFramework)' == 'net6.0'" />
-		<PackageReference Include="System.IO.Packaging" Version="8.0.1"  Condition="'$(TargetFramework)' == 'net8.0'" />
+		<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.10" Condition="'$(TargetFramework)' == 'net8.0'" />
+		<PackageReference Include="runtime.linux-arm64.runtime.native.System.IO.Ports" Version="9.0.5" />
+		<PackageReference Include="runtime.osx-arm64.runtime.native.System.IO.Ports" Version="9.0.5" />
+		<PackageReference Include="System.Formats.Asn1" Version="8.0.2" Condition="'$(TargetFramework)' == 'net6.0'" />
+		<PackageReference Include="System.Formats.Asn1" Version="9.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+		<PackageReference Include="System.IO.Packaging" Version="6.0.2" Condition="'$(TargetFramework)' == 'net6.0'" />
+		<PackageReference Include="System.IO.Packaging" Version="8.0.1" Condition="'$(TargetFramework)' == 'net8.0'" />
+		<PackageReference Include="System.Text.Json" Version="8.0.5" />
 	</ItemGroup>
 
   <ItemGroup>

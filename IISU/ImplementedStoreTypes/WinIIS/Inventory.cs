@@ -14,6 +14,8 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+// Ignore Spelling: Keyfactor IISU
+
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -30,7 +32,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
     public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {
         private ILogger _logger;
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         Collection<PSObject>? results = null;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
         public string ExtensionName => "WinIISUInventory";
 
