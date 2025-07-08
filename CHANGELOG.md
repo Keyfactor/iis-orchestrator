@@ -1,3 +1,6 @@
+2.6.3
+* Fixed reenrollment job when RDN Components contained escaped commas
+
 2.6.2
 * Fixed error when attempting to connect to remote computer using UO service account
 * Fixed error when connecting to remote computer using HTTPS; was defaulting to HTTP
