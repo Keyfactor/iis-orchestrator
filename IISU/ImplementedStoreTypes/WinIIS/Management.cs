@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Management.Automation;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 using Keyfactor.Logging;
@@ -89,6 +90,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
+                string alias = config.JobCertificate.Alias.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
 
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
 
@@ -169,6 +171,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                         {
                                             _logger.LogWarning("PowerShell script returned with no results.");
                                             psResult = OrchestratorJobStatusJobResult.Unknown;
+                                        }
+
+                                        // Only is the binding returns successful, check of original cert is still bound to any site, if not remove it from the store
+                                        if (psResult == OrchestratorJobStatusJobResult.Success && !string.IsNullOrEmpty(alias))
+                                        {
+                                            _logger.LogTrace("Attempting to remove original certificate from store if it is no longer bound to any site.");
+                                            RemoveIISCertificate(alias);
+                                            _logger.LogTrace("Returned from removing cert if not used.");
                                         }
 
                                         complete = new JobResult
