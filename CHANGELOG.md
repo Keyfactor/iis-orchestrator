@@ -1,5 +1,6 @@
 2.6.3
 * Fixed reenrollment job when RDN Components contained escaped commas
+* Updated renewal job for IIS Certs to delete the old cert if not bound or used by other web sites.
 
 2.6.2
 * Fixed error when attempting to connect to remote computer using UO service account

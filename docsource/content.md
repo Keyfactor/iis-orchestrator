@@ -82,6 +82,26 @@ For customers wishing to use something other than the local administrator accoun
     -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
     -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
 
+### Using Crypto Service Providers (CSP)
+When adding or reenrolling certificates, you may specify an optional CSP to be used when generating and storing the private keys.  This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. 
+
+The list of installed cryptographic providers can be obtained by running the PowerShell command on the target server:
+
+     certutil -csplist
+
+When performing a ReEnrollment or On Device Key Generation (ODKG) job, if no CSP is specified, a default value of 'Microsoft Strong Cryptographic Provider' will be used.  
+
+When performing an Add job, if no CSP is specified, the machine's default CSP will be used, in most cases this could be the 'Microsoft Enhanced Cryptographic Provider v1.0' provider.
+
+Each CSP only supports certain key types and algorithms.
+
+Below is a brief summary of the CSPs and their support for RSA and ECC algorithms:
+|CSP Name|Supports RSA?|Supports ECC?|
+|---|---|---|
+|Microsoft RSA SChannel Cryptographic Provider	|✅|❌|
+|Microsoft Software Key Storage Provider	    |✅|✅|
+|Microsoft Enhanced Cryptographic Provider	    |✅|❌|
+
 ## Client Machine Instructions
 Prior to version 2.6, this extension would only run in the Windows environment.  Version 2.6 and greater is capable of running on Linux, however, only the SSH protocol is supported.
 

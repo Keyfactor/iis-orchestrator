@@ -818,7 +818,7 @@ function Remove-KFIISCertificateIfUnused {
 
         if ($bindings.Count -gt 0) {
             Write-Warning "The certificate with thumbprint $thumbprint is still used by the following bindings:"
-            $bindings | Format-Table -AutoSize
+            $bindings | Format-Table -AutoSize | Out-String | Write-Warning
             return
         }
 
