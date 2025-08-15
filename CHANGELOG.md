@@ -1,6 +1,8 @@
 2.6.3
 * Fixed reenrollment job when RDN Components contained escaped commas
 * Updated renewal job for IIS Certs to delete the old cert if not bound or used by other web sites.
+* Improved Inventory reporting of CSP when cert uses newer CNG Keys
+* Fixed an issue with complex PFX passwords that contained special characters such as '@' or '$', etc.
 
 2.6.2
 * Fixed error when attempting to connect to remote computer using UO service account
