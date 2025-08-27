@@ -90,7 +90,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
-                string alias = config.JobCertificate.Alias.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
+                string alias = config.JobCertificate?.Alias?.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
 
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
 

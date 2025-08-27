@@ -438,8 +438,13 @@ function New-KFIISSiteBinding {
 
             foreach ($binding in $httpsBindings) {
                 try {
-                    Write-Verbose "Calling Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false"
-                    Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false
+                    $bindingInfo = $binding.GetAttributeValue("bindingInformation")
+                    $protocol    = $binding.protocol
+
+                    Write-Verbose "Calling Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false"
+                    Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false
+                    Write-Verbose "Completed removing the Web Binding"
+
                 } catch {
                     $msg = "Error removing binding '$($binding.bindingInformation)': $_"
                     Write-Warning $msg -InformationAction SilentlyContinue
@@ -1210,7 +1215,6 @@ function Import-SignedCertificate {
         [byte[]]$RawData,               # RawData from the certificate
 
         [Parameter(Mandatory = $true)]
-        [ValidateSet("My", "Root", "CA", "TrustedPublisher", "TrustedPeople")]
         [string]$StoreName              # Store to which the certificate should be imported
     )
 
