@@ -1,4 +1,9 @@
-﻿# Set preferences globally at the script level
+﻿# Update notes:
+# 8/12/25   Updated functions to manage IIS bindings and certificates
+#           Updated script to read CSPs correctly using newer CNG Keys
+#		    Fix an error with complex PFX passwords having irregular characters
+
+# Set preferences globally at the script level
 $DebugPreference = "Continue"
 $VerbosePreference = "Continue"
 $InformationPreference = "Continue"
@@ -225,28 +230,72 @@ function Add-KFCertificateToStore{
 
             # Execute certutil based on whether a private key password was supplied
             try {
-                # Build certutil command to import the certificate with exportable private key and CSP
-                $command = "certutil -f -p `"$PrivateKeyPassword`" -csp `"$CryptoServiceProvider`" -importpfx $StoreName `"$tempPfx`""
-                $traceCommand = "certutil -f -p `"************`" -csp `"$CryptoServiceProvider`" -importpfx $StoreName `"$tempPfx`""
+                # Start building certutil arguments
+                $arguments = @('-f')
 
-                Write-Verbose "Running: $traceCommand"
-                $output = Invoke-Expression $command
-
-                if ($LASTEXITCODE -ne 0) {
-                    throw "certutil failed with code $LASTEXITCODE. `nOutput: $output `nMake sure there is no cryptographic mismatch and the CSP supports the imported PFX.`n"
+                if ($PrivateKeyPassword) {
+                    Write-Verbose "Has a private key"
+                    $arguments += '-p'
+                    $arguments += $PrivateKeyPassword
                 }
 
-                # Get latest cert with private key in the store
-                $store = "Cert:\LocalMachine\$StoreName"
-                $cert = Get-ChildItem -Path $store | Where-Object { $_.HasPrivateKey } | Sort-Object NotBefore -Descending | Select-Object -First 1
-
-                if ($cert) {
-                    Write-Information "Certificate imported successfully with Thumbprint: $($cert.Thumbprint)"
-                    return $cert.Thumbprint
-                } else {
-                    throw "Import succeeded, but no certificate with a private key was found in $store"
+                if ($CryptoServiceProvider) {
+                    Write-Verbose "Has a CryptoServiceProvider: $CryptoServiceProvider"
+                    $arguments += '-csp'
+                    $arguments += $CryptoServiceProvider
                 }
 
+                $arguments += '-importpfx'
+                $arguments += $StoreName
+                $arguments += $tempPfx
+
+                # Quote any arguments with spaces
+                $argLine = ($arguments | ForEach-Object {
+                    if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
+                }) -join ' '
+
+                write-Verbose "Running certutil with arguments: $argLine"
+
+                # Setup process execution
+                $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+                $processInfo.FileName = "certutil.exe"
+                $processInfo.Arguments = $argLine.Trim()
+                $processInfo.RedirectStandardOutput = $true
+                $processInfo.RedirectStandardError = $true
+                $processInfo.UseShellExecute = $false
+                $processInfo.CreateNoWindow = $true
+
+                $process = New-Object System.Diagnostics.Process
+                $process.StartInfo = $processInfo
+
+                $process.Start() | Out-Null
+
+                $stdOut = $process.StandardOutput.ReadToEnd()
+                $stdErr = $process.StandardError.ReadToEnd()
+
+                $process.WaitForExit()
+
+                if ($process.ExitCode -ne 0) {
+                    throw "certutil failed with code $($process.ExitCode). Output:`n$stdOut`nError:`n$stdErr"
+                }
+
+                # Retrieve thumbprint of the newly imported cert
+                try {
+                    $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName" |
+                        Sort-Object NotAfter -Descending |
+                        Select-Object -First 1
+                    if ($cert) {
+                        Write-Information "Imported certificate thumbprint: $($cert.Thumbprint)"
+                        return $cert.Thumbprint
+                    } else {
+                        Write-Warning "Could not retrieve the imported certificate."
+                        return $null
+                    }
+                }
+                catch {
+                    Write-Warning "Failed to retrieve thumbprint: $_"
+                    return $null
+                }
             } catch {
                 Write-Error "ERROR: $_"
             } finally {
@@ -279,105 +328,6 @@ function Add-KFCertificateToStore{
     }
 }
 
-function Add-KFCertificateToStoreNEW{
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$Base64Cert,
-    
-        [Parameter(Mandatory = $false)]
-        [string]$PrivateKeyPassword,
-    
-        [Parameter(Mandatory = $true)]
-        [string]$StoreName,
-    
-        [Parameter(Mandatory = $false)]
-        [string]$CryptoServiceProvider
-    )
-
-    try {
-        Write-Information "Entering PowerShell Script Add-KFCertificate"
-        Write-Verbose "Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
-
-        $thumbprint = $null
-
-        if ($CryptoServiceProvider) 
-        {
-            # Test to see if CSP exists
-            if(-not (Test-CryptoServiceProvider -CSPName $CryptoServiceProvider))
-            {
-                Write-Information "INFO: The CSP $CryptoServiceProvider was not found on the system."
-                Write-Warning "WARN: CSP $CryptoServiceProvider was not found on the system."
-                return
-            }
-
-            Write-Information "Adding certificate with the CSP '$CryptoServiceProvider'"
-
-            # Convert Base64 PFX to bytes and save to temp file
-            $tempPfxPath = [System.IO.Path]::GetTempFileName() + ".pfx"
-            [System.IO.File]::WriteAllBytes($tempPfxPath, [Convert]::FromBase64String($Base64Cert))
-
-            try {
-                # Load the PFX into a PKCS12 object
-                $pfx = New-Object -ComObject X509Enrollment.CX509Enrollment
-                $pfx.InitializeImport(1, [System.IO.File]::ReadAllText($tempPfxPath), $PrivateKeyPassword)
-
-                # Create new private key with desired CSP
-                $privateKey = New-Object -ComObject X509Enrollment.CX509PrivateKey
-                $privateKey.ProviderName    = $CryptoServiceProvider
-                $privateKey.Length          = [int]2048
-                $privateKey.KeySpec         = 1 # AT_KEYEXCHANGE
-                $privateKey.ExportPolicy    = 1 # AllowExport
-                $privateKey.MachineContext  = $true
-                $privateKey.Create()
-
-                # Associate private key with enrollment
-                $pfx.InstallResponse(2, "", 0, $null)
-
-                Write-Host "Certificate imported successfully using CSP: $CryptoServiceProvider"
-
-                # The most recently added cert (with private key) should be the new one
-                $latest = $certsBefore | Where-Object { $_.HasPrivateKey } | Sort-Object NotBefore -Descending | Select-Object -First 1
-
-                if ($latest) {
-                    Write-Information "Certificate imported successfully with thumbprint: $($latest.Thumbprint)"
-                    return $latest.Thumbprint
-                } else {
-                    throw "Certificate installed but no cert with private key was found in store '$StoreName'."
-                }
-
-            } catch {
-                # Handle any errors and log the exception message
-                Write-Error "Error during certificate import: $_"
-                return "Error: $_"
-            } finally {
-                # Ensure the temporary file is deleted
-                if (Test-Path $tempFileName) {
-                    Remove-Item $tempFileName -Force
-                }
-            }
-        } else {
-            $bytes = [System.Convert]::FromBase64String($Base64Cert)
-            $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, "LocalMachine"
-            Write-Information "Store '$StoreName' is open." 
-            $certStore.Open(5)
-
-            $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $PrivateKeyPassword, 18 <# Persist, Machine #>
-            $certStore.Add($cert)
-            $certStore.Close();
-            Write-Information "Store '$StoreName' is closed." 
-
-            # Get the thumbprint so it can be returned to the calling function
-            $thumbprint = $cert.Thumbprint
-            Write-Information "The thumbprint '$thumbprint' was created." 
-        }
-
-        Write-Host "Certificate added successfully to $StoreName." 
-        return $thumbprint
-    } catch {
-        Write-Error "An error occurred: $_" 
-        return $null
-    }
-}
 function Remove-KFCertificateFromStore {
     param (
         [string]$Thumbprint,
@@ -464,13 +414,17 @@ function New-KFIISSiteBinding {
 
         return $result
     }
+    Write-Verbose "No binding conflicts found for SiteName: '$SiteName', IPAddress: '$IPAddress', Port: $Port, HostName: '$Hostname'"
 
     $searchBindings = "${IPAddress}:${Port}:${Hostname}"
     $hasIISDrive = Ensure-IISDrive
     Write-Verbose "IIS Drive is available: $hasIISDrive"
 
     if ($hasIISDrive) {
-        Import-Module WebAdministration
+        
+        Write-Verbose "IIS Drive is available, using WebAdministration module."
+
+        $null = Import-Module WebAdministration
         $sitePath = "IIS:\Sites\$SiteName"
         if (-not (Test-Path $sitePath)) {
             $msg = "Site '$SiteName' not found in IIS drive."
@@ -480,12 +434,17 @@ function New-KFIISSiteBinding {
             $site = Get-Item $sitePath
             $httpsBindings = $site.Bindings.Collection | Where-Object {
                 $_.bindingInformation -eq $searchBindings -and $_.protocol -eq "https"
-            }
+        }
 
             foreach ($binding in $httpsBindings) {
                 try {
-                    Write-Verbose "Calling Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false"
-                    Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false
+                    $bindingInfo = $binding.GetAttributeValue("bindingInformation")
+                    $protocol    = $binding.protocol
+
+                    Write-Verbose "Calling Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false"
+                    Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false
+                    Write-Verbose "Completed removing the Web Binding"
+
                 } catch {
                     $msg = "Error removing binding '$($binding.bindingInformation)': $_"
                     Write-Warning $msg -InformationAction SilentlyContinue
@@ -520,6 +479,8 @@ function New-KFIISSiteBinding {
         }
     } else {
         # SERVERMANAGER FALLBACK
+        Write-Verbose "IIS Drive is not available, using ServerManager fallback."
+
         Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
         $iis = New-Object Microsoft.Web.Administration.ServerManager
         $site = $iis.Sites[$SiteName]
@@ -578,7 +539,7 @@ function CheckExistingBindings {
     $conflicts = @()
 
     if (Ensure-IISDrive) {
-        Import-Module WebAdministration
+        $null = Import-Module WebAdministration
 
         Get-Website | Where-Object { $_.Name -ne $TargetSiteName } | ForEach-Object {
             $siteName = $_.Name
@@ -647,7 +608,7 @@ function CheckExistingBindingsORIG {
     )
 
     if (Ensure-IISDrive) {
-        Import-Module WebAdministration
+        $null = Import-Module WebAdministration
  
         $conflict = $false
  
@@ -710,7 +671,7 @@ function Ensure-IISDrive {
     # Try to import the WebAdministration module if not already loaded
     if (-not (Get-Module -Name WebAdministration)) {
         try {
-            Import-Module WebAdministration -ErrorAction Stop
+            $null = Import-Module WebAdministration -ErrorAction Stop
         }
         catch {
             Write-Warning "WebAdministration module could not be imported. IIS:\ drive will not be available."
@@ -818,7 +779,7 @@ function Remove-KFIISCertificateIfUnused {
 
         if ($bindings.Count -gt 0) {
             Write-Warning "The certificate with thumbprint $thumbprint is still used by the following bindings:"
-            $bindings | Format-Table -AutoSize
+            $bindings | Format-Table -AutoSize | Out-String | Write-Warning
             return
         }
 
@@ -1166,6 +1127,9 @@ function New-CSREnrollment {
     # Validate the Crypto Service Provider
     Validate-CryptoProvider -ProviderName $ProviderName
 
+    # Parse Subject for any escaped commas
+    $parsedSubject = Parse-DNSubject $SubjectText
+
     # Build the SAN entries if provided
     $sanContent = ""
     if ($SAN) {
@@ -1184,7 +1148,7 @@ $($sanDirectives -join "`n")
 Signature=`"$`Windows NT$`"
 
 [NewRequest]
-Subject = "$SubjectText"
+Subject = "$parsedSubject"
 ProviderName = "$ProviderName"
 MachineKeySet = True
 HashAlgorithm = SHA256
@@ -1251,7 +1215,6 @@ function Import-SignedCertificate {
         [byte[]]$RawData,               # RawData from the certificate
 
         [Parameter(Mandatory = $true)]
-        [ValidateSet("My", "Root", "CA", "TrustedPublisher", "TrustedPeople")]
         [string]$StoreName              # Store to which the certificate should be imported
     )
 
@@ -1334,6 +1297,43 @@ function Get-CertificateCSP {
     )
 
     # Check if the certificate has a private key
+    if (-not $Cert.HasPrivateKey) {
+        Write-Warning "Certificate does not have a private key associated with it"
+        return $null
+    }
+
+    $privateKey = $Cert.PrivateKey
+    if ($privateKey) {
+        # For older .NET Framework
+        $cspKeyContainerInfo = $privateKey.CspKeyContainerInfo
+
+        if ($cspKeyContainerInfo) {
+            return $cspKeyContainerInfo.ProviderName
+        }
+    }
+
+    try {
+        $key = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+        if ($key -and $key.GetType().Name -eq "RSACng") {
+            $cngKey = $key.Key
+                
+            return $cngKey.Provider.Provider
+        }
+    }
+    catch {
+        Write-Warning "CNG key detection failed: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+# Function that takes an x509 certificate object and returns the csp
+function Get-CertificateCSPOLD {
+    param (
+        [Parameter(Mandatory = $true)]
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert
+    )
+
+    # Check if the certificate has a private key
     if ($Cert -and $Cert.HasPrivateKey) {
         try {
             $key = $Cert.PrivateKey
@@ -1402,4 +1402,108 @@ function Validate-CryptoProvider {
     }
 
     Write-Verbose "Crypto Service Provider '$ProviderName' is valid."
+}
+
+function Parse-DNSubject {
+    <#
+    .SYNOPSIS
+        Parses a Distinguished Name (DN) subject string and properly quotes RDN values containing escaped commas.
+    
+    .DESCRIPTION
+        This function takes a DN subject string and parses the Relative Distinguished Name (RDN) components,
+        adding proper quotes around values that contain escaped commas and escaping quotes for use in 
+        PowerShell here-strings. Only RDN values with escaped commas get quoted.
+    
+    .PARAMETER Subject
+        The DN subject string to parse (e.g., "CN=Keyfactor,O=Keyfactor\, Inc")
+    
+    .EXAMPLE
+        Parse-DNSubject -Subject "CN=Keyfactor,O=Keyfactor\, Inc"
+        Returns: CN=Keyfactor,O=""Keyfactor, Inc""
+    
+    .EXAMPLE
+        Parse-DNSubject -Subject "CN=Test User,O=Company\, LLC,OU=IT Department\, Security"
+        Returns: CN=Test User,O=""Company, LLC"",OU=""IT Department, Security""
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Subject
+    )
+    
+    # Initialize variables
+    $parsedComponents = @()
+    $currentComponent = ""
+    $i = 0
+    
+    # Convert string to character array for easier parsing
+    $chars = $Subject.ToCharArray()
+    
+    while ($i -lt $chars.Length) {
+        $char = $chars[$i]
+        
+        # Check if we hit a comma
+        if ($char -eq ',') {
+            # Look back to see if it's escaped
+            $isEscaped = $false
+            if ($i -gt 0 -and $chars[$i-1] -eq '\') {
+                $isEscaped = $true
+            }
+            
+            if ($isEscaped) {
+                # This is an escaped comma, add it to current component
+                $currentComponent += $char
+            } else {
+                # This is a separator comma, finish current component
+                if ($currentComponent.Trim() -ne "") {
+                    $parsedComponents += $currentComponent.Trim()
+                    $currentComponent = ""
+                }
+            }
+        } else {
+            # Regular character, add to current component
+            $currentComponent += $char
+        }
+        
+        $i++
+    }
+    
+    # Add the last component
+    if ($currentComponent.Trim() -ne "") {
+        $parsedComponents += $currentComponent.Trim()
+    }
+    
+    # Process each component to add quotes where needed
+    $processedComponents = @()
+    
+    foreach ($component in $parsedComponents) {
+        # Split on first equals sign to get attribute and value
+        $equalIndex = $component.IndexOf('=')
+        if ($equalIndex -gt 0) {
+            $attribute = $component.Substring(0, $equalIndex).Trim()
+            $value = $component.Substring($equalIndex + 1).Trim()
+            
+            # Clean up escaped commas first
+            $cleanValue = $value -replace '\\,', ','
+            
+            # Check if original value had escaped commas (needs quotes)
+            if ($value -match '\\,') {
+                # This RDN value had escaped commas, so wrap in doubled quotes and escape quotes
+                $escapedValue = $cleanValue -replace '"', '""'
+                $processedComponents += "$attribute=`"`"$escapedValue`"`""
+            } else {
+                # No escaped commas, keep as simple value but escape any existing quotes
+                $escapedValue = $cleanValue -replace '"', '""'
+                $processedComponents += "$attribute=$escapedValue"
+            }
+        } else {
+            # Invalid component format, keep as is
+            $processedComponents += $component
+        }
+    }
+    
+    # Join components back together (no outer quotes needed since it goes in PowerShell string)
+    $subjectString = ($processedComponents -join ',')
+    return $subjectString
 }

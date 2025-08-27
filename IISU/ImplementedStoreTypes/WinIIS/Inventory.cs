@@ -95,7 +95,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     {
                         Result = OrchestratorJobStatusJobResult.Success,
                         JobHistoryId = jobConfiguration.JobHistoryId,
-                        FailureMessage = ""
+                        FailureMessage = $"Inventory completed returning {inventoryItems.Count} Items."
                     };
                 }
 
