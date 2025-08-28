@@ -210,7 +210,14 @@ function Add-KFCertificateToStore{
         Write-Verbose "Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
 
         # Get the thumbprint of the passed in certificate
-        $thumbprint = Get-PfxThumbprint -Base64Cert $Base64Cert -Password $PrivateKeyPassword
+        # Convert password to secure string if provided, otherwise use $null
+        $bytes = [System.Convert]::FromBase64String($Base64Cert)
+        $securePassword = if ($PrivateKeyPassword) { ConvertTo-SecureString -String $PrivateKeyPassword -AsPlainText -Force } else { $null }
+
+        # 
+        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($bytes, $securePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+        $thumbprint = $cert.Thumbprint
+        
         if (-not $thumbprint) { throw "Failed to get the certificate thumbprint.  The PFX may be invalid or the password is incorrect." }
 
         if ($CryptoServiceProvider) 
@@ -289,19 +296,15 @@ function Add-KFCertificateToStore{
             }
 
         } else {
-            $bytes = [System.Convert]::FromBase64String($Base64Cert)
             $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, "LocalMachine"
             Write-Information "Store '$StoreName' is open." 
             $certStore.Open(5)
-
-            $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $PrivateKeyPassword, 18 <# Persist, Machine #>
             $certStore.Add($cert)
             $certStore.Close();
             Write-Information "Store '$StoreName' is closed." 
-            
         }
 
-        Write-Information "The thumbprint '$thumbprint' was created in store $StoreName." 
+        Write-Information "The thumbprint '$thumbprint' was added to store $StoreName." 
         return $thumbprint
     } catch {
         Write-Error "An error occurred: $_" 
