@@ -209,7 +209,9 @@ function Add-KFCertificateToStore{
         Write-Information "Entering PowerShell Script Add-KFCertificate"
         Write-Verbose "Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
 
-        $thumbprint = $null
+        # Get the thumbprint of the passed in certificate
+        $thumbprint = Get-PfxThumbprint -Base64Cert $Base64Cert -Password $PrivateKeyPassword
+        if (-not $thumbprint) { throw "Failed to get the certificate thumbprint.  The PFX may be invalid or the password is incorrect." }
 
         if ($CryptoServiceProvider) 
         {
@@ -278,29 +280,11 @@ function Add-KFCertificateToStore{
                 if ($process.ExitCode -ne 0) {
                     throw "certutil failed with code $($process.ExitCode). Output:`n$stdOut`nError:`n$stdErr"
                 }
-
-                # Retrieve thumbprint of the newly imported cert
-                try {
-                    $cert = Get-ChildItem -Path "Cert:\LocalMachine\$StoreName" |
-                        Sort-Object NotAfter -Descending |
-                        Select-Object -First 1
-                    if ($cert) {
-                        Write-Information "Imported certificate thumbprint: $($cert.Thumbprint)"
-                        return $cert.Thumbprint
-                    } else {
-                        Write-Warning "Could not retrieve the imported certificate."
-                        return $null
-                    }
-                }
-                catch {
-                    Write-Warning "Failed to retrieve thumbprint: $_"
-                    return $null
-                }
             } catch {
                 Write-Error "ERROR: $_"
             } finally {
                 if (Test-Path $tempPfx) {
-                    #Remove-Item $tempPfx -Force
+                    Remove-Item $tempPfx -Force
                 }
             }
 
@@ -314,13 +298,10 @@ function Add-KFCertificateToStore{
             $certStore.Add($cert)
             $certStore.Close();
             Write-Information "Store '$StoreName' is closed." 
-
-            # Get the thumbprint so it can be returned to the calling function
-            $thumbprint = $cert.Thumbprint
-            Write-Information "The thumbprint '$thumbprint' was created." 
+            
         }
 
-        Write-Host "Certificate added successfully to $StoreName." 
+        Write-Information "The thumbprint '$thumbprint' was created in store $StoreName." 
         return $thumbprint
     } catch {
         Write-Error "An error occurred: $_" 
@@ -469,12 +450,19 @@ function New-KFIISSiteBinding {
                 $_.bindingInformation -eq $searchBindings
             }
 
-            if ($binding) {
-                Write-Verbose "Binding thumbprint $thumbprint to $binding.bindingInformation in store: $StoreName"
-                $null = $binding.AddSslCertificate($Thumbprint, $StoreName)
-                $result = New-ResultObject -Status Success -Code 0 -Step BindSSL
-            } else {
-                $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -Message "No binding found for: $searchBindings"
+            try
+            {
+                if ($binding) {
+                    Write-Verbose "Binding thumbprint $thumbprint to $binding.bindingInformation in store: $StoreName"
+                    $null = $binding.AddSslCertificate($Thumbprint, $StoreName)
+                    $result = New-ResultObject -Status Success -Code 0 -Step BindSSL
+                } else {
+                    $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -Message "No binding found for: $searchBindings"
+                }
+            }
+            catch
+            {
+                $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -Message $_
             }
         }
     } else {
@@ -1264,6 +1252,37 @@ function Import-SignedCertificate {
 #####
 
 # Shared Functions
+# Function to return the certificate's thumbprint
+function Get-PfxThumbprint {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Base64Cert,
+
+        [Parameter(Mandatory = $false)]
+        [string]$Password
+    )
+
+    try {
+        # Convert Base64 to byte array
+        $pfxBytes = [Convert]::FromBase64String($Base64Cert)
+
+        # Convert password to secure string if provided, otherwise use $null
+        $securePassword = if ($Password) { ConvertTo-SecureString -String $Password -AsPlainText -Force } else { $null }
+
+        # Import certificate
+        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+        $cert.Import($pfxBytes, $securePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+
+        # Return thumbprint (formatted)
+        return $cert.Thumbprint.Replace(" ", "").ToUpper()
+    }
+    catch {
+        Write-Error "Failed to load PFX: $_"
+        return $null
+    }
+}
+
 # Function to get SAN (Subject Alternative Names) from a certificate
 function Get-KFSAN($cert) {
     $san = $cert.Extensions | Where-Object { $_.Oid.FriendlyName -eq "Subject Alternative Name" }
