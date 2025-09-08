@@ -5,6 +5,7 @@
 * Fixed an issue with complex PFX passwords that contained special characters such as '@' or '$', etc.
 * Fixed an issue when adding certificate to store, sometimes the wrong thumbprint was returned, thus breaking web site binding.
 * Removed the IIS bindings check.  Now bindings are handled similar to IIS - if you bind a cert to a site using the same bindings, you risk the possibility of one of the duplicate sites to stop working and the certificate being bound to either site.  Refer to IIS Documentation pertaining to HTTPS binding.
+* Fixed an issue with (remote) ODKG jobs that caused an error when the CSP was not specified.
 
 2.6.2
 * Fixed error when attempting to connect to remote computer using UO service account
