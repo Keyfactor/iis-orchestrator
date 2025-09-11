@@ -115,7 +115,7 @@
                             "DependsOn": "",
                             "DefaultValue": "",
                             "Options": "",
-                            "Description": "Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server."
+                            "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
                         },
                         {
                             "Name": "SAN",
@@ -306,21 +306,21 @@
                             "Options": "https,http",
                             "Description": "Multiple choice value specifying the protocol to bind to. Example: 'https' for secure communication."
                         },
-                        {
-                            "Name": "ProviderName",
-                            "DisplayName": "Crypto Provider Name",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": false
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "Name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing the private keys. If not specified, defaults to 'Microsoft Strong Cryptographic Provider'. This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. The list of installed cryptographic providers can be obtained by running 'certutil -csplist' on the target Server."
+                      {
+                        "Name": "ProviderName",
+                        "DisplayName": "Crypto Provider Name",
+                        "Type": "String",
+                        "RequiredWhen": {
+                          "HasPrivateKey": false,
+                          "OnAdd": false,
+                          "OnRemove": false,
+                          "OnReenrollment": false
                         },
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Options": "",
+                        "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+                      },
                         {
                             "Name": "SAN",
                             "DisplayName": "SAN",
@@ -441,21 +441,21 @@
                             },
                             "Description": "String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance."
                         },
-                        {
-                            "Name": "ProviderName",
-                            "DisplayName": "Crypto Provider Name",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": false
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "Optional string value specifying the name of the Windows cryptographic provider to use during reenrollment jobs when generating and storing private keys. Example: 'Microsoft Strong Cryptographic Provider'."
+                      {
+                        "Name": "ProviderName",
+                        "DisplayName": "Crypto Provider Name",
+                        "Type": "String",
+                        "RequiredWhen": {
+                          "HasPrivateKey": false,
+                          "OnAdd": false,
+                          "OnRemove": false,
+                          "OnReenrollment": false
                         },
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Options": "",
+                        "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+                      },
                         {
                             "Name": "SAN",
                             "DisplayName": "SAN",
