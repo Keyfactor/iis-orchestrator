@@ -1,9 +1,16 @@
-﻿# Update notes:
+﻿# Version 1.3.0
+
+# Summary
+# Contains PowerShell functions to execute administration jobs for general Windows certificates, IIS and SQL Server.
+# There are additional supporting PowerShell functions to support job specific actions.
+
+# Update notes:
 # 08/12/25  Updated functions to manage IIS bindings and certificates
 #           Updated script to read CSPs correctly using newer CNG Keys
 #		    Fix an error with complex PFX passwords having irregular characters
 # 08/29/25  Fixed the add cert to store function to return the correct thumbprint
 #           Made changes to the IIS Binding logic, breaking it into manageable pieces to aid in debugging issues
+# 09/16/25  Updated the Get CSP function to handle null values when reading hybrid certificates
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
@@ -374,160 +381,6 @@ function Remove-KFCertificateFromStore {
     return $isSuccessful
 }
 
-function New-KFIISSiteBindingOLD {
-    [CmdletBinding()]
-    [OutputType([pscustomobject])]
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$SiteName,
-        [string]$IPAddress = "*",
-        [int]$Port = 443,
-        [string]$Hostname = "",
-        [ValidateSet("http", "https")]
-        [string]$Protocol = "https",
-        [string]$Thumbprint,
-        [string]$StoreName = "My",
-        [int]$SslFlags = 0
-    )
-
-    Write-Information "Entering PowerShell Script: New-KFIISSiteBinding" -InformationAction SilentlyContinue
-    Write-Verbose "Entered New-KFIISSiteBinding with values SiteName: '$SiteName', IPAddress: '$IPAddress', Port: $Port, HostName: '$Hostname', Protocol: '$Protocol', Thumbprint: '$Thumbprint', Store Path: '$StoreName', SslFlags: '$SslFlags'"
-
-    $result = $null
-
-    # Check for existing binding conflict
-    $conflicts = @(CheckExistingBindings -DesiredIP $IPAddress -DesiredPort $Port -DesiredHost $Hostname -TargetSiteName $SiteName)
-
-    if ($conflicts.Count -gt 0) {
-        $conflictMessage = "Binding conflict detected with the following existing bindings:`n" + ($conflicts | ForEach-Object { " - Site: $($_.SiteName), IP: $($_.BindingIP), Port: $($_.BindingPort), Host: $($_.BindingHost)" }) -join "`n"
-
-        Write-Warning $conflictMessage -InformationAction SilentlyContinue
-
-        $result = New-ResultObject -Status Skipped -Code 100 -Step CheckBinding -Message $msg -ErrorMessage $conflictMessage 
-
-        return $result
-    }
-    Write-Verbose "No binding conflicts found for SiteName: '$SiteName', IPAddress: '$IPAddress', Port: $Port, HostName: '$Hostname'"
-
-    $searchBindings = "${IPAddress}:${Port}:${Hostname}"
-    $hasIISDrive = Ensure-IISDrive
-    Write-Verbose "IIS Drive is available: $hasIISDrive"
-
-    if ($hasIISDrive) {
-        
-        Write-Verbose "IIS Drive is available, using WebAdministration module."
-
-        $null = Import-Module WebAdministration
-        $sitePath = "IIS:\Sites\$SiteName"
-        if (-not (Test-Path $sitePath)) {
-            $msg = "Site '$SiteName' not found in IIS drive."
-            Write-Error $msg -InformationAction SilentlyContinue
-            $result = New-ResultObject -Status Error -Code 201 -Step FindWebSite -ErrorMessage $msg -Details @{ SiteName = $SiteName; IPAddress = $IPAddress; Port = $Port; HostName = $Hostname }
-        } else {
-            $site = Get-Item $sitePath
-            $httpsBindings = $site.Bindings.Collection | Where-Object {
-                $_.bindingInformation -eq $searchBindings -and $_.protocol -eq "https"
-        }
-
-            foreach ($binding in $httpsBindings) {
-                try {
-                    $bindingInfo = $binding.GetAttributeValue("bindingInformation")
-                    $protocol    = $binding.protocol
-
-                    Write-Verbose "Calling Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false"
-                    Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false
-                    Write-Verbose "Completed removing the Web Binding"
-
-                } catch {
-                    $msg = "Error removing binding '$($binding.bindingInformation)': $_"
-                    Write-Warning $msg -InformationAction SilentlyContinue
-                    $result = New-ResultObject -Status Error -Code 201 -Step RemoveBinding -ErrorMessage $msg
-                    return $result
-                }
-            }
-
-            # Site2 then has Test1 cert assigned to it??
-            try {
-                Write-Verbose "Calling New-WebBinding -Name $SiteName -Protocol $Protocol -IPAddress $IPAddress -Port $Port -HostHeader '$Hostname' -SslFlags $SslFlags"
-                New-WebBinding -Name $SiteName -Protocol $Protocol -IPAddress $IPAddress -Port $Port -HostHeader $Hostname -SslFlags $SslFlags
-            } catch {
-                $msg = "Error adding binding: $_"
-                Write-Warning $msg -InformationAction SilentlyContinue
-                $result = New-ResultObject -Status Error -Code 202 -Step AddBinding -ErrorMessage $msg
-                return $result
-            }
-
-            Write-Verbose "Calling Get-WebBinding -Name $SiteName -Protocol $Protocol, Where BindingInformation equals '$searchBindings'"
-            $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol | Where-Object {
-                $_.bindingInformation -eq $searchBindings
-            }
-
-            try
-            {
-                if ($binding) {
-                    Write-Verbose "Binding thumbprint $thumbprint to $binding.bindingInformation in store: $StoreName"
-                    $null = $binding.AddSslCertificate($Thumbprint, $StoreName)
-                    $result = New-ResultObject -Status Success -Code 0 -Step BindSSL
-                } else {
-                    $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -Message "No binding found for: $searchBindings"
-                }
-            }
-            catch
-            {
-                $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -Message $_
-            }
-        }
-    } else {
-        # SERVERMANAGER FALLBACK
-        Write-Verbose "IIS Drive is not available, using ServerManager fallback."
-
-        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
-        $iis = New-Object Microsoft.Web.Administration.ServerManager
-        $site = $iis.Sites[$SiteName]
-
-        if ($null -eq $site) {
-            $msg = "Site '$SiteName' not found in ServerManager."
-            Write-Error $msg -InformationAction SilentlyContinue
-            $result = New-ResultObject -Status Error -Code 201 -Step FindWebSite -Message $msg -Details @{ SiteName = $SiteName; IPAddress = $IPAddress; Port = $Port; HostName = $Hostname }
-        } else {
-            $httpsBindings = $site.Bindings | Where-Object {
-                $_.bindingInformation -eq $searchBindings -and $_.protocol -eq "https"
-            }
-
-            foreach ($binding in $httpsBindings) {
-                try {
-                    $site.Bindings.Remove($binding)
-                } catch {
-                    $msg = "Error removing binding: $_"
-                    Write-Warning $msg -InformationAction SilentlyContinue
-                    $result = New-ResultObject -Status Error -Code 201 -Step RemoveBinding -ErrorMessage $msg
-                    return $result
-                }
-            }
-
-            $cleanThumbprint = $Thumbprint -replace '[^a-fA-F0-9]', ''
-            $hashBytes = -split $cleanThumbprint -replace '..', '$& ' -split ' ' | Where-Object { $_ -ne '' } | ForEach-Object { [Convert]::ToByte($_, 16) }
-
-            try {
-                $newBinding = $site.Bindings.Add($searchBindings, $Protocol)
-                if ($Protocol -eq "https") {
-                    $newBinding.CertificateStoreName = $StoreName
-                    $newBinding.CertificateHash = [byte[]]$hashBytes
-                    $newBinding.SetAttributeValue("sslFlags", $SslFlags)
-                }
-                $iis.CommitChanges()
-                $result = New-ResultObject -Status Success -Code 0 -Step BindSSL -Message "Binding and certificate successfully applied via ServerManager."
-            } catch {
-                $msg = "Error adding binding: $_"
-                Write-Warning $msg -InformationAction SilentlyContinue
-                $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -ErrorMessage $msg
-            }
-        }
-    }
-
-    return $result
-}
-
 # IIS Functions
 function New-KFIISSiteBinding {
     [CmdletBinding()]
@@ -828,7 +681,7 @@ function Remove-KFIISSiteBinding {
     }
 }
 
-# Called on a renewal to remove any certificats if not bound or used
+# Called on a renewal to remove any certificates if not bound or used
 function Remove-KFIISCertificateIfUnused {
     param (
         [Parameter(Mandatory = $true)]
@@ -1381,6 +1234,52 @@ function Test-CryptoServiceProvider {
 
 # Function that takes an x509 certificate object and returns the csp
 function Get-CertificateCSP {
+    param(
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$cert
+    )
+    
+    try {
+        # Check if certificate has a private key
+        if (-not $cert.HasPrivateKey) {
+            return "No private key"
+        }
+        
+        # Get the private key
+        $privateKey = $cert.PrivateKey
+        
+        if ($privateKey -and $privateKey.CspKeyContainerInfo) {
+            # For older .NET Framework
+            $cspKeyContainerInfo = $privateKey.CspKeyContainerInfo
+            
+            if ($cspKeyContainerInfo -and $cspKeyContainerInfo.ProviderName) {
+                return [string]$cspKeyContainerInfo.ProviderName
+            }
+        }
+        
+        # For newer .NET Core/5+ or CNG keys
+        try {
+            $key = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+            if ($key -and $key.GetType().Name -eq "RSACng") {
+                $cngKey = $key.Key
+                if ($cngKey -and $cngKey.Provider -and $cngKey.Provider.Provider) {
+                    return [string]$cngKey.Provider.Provider
+                }
+            }
+        }
+        catch {
+            Write-Verbose "CNG key detection failed: $($_.Exception.Message)"
+        }
+        
+        # Ensure we always return a string
+        return "Unknown provider"
+        
+    }
+    catch {
+        return "Error retrieving CSP: $($_.Exception.Message)"
+    }
+}
+
+function Get-CertificateCSPV2 {
     param (
         [Parameter(Mandatory = $true)]
         [System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert
