@@ -386,7 +386,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
 
                 // Add Parameters if provided
-                if (parameters != null)
+                if (parameters != null && parameters.Count > 0)
                 {
                     if (isLocalMachine || isScript)
                     {
@@ -398,13 +398,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     else
                     {
                         // Remote execution: Use ArgumentList for parameters
-                        var paramBlock = string.Join(", ", parameters.Select(p => $"[{p.Value.GetType().Name}] ${p.Key}"));
+                        var paramBlock = string.Join(", ", parameters.Select(p =>
+                        {
+                            string typeName = p.Value?.GetType().Name ?? "object";
+                            return $"[{typeName}] ${p.Key}";
+                        }));
+
                         var paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
 
                         string scriptBlockWithParams = $@"
-                    param({paramBlock})
-                    {commandOrScript} {paramUsage}
-                ";
+                            param({paramBlock})
+                            {commandOrScript} {paramUsage}
+                        ";
 
                         PS.Commands.Clear(); // Clear previous commands
                         PS.AddCommand("Invoke-Command")
