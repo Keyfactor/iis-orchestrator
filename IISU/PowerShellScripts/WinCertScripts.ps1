@@ -1,4 +1,18 @@
-﻿# Set preferences globally at the script level
+﻿# Version 1.3.0
+
+# Summary
+# Contains PowerShell functions to execute administration jobs for general Windows certificates, IIS and SQL Server.
+# There are additional supporting PowerShell functions to support job specific actions.
+
+# Update notes:
+# 08/12/25  Updated functions to manage IIS bindings and certificates
+#           Updated script to read CSPs correctly using newer CNG Keys
+#		    Fix an error with complex PFX passwords having irregular characters
+# 08/29/25  Fixed the add cert to store function to return the correct thumbprint
+#           Made changes to the IIS Binding logic, breaking it into manageable pieces to aid in debugging issues
+# 09/16/25  Updated the Get CSP function to handle null values when reading hybrid certificates
+
+# Set preferences globally at the script level
 $DebugPreference = "Continue"
 $VerbosePreference = "Continue"
 $InformationPreference = "Continue"
@@ -204,7 +218,19 @@ function Add-KFCertificateToStore{
         Write-Information "Entering PowerShell Script Add-KFCertificate"
         Write-Verbose "Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
 
-        $thumbprint = $null
+        # Get the thumbprint of the passed in certificate
+        # Convert password to secure string if provided, otherwise use $null
+        $bytes = [System.Convert]::FromBase64String($Base64Cert)
+        $securePassword = if ($PrivateKeyPassword) { ConvertTo-SecureString -String $PrivateKeyPassword -AsPlainText -Force } else { $null }
+
+        # Set the storage flags and get the certificate's thumbprint
+        $keyStorageFlags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor `
+                   [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet
+
+        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($bytes, $securePassword, $keyStorageFlags)
+        $thumbprint = $cert.Thumbprint
+        
+        if (-not $thumbprint) { throw "Failed to get the certificate thumbprint.  The PFX may be invalid or the password is incorrect." }
 
         if ($CryptoServiceProvider) 
         {
@@ -225,53 +251,76 @@ function Add-KFCertificateToStore{
 
             # Execute certutil based on whether a private key password was supplied
             try {
-                # Build certutil command to import the certificate with exportable private key and CSP
-                $command = "certutil -f -p `"$PrivateKeyPassword`" -csp `"$CryptoServiceProvider`" -importpfx $StoreName `"$tempPfx`""
-                $traceCommand = "certutil -f -p `"************`" -csp `"$CryptoServiceProvider`" -importpfx $StoreName `"$tempPfx`""
+                # Start building certutil arguments
+                $arguments = @('-f')
 
-                Write-Verbose "Running: $traceCommand"
-                $output = Invoke-Expression $command
-
-                if ($LASTEXITCODE -ne 0) {
-                    throw "certutil failed with code $LASTEXITCODE. `nOutput: $output `nMake sure there is no cryptographic mismatch and the CSP supports the imported PFX.`n"
+                if ($PrivateKeyPassword) {
+                    Write-Verbose "Has a private key"
+                    $arguments += '-p'
+                    $arguments += $PrivateKeyPassword
                 }
 
-                # Get latest cert with private key in the store
-                $store = "Cert:\LocalMachine\$StoreName"
-                $cert = Get-ChildItem -Path $store | Where-Object { $_.HasPrivateKey } | Sort-Object NotBefore -Descending | Select-Object -First 1
-
-                if ($cert) {
-                    Write-Information "Certificate imported successfully with Thumbprint: $($cert.Thumbprint)"
-                    return $cert.Thumbprint
-                } else {
-                    throw "Import succeeded, but no certificate with a private key was found in $store"
+                if ($CryptoServiceProvider) {
+                    Write-Verbose "Has a CryptoServiceProvider: $CryptoServiceProvider"
+                    $arguments += '-csp'
+                    $arguments += $CryptoServiceProvider
                 }
 
+                $arguments += '-importpfx'
+                $arguments += $StoreName
+                $arguments += $tempPfx
+
+                # Quote any arguments with spaces
+                $argLine = ($arguments | ForEach-Object {
+                    if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
+                }) -join ' '
+
+                write-Verbose "Running certutil with arguments: $argLine"
+
+                # Setup process execution
+                $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+                $processInfo.FileName = "certutil.exe"
+                $processInfo.Arguments = $argLine.Trim()
+                $processInfo.RedirectStandardOutput = $true
+                $processInfo.RedirectStandardError = $true
+                $processInfo.UseShellExecute = $false
+                $processInfo.CreateNoWindow = $true
+
+                $process = New-Object System.Diagnostics.Process
+                $process.StartInfo = $processInfo
+
+                $process.Start() | Out-Null
+
+                $stdOut = $process.StandardOutput.ReadToEnd()
+                $stdErr = $process.StandardError.ReadToEnd()
+
+                $process.WaitForExit()
+
+                if ($process.ExitCode -ne 0) {
+                    throw "certutil failed with code $($process.ExitCode). Output:`n$stdOut`nError:`n$stdErr"
+                }
             } catch {
                 Write-Error "ERROR: $_"
             } finally {
                 if (Test-Path $tempPfx) {
-                    #Remove-Item $tempPfx -Force
+                    Remove-Item $tempPfx -Force
                 }
             }
 
         } else {
-            $bytes = [System.Convert]::FromBase64String($Base64Cert)
             $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, "LocalMachine"
             Write-Information "Store '$StoreName' is open." 
-            $certStore.Open(5)
 
-            $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $PrivateKeyPassword, 18 <# Persist, Machine #>
+            # Open store with read/write, and don't create the store if it doesn't exist
+            $openFlags = [System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite -bor `
+                    [System.Security.Cryptography.X509Certificates.OpenFlags]::OpenExistingOnly
+            $certStore.Open($openFlags)
             $certStore.Add($cert)
             $certStore.Close();
             Write-Information "Store '$StoreName' is closed." 
-
-            # Get the thumbprint so it can be returned to the calling function
-            $thumbprint = $cert.Thumbprint
-            Write-Information "The thumbprint '$thumbprint' was created." 
         }
 
-        Write-Host "Certificate added successfully to $StoreName." 
+        Write-Information "The thumbprint '$thumbprint' was added to store $StoreName." 
         return $thumbprint
     } catch {
         Write-Error "An error occurred: $_" 
@@ -279,105 +328,6 @@ function Add-KFCertificateToStore{
     }
 }
 
-function Add-KFCertificateToStoreNEW{
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$Base64Cert,
-    
-        [Parameter(Mandatory = $false)]
-        [string]$PrivateKeyPassword,
-    
-        [Parameter(Mandatory = $true)]
-        [string]$StoreName,
-    
-        [Parameter(Mandatory = $false)]
-        [string]$CryptoServiceProvider
-    )
-
-    try {
-        Write-Information "Entering PowerShell Script Add-KFCertificate"
-        Write-Verbose "Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
-
-        $thumbprint = $null
-
-        if ($CryptoServiceProvider) 
-        {
-            # Test to see if CSP exists
-            if(-not (Test-CryptoServiceProvider -CSPName $CryptoServiceProvider))
-            {
-                Write-Information "INFO: The CSP $CryptoServiceProvider was not found on the system."
-                Write-Warning "WARN: CSP $CryptoServiceProvider was not found on the system."
-                return
-            }
-
-            Write-Information "Adding certificate with the CSP '$CryptoServiceProvider'"
-
-            # Convert Base64 PFX to bytes and save to temp file
-            $tempPfxPath = [System.IO.Path]::GetTempFileName() + ".pfx"
-            [System.IO.File]::WriteAllBytes($tempPfxPath, [Convert]::FromBase64String($Base64Cert))
-
-            try {
-                # Load the PFX into a PKCS12 object
-                $pfx = New-Object -ComObject X509Enrollment.CX509Enrollment
-                $pfx.InitializeImport(1, [System.IO.File]::ReadAllText($tempPfxPath), $PrivateKeyPassword)
-
-                # Create new private key with desired CSP
-                $privateKey = New-Object -ComObject X509Enrollment.CX509PrivateKey
-                $privateKey.ProviderName    = $CryptoServiceProvider
-                $privateKey.Length          = [int]2048
-                $privateKey.KeySpec         = 1 # AT_KEYEXCHANGE
-                $privateKey.ExportPolicy    = 1 # AllowExport
-                $privateKey.MachineContext  = $true
-                $privateKey.Create()
-
-                # Associate private key with enrollment
-                $pfx.InstallResponse(2, "", 0, $null)
-
-                Write-Host "Certificate imported successfully using CSP: $CryptoServiceProvider"
-
-                # The most recently added cert (with private key) should be the new one
-                $latest = $certsBefore | Where-Object { $_.HasPrivateKey } | Sort-Object NotBefore -Descending | Select-Object -First 1
-
-                if ($latest) {
-                    Write-Information "Certificate imported successfully with thumbprint: $($latest.Thumbprint)"
-                    return $latest.Thumbprint
-                } else {
-                    throw "Certificate installed but no cert with private key was found in store '$StoreName'."
-                }
-
-            } catch {
-                # Handle any errors and log the exception message
-                Write-Error "Error during certificate import: $_"
-                return "Error: $_"
-            } finally {
-                # Ensure the temporary file is deleted
-                if (Test-Path $tempFileName) {
-                    Remove-Item $tempFileName -Force
-                }
-            }
-        } else {
-            $bytes = [System.Convert]::FromBase64String($Base64Cert)
-            $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, "LocalMachine"
-            Write-Information "Store '$StoreName' is open." 
-            $certStore.Open(5)
-
-            $cert = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $bytes, $PrivateKeyPassword, 18 <# Persist, Machine #>
-            $certStore.Add($cert)
-            $certStore.Close();
-            Write-Information "Store '$StoreName' is closed." 
-
-            # Get the thumbprint so it can be returned to the calling function
-            $thumbprint = $cert.Thumbprint
-            Write-Information "The thumbprint '$thumbprint' was created." 
-        }
-
-        Write-Host "Certificate added successfully to $StoreName." 
-        return $thumbprint
-    } catch {
-        Write-Error "An error occurred: $_" 
-        return $null
-    }
-}
 function Remove-KFCertificateFromStore {
     param (
         [string]$Thumbprint,
@@ -431,302 +381,255 @@ function Remove-KFCertificateFromStore {
     return $isSuccessful
 }
 
+# IIS Functions
 function New-KFIISSiteBinding {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory = $true)]
         [string]$SiteName,
+        
         [string]$IPAddress = "*",
+        
         [int]$Port = 443,
+        
+        [AllowEmptyString()]
         [string]$Hostname = "",
+        
         [ValidateSet("http", "https")]
         [string]$Protocol = "https",
+        
+        [ValidateScript({
+            if ($Protocol -eq 'https' -and [string]::IsNullOrEmpty($_)) {
+                throw "Thumbprint is required when Protocol is 'https'"
+            }
+            $true
+        })]
         [string]$Thumbprint,
+        
         [string]$StoreName = "My",
+        
         [int]$SslFlags = 0
     )
 
     Write-Information "Entering PowerShell Script: New-KFIISSiteBinding" -InformationAction SilentlyContinue
-    Write-Verbose "Entered New-KFIISSiteBinding with values SiteName: '$SiteName', IPAddress: '$IPAddress', Port: $Port, HostName: '$Hostname', Protocol: '$Protocol', Thumbprint: '$Thumbprint', Store Path: '$StoreName', SslFlags: '$SslFlags'"
+    Write-Verbose "Function: New-KFIISSiteBinding"
+    Write-Verbose "Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
 
-    $result = $null
+    try {
+        # This function mimics IIS Manager behavior:
+        # - Replaces exact binding matches (same IP:Port:Hostname)
+        # - Allows multiple bindings with different hostnames (SNI)
+        # - Lets IIS handle true conflicts rather than pre-checking
+        
+        # Step 1: Verify site exists and get management approach
+        $managementInfo = Get-IISManagementInfo -SiteName $SiteName
+        if (-not $managementInfo.Success) {
+            return $managementInfo.Result
+        }
 
-    # Check for existing binding conflict
-    $conflicts = @(CheckExistingBindings -DesiredIP $IPAddress -DesiredPort $Port -DesiredHost $Hostname -TargetSiteName $SiteName)
+        # Step 2: Remove existing HTTPS bindings for this exact binding information
+        # This mimics IIS behavior: replace exact matches, allow different hostnames
+        $searchBindings = "${IPAddress}:${Port}:${Hostname}"
+        Write-Verbose "Removing existing HTTPS bindings for: $searchBindings"
+        
+        $removalResult = Remove-ExistingIISBinding -SiteName $SiteName -BindingInfo $searchBindings -UseIISDrive $managementInfo.UseIISDrive
+        if ($removalResult.Status -eq 'Error') {
+            return $removalResult
+        }
 
-    if ($conflicts.Count -gt 0) {
-        $conflictMessage = "Binding conflict detected with the following existing bindings:`n" + ($conflicts | ForEach-Object { " - Site: $($_.SiteName), IP: $($_.BindingIP), Port: $($_.BindingPort), Host: $($_.BindingHost)" }) -join "`n"
+        # Step 3: Add new binding with SSL certificate
+        Write-Verbose "Adding new binding with SSL certificate"
+        
+        $addParams = @{
+            SiteName = $SiteName
+            Protocol = $Protocol
+            IPAddress = $IPAddress
+            Port = $Port
+            Hostname = $Hostname
+            Thumbprint = $Thumbprint
+            StoreName = $StoreName
+            SslFlags = $SslFlags
+            UseIISDrive = $managementInfo.UseIISDrive
+        }
+        
+        $addResult = Add-IISBindingWithSSL @addParams
+        return $addResult
 
-        Write-Warning $conflictMessage -InformationAction SilentlyContinue
-
-        $result = New-ResultObject -Status Skipped -Code 100 -Step CheckBinding -Message $msg -ErrorMessage $conflictMessage 
-
-        return $result
     }
+    catch {
+        $errorMessage = "Unexpected error in New-KFIISSiteBinding: $($_.Exception.Message)"
+        Write-Error $errorMessage
+        return New-ResultObject -Status Error -Code 999 -Step UnexpectedError -ErrorMessage $errorMessage
+    }
+}
+function Remove-ExistingIISBinding {
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$SiteName,
+        
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$BindingInfo,
+        
+        [Parameter(Mandatory = $true)]
+        [bool]$UseIISDrive
+    )
 
-    $searchBindings = "${IPAddress}:${Port}:${Hostname}"
-    $hasIISDrive = Ensure-IISDrive
-    Write-Verbose "IIS Drive is available: $hasIISDrive"
+    Write-Verbose "Removing existing bindings for exact match: $BindingInfo on site $SiteName (mimics IIS replace behavior)"
 
-    if ($hasIISDrive) {
-        Import-Module WebAdministration
-        $sitePath = "IIS:\Sites\$SiteName"
-        if (-not (Test-Path $sitePath)) {
-            $msg = "Site '$SiteName' not found in IIS drive."
-            Write-Error $msg -InformationAction SilentlyContinue
-            $result = New-ResultObject -Status Error -Code 201 -Step FindWebSite -Message $msg -Details @{ SiteName = $SiteName; IPAddress = $IPAddress; Port = $Port; HostName = $Hostname }
-        } else {
+    try {
+        if ($UseIISDrive) {
+            $sitePath = "IIS:\Sites\$SiteName"
             $site = Get-Item $sitePath
             $httpsBindings = $site.Bindings.Collection | Where-Object {
-                $_.bindingInformation -eq $searchBindings -and $_.protocol -eq "https"
+                $_.bindingInformation -eq $BindingInfo -and $_.protocol -eq "https"
             }
 
             foreach ($binding in $httpsBindings) {
-                try {
-                    Write-Verbose "Calling Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false"
-                    Remove-WebBinding -Name $SiteName -BindingInformation $binding.bindingInformation -Protocol $binding.protocol -Confirm:$false
-                } catch {
-                    $msg = "Error removing binding '$($binding.bindingInformation)': $_"
-                    Write-Warning $msg -InformationAction SilentlyContinue
-                    $result = New-ResultObject -Status Error -Code 201 -Step RemoveBinding -ErrorMessage $msg
-                    return $result
-                }
-            }
+                $bindingInfo = $binding.GetAttributeValue("bindingInformation")
+                $protocol = $binding.protocol
 
-            # Site2 then has Test1 cert assigned to it??
-            try {
-                Write-Verbose "Calling New-WebBinding -Name $SiteName -Protocol $Protocol -IPAddress $IPAddress -Port $Port -HostHeader '$Hostname' -SslFlags $SslFlags"
-                New-WebBinding -Name $SiteName -Protocol $Protocol -IPAddress $IPAddress -Port $Port -HostHeader $Hostname -SslFlags $SslFlags
-            } catch {
-                $msg = "Error adding binding: $_"
-                Write-Warning $msg -InformationAction SilentlyContinue
-                $result = New-ResultObject -Status Error -Code 202 -Step AddBinding -ErrorMessage $msg
-                return $result
-            }
-
-            Write-Verbose "Calling Get-WebBinding -Name $SiteName -Protocol $Protocol, Where BindingInformation equals '$searchBindings'"
-            $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol | Where-Object {
-                $_.bindingInformation -eq $searchBindings
-            }
-
-            if ($binding) {
-                Write-Verbose "Binding thumbprint $thumbprint to $binding.bindingInformation in store: $StoreName"
-                $null = $binding.AddSslCertificate($Thumbprint, $StoreName)
-                $result = New-ResultObject -Status Success -Code 0 -Step BindSSL
-            } else {
-                $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -Message "No binding found for: $searchBindings"
+                Write-Verbose "Removing binding: $bindingInfo ($protocol)"
+                Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false
+                Write-Verbose "Successfully removed binding"
             }
         }
-    } else {
-        # SERVERMANAGER FALLBACK
-        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
-        $iis = New-Object Microsoft.Web.Administration.ServerManager
-        $site = $iis.Sites[$SiteName]
+        else {
+            # ServerManager fallback
+            Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
+            $iis = New-Object Microsoft.Web.Administration.ServerManager
+            $site = $iis.Sites[$SiteName]
 
-        if ($null -eq $site) {
-            $msg = "Site '$SiteName' not found in ServerManager."
-            Write-Error $msg -InformationAction SilentlyContinue
-            $result = New-ResultObject -Status Error -Code 201 -Step FindWebSite -Message $msg -Details @{ SiteName = $SiteName; IPAddress = $IPAddress; Port = $Port; HostName = $Hostname }
-        } else {
             $httpsBindings = $site.Bindings | Where-Object {
-                $_.bindingInformation -eq $searchBindings -and $_.protocol -eq "https"
+                $_.BindingInformation -eq $BindingInfo -and $_.Protocol -eq "https"
             }
 
             foreach ($binding in $httpsBindings) {
-                try {
-                    $site.Bindings.Remove($binding)
-                } catch {
-                    $msg = "Error removing binding: $_"
-                    Write-Warning $msg -InformationAction SilentlyContinue
-                    $result = New-ResultObject -Status Error -Code 201 -Step RemoveBinding -ErrorMessage $msg
-                    return $result
-                }
+                Write-Verbose "Removing binding: $($binding.BindingInformation)"
+                $site.Bindings.Remove($binding)
             }
-
-            $cleanThumbprint = $Thumbprint -replace '[^a-fA-F0-9]', ''
-            $hashBytes = -split $cleanThumbprint -replace '..', '$& ' -split ' ' | Where-Object { $_ -ne '' } | ForEach-Object { [Convert]::ToByte($_, 16) }
-
-            try {
-                $newBinding = $site.Bindings.Add($searchBindings, $Protocol)
-                if ($Protocol -eq "https") {
-                    $newBinding.CertificateStoreName = $StoreName
-                    $newBinding.CertificateHash = [byte[]]$hashBytes
-                    $newBinding.SetAttributeValue("sslFlags", $SslFlags)
-                }
-                $iis.CommitChanges()
-                $result = New-ResultObject -Status Success -Code 0 -Step BindSSL -Message "Binding and certificate successfully applied via ServerManager."
-            } catch {
-                $msg = "Error adding binding: $_"
-                Write-Warning $msg -InformationAction SilentlyContinue
-                $result = New-ResultObject -Status Error -Code 202 -Step BindSSL -ErrorMessage $msg
-            }
+            
+            $iis.CommitChanges()
         }
+
+        return New-ResultObject -Status Success -Code 0 -Step RemoveBinding -Message "Successfully removed existing bindings"
     }
-
-    return $result
-}
-
-function CheckExistingBindings {
-    param (
-        [string]$DesiredIP,
-        [string]$DesiredPort,
-        [string]$DesiredHost,
-        [string]$TargetSiteName
-    )
-
-    $conflicts = @()
-
-    if (Ensure-IISDrive) {
-        Import-Module WebAdministration
-
-        Get-Website | Where-Object { $_.Name -ne $TargetSiteName } | ForEach-Object {
-            $siteName = $_.Name
-            $_.Bindings.Collection | ForEach-Object {
-                $parts = $_.bindingInformation.Split(':')
-                $bindingIP = $parts[0]
-                $bindingPort = $parts[1]
-                $bindingHost = if ($_.HostHeader) { $_.HostHeader } else { "" }
-
-                if (
-                    $bindingIP -eq $DesiredIP -and
-                    $bindingPort -eq $DesiredPort -and
-                    $bindingHost -eq $DesiredHost
-                ) {
-                    $conflicts += [pscustomobject]@{
-                        SiteName     = $siteName
-                        BindingIP    = $bindingIP
-                        BindingPort  = $bindingPort
-                        BindingHost  = $bindingHost
-                    }
-                }
-            }
-        }
-
-        return @($conflicts)
-    }
-    else {
-        # SERVERMANAGER FALLBACK
-        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
-        $iis = New-Object Microsoft.Web.Administration.ServerManager
-
-        foreach ($site in $iis.Sites) {
-            if ($site.Name -ne $TargetSiteName) {
-                foreach ($binding in $site.Bindings) {
-                    $bindingInfo = $binding.BindingInformation.Split(':')
-                    $bindingIP = $bindingInfo[0]
-                    $bindingPort = $bindingInfo[1]
-                    $bindingHost = $binding.Host
-
-                    if (
-                        $bindingIP -eq $DesiredIP -and
-                        $bindingPort -eq $DesiredPort -and
-                        ($bindingHost -eq $DesiredHost -or ($bindingHost -eq $null -and $DesiredHost -eq ""))
-                    ) {
-                        $conflicts += [pscustomobject]@{
-                            SiteName     = $site.Name
-                            BindingIP    = $bindingIP
-                            BindingPort  = $bindingPort
-                            BindingHost  = $bindingHost
-                        }
-                    }
-                }
-            }
-        }
-
-        return $conflicts
+    catch {
+        $errorMessage = "Error removing existing binding: $($_.Exception.Message)"
+        Write-Warning $errorMessage
+        return New-ResultObject -Status Error -Code 201 -Step RemoveBinding -ErrorMessage $errorMessage
     }
 }
-
-function CheckExistingBindingsORIG {
-    param (
-        [string]$DesiredIP,
-        [string]$DesiredPort,
-        [string]$DesiredHost,
-        [string]$TargetSiteName
-    )
-
-    if (Ensure-IISDrive) {
-        Import-Module WebAdministration
- 
-        $conflict = $false
- 
-        Get-Website | Where-Object { $_.Name -ne $TargetSiteName } | ForEach-Object {
-            $siteName = $_.Name
-            $_.Bindings.Collection | ForEach-Object {
-                $parts = $_.bindingInformation.Split(':')
-                $bindingIP = $parts[0]
-                $bindingPort = $parts[1]
-                $bindingHost = if ($_.HostHeader) { $_.HostHeader } else { "" }
-
-                if (
-                    $bindingIP -eq $DesiredIP -and
-                    $bindingPort -eq $DesiredPort -and
-                    $bindingHost -eq $DesiredHost
-                ) {
-                    Write-Verbose "⚠️ Conflict found in site '$siteName' with binding: $($DesiredIP):$($DesiredPort):$($DesiredHost)"
-                    $conflict = $true
-                }
-            }
-        }
- 
-        return $conflict
-    }
-    else {
-        # SERVERMANAGER FALLBACK
-        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
-        $iis = New-Object Microsoft.Web.Administration.ServerManager
-
-        $conflict = $false
-
-        $site = $iis.Sites[$SiteName]
-        foreach ($site in $iis.Sites) {
-            if ($site.Name -ne $TargetSiteName) {
-                foreach ($binding in $site.Bindings) {
-                    $bindingInfo = $binding.BindingInformation.Split(':')
-                    $bindingIP = $bindingInfo[0]
-                    $bindingPort = $bindingInfo[1]
-                    $bindingHost = $binding.Host
-
-                    if (
-                        $bindingIP -eq $DesiredIP -and
-                        $bindingPort -eq $DesiredPort -and
-                        ($bindingHost -eq $DesiredHost -or ($bindingHost -eq $null -and $DesiredHost -eq ""))
-                    ) {
-                        $conflict = $true
-                    }
-                }
-            }
-        }
-
-        return $conflict
-    }
-}
-
-function Ensure-IISDrive {
+function Add-IISBindingWithSSL {
     [CmdletBinding()]
-    param ()
+    [OutputType([pscustomobject])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$SiteName,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$Protocol,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$IPAddress,
+        
+        [Parameter(Mandatory = $true)]
+        [int]$Port,
+        
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$Hostname,
+        
+        [string]$Thumbprint,
+        
+        [string]$StoreName = "My",
+        
+        [int]$SslFlags = 0,
+        
+        [Parameter(Mandatory = $true)]
+        [bool]$UseIISDrive
+    )
 
-    # Try to import the WebAdministration module if not already loaded
-    if (-not (Get-Module -Name WebAdministration)) {
-        try {
-            Import-Module WebAdministration -ErrorAction Stop
+    Write-Verbose "Adding binding: Protocol=$Protocol, IP=$IPAddress, Port=$Port, Host='$Hostname'"
+
+    try {
+        if ($UseIISDrive) {
+            # Add binding using WebAdministration module
+            $bindingParams = @{
+                Name = $SiteName
+                Protocol = $Protocol
+                IPAddress = $IPAddress
+                Port = $Port
+                SslFlags = $SslFlags
+            }
+            
+            # Only add HostHeader if it's not empty (New-WebBinding doesn't like empty strings)
+            if (-not [string]::IsNullOrEmpty($Hostname)) {
+                $bindingParams.HostHeader = $Hostname
+            }
+            
+            Write-Verbose "Creating new web binding with parameters: $(($bindingParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')"
+            New-WebBinding @bindingParams
+
+            # Bind SSL certificate if HTTPS
+            if ($Protocol -eq "https" -and -not [string]::IsNullOrEmpty($Thumbprint)) {
+                $searchBindings = "${IPAddress}:${Port}:${Hostname}"
+                Write-Verbose "Searching for binding: $searchBindings"
+                
+                $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol | Where-Object {
+                    $_.bindingInformation -eq $searchBindings
+                }
+
+                if ($binding) {
+                    Write-Verbose "Binding SSL certificate with thumbprint: $Thumbprint"
+                    $null = $binding.AddSslCertificate($Thumbprint, $StoreName)
+                    Write-Verbose "SSL certificate successfully bound"
+                    return New-ResultObject -Status Success -Code 0 -Step BindSSL -Message "Binding and SSL certificate successfully applied"
+                } else {
+                    return New-ResultObject -Status Error -Code 202 -Step BindSSL -ErrorMessage "No binding found for: $searchBindings"
+                }
+            }
+            else {
+                return New-ResultObject -Status Success -Code 0 -Step AddBinding -Message "HTTP binding successfully added"
+            }
         }
-        catch {
-            Write-Warning "WebAdministration module could not be imported. IIS:\ drive will not be available."
-            return $false
+        else {
+            # ServerManager fallback
+            Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
+            $iis = New-Object Microsoft.Web.Administration.ServerManager
+            $site = $iis.Sites[$SiteName]
+
+            $searchBindings = "${IPAddress}:${Port}:${Hostname}"
+            $newBinding = $site.Bindings.Add($searchBindings, $Protocol)
+
+            if ($Protocol -eq "https" -and -not [string]::IsNullOrEmpty($Thumbprint)) {
+                # Clean and convert thumbprint to byte array
+                $cleanThumbprint = $Thumbprint -replace '[^a-fA-F0-9]', ''
+                $hashBytes = for ($i = 0; $i -lt $cleanThumbprint.Length; $i += 2) {
+                    [Convert]::ToByte($cleanThumbprint.Substring($i, 2), 16)
+                }
+
+                $newBinding.CertificateStoreName = $StoreName
+                $newBinding.CertificateHash = [byte[]]$hashBytes
+                $newBinding.SetAttributeValue("sslFlags", $SslFlags)
+            }
+
+            $iis.CommitChanges()
+            return New-ResultObject -Status Success -Code 0 -Step BindSSL -Message "Binding and certificate successfully applied via ServerManager"
         }
     }
-
-    # Check if IIS drive is available
-    if (-not (Get-PSDrive -Name 'IIS' -ErrorAction SilentlyContinue)) {
-        Write-Warning "IIS:\ drive not available. Ensure IIS is installed and the WebAdministration module is imported."
-        return $false
+    catch {
+        $errorMessage = "Error adding binding with SSL: $($_.Exception.Message)"
+        Write-Warning $errorMessage
+        return New-ResultObject -Status Error -Code 202 -Step AddBinding -ErrorMessage $errorMessage
     }
-
-    return $true
 }
+#
 
+# May want to replace this function with Remove-ExistingIISBinding in future version
 function Remove-KFIISSiteBinding {
     [CmdletBinding()]
     param (
@@ -778,6 +681,7 @@ function Remove-KFIISSiteBinding {
     }
 }
 
+# Called on a renewal to remove any certificates if not bound or used
 function Remove-KFIISCertificateIfUnused {
     param (
         [Parameter(Mandatory = $true)]
@@ -818,7 +722,7 @@ function Remove-KFIISCertificateIfUnused {
 
         if ($bindings.Count -gt 0) {
             Write-Warning "The certificate with thumbprint $thumbprint is still used by the following bindings:"
-            $bindings | Format-Table -AutoSize
+            $bindings | Format-Table -AutoSize | Out-String | Write-Warning
             return
         }
 
@@ -1166,6 +1070,9 @@ function New-CSREnrollment {
     # Validate the Crypto Service Provider
     Validate-CryptoProvider -ProviderName $ProviderName
 
+    # Parse Subject for any escaped commas
+    $parsedSubject = Parse-DNSubject $SubjectText
+
     # Build the SAN entries if provided
     $sanContent = ""
     if ($SAN) {
@@ -1184,7 +1091,7 @@ $($sanDirectives -join "`n")
 Signature=`"$`Windows NT$`"
 
 [NewRequest]
-Subject = "$SubjectText"
+Subject = "$parsedSubject"
 ProviderName = "$ProviderName"
 MachineKeySet = True
 HashAlgorithm = SHA256
@@ -1251,7 +1158,6 @@ function Import-SignedCertificate {
         [byte[]]$RawData,               # RawData from the certificate
 
         [Parameter(Mandatory = $true)]
-        [ValidateSet("My", "Root", "CA", "TrustedPublisher", "TrustedPeople")]
         [string]$StoreName              # Store to which the certificate should be imported
     )
 
@@ -1328,33 +1234,83 @@ function Test-CryptoServiceProvider {
 
 # Function that takes an x509 certificate object and returns the csp
 function Get-CertificateCSP {
+    param(
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$cert
+    )
+    
+    try {
+        # Check if certificate has a private key
+        if (-not $cert.HasPrivateKey) {
+            return "No private key"
+        }
+        
+        # Get the private key
+        $privateKey = $cert.PrivateKey
+        
+        if ($privateKey -and $privateKey.CspKeyContainerInfo) {
+            # For older .NET Framework
+            $cspKeyContainerInfo = $privateKey.CspKeyContainerInfo
+            
+            if ($cspKeyContainerInfo -and $cspKeyContainerInfo.ProviderName) {
+                return [string]$cspKeyContainerInfo.ProviderName
+            }
+        }
+        
+        # For newer .NET Core/5+ or CNG keys
+        try {
+            $key = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+            if ($key -and $key.GetType().Name -eq "RSACng") {
+                $cngKey = $key.Key
+                if ($cngKey -and $cngKey.Provider -and $cngKey.Provider.Provider) {
+                    return [string]$cngKey.Provider.Provider
+                }
+            }
+        }
+        catch {
+            Write-Verbose "CNG key detection failed: $($_.Exception.Message)"
+        }
+        
+        # Ensure we always return a string
+        return "Unknown provider"
+        
+    }
+    catch {
+        return "Error retrieving CSP: $($_.Exception.Message)"
+    }
+}
+
+function Get-CertificateCSPV2 {
     param (
         [Parameter(Mandatory = $true)]
         [System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert
     )
 
     # Check if the certificate has a private key
-    if ($Cert -and $Cert.HasPrivateKey) {
-        try {
-            $key = $Cert.PrivateKey
+    if (-not $Cert.HasPrivateKey) {
+        Write-Warning "Certificate does not have a private key associated with it"
+        return $null
+    }
 
-            if ($key -is [System.Security.Cryptography.RSACryptoServiceProvider]) {
-                # CAPI-based key
-                return $key.CspKeyContainerInfo.ProviderName
-            }
-            elseif ($key -is [System.Security.Cryptography.RSACng]) {
-                # CNG-based key
-                return $key.Key.Provider
-            }
-            else {
-                return "Unknown provider type: $($key.GetType().FullName)"
-            }
-        } catch {
-            Write-Warning "Could not access provider information: $_"
-            return $null
+    $privateKey = $Cert.PrivateKey
+    if ($privateKey) {
+        # For older .NET Framework
+        $cspKeyContainerInfo = $privateKey.CspKeyContainerInfo
+
+        if ($cspKeyContainerInfo) {
+            return $cspKeyContainerInfo.ProviderName
         }
-    } else {
-        Write-Warning "Certificate has no private key."
+    }
+
+    try {
+        $key = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+        if ($key -and $key.GetType().Name -eq "RSACng") {
+            $cngKey = $key.Key
+                
+            return $cngKey.Provider.Provider
+        }
+    }
+    catch {
+        Write-Warning "CNG key detection failed: $($_.Exception.Message)"
         return $null
     }
 }
@@ -1402,4 +1358,188 @@ function Validate-CryptoProvider {
     }
 
     Write-Verbose "Crypto Service Provider '$ProviderName' is valid."
+}
+
+function Parse-DNSubject {
+    <#
+    .SYNOPSIS
+        Parses a Distinguished Name (DN) subject string and properly quotes RDN values containing escaped commas.
+    
+    .DESCRIPTION
+        This function takes a DN subject string and parses the Relative Distinguished Name (RDN) components,
+        adding proper quotes around values that contain escaped commas and escaping quotes for use in 
+        PowerShell here-strings. Only RDN values with escaped commas get quoted.
+    
+    .PARAMETER Subject
+        The DN subject string to parse (e.g., "CN=Keyfactor,O=Keyfactor\, Inc")
+    
+    .EXAMPLE
+        Parse-DNSubject -Subject "CN=Keyfactor,O=Keyfactor\, Inc"
+        Returns: CN=Keyfactor,O=""Keyfactor, Inc""
+    
+    .EXAMPLE
+        Parse-DNSubject -Subject "CN=Test User,O=Company\, LLC,OU=IT Department\, Security"
+        Returns: CN=Test User,O=""Company, LLC"",OU=""IT Department, Security""
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [string]$Subject
+    )
+    
+    # Initialize variables
+    $parsedComponents = @()
+    $currentComponent = ""
+    $i = 0
+    
+    # Convert string to character array for easier parsing
+    $chars = $Subject.ToCharArray()
+    
+    while ($i -lt $chars.Length) {
+        $char = $chars[$i]
+        
+        # Check if we hit a comma
+        if ($char -eq ',') {
+            # Look back to see if it's escaped
+            $isEscaped = $false
+            if ($i -gt 0 -and $chars[$i-1] -eq '\') {
+                $isEscaped = $true
+            }
+            
+            if ($isEscaped) {
+                # This is an escaped comma, add it to current component
+                $currentComponent += $char
+            } else {
+                # This is a separator comma, finish current component
+                if ($currentComponent.Trim() -ne "") {
+                    $parsedComponents += $currentComponent.Trim()
+                    $currentComponent = ""
+                }
+            }
+        } else {
+            # Regular character, add to current component
+            $currentComponent += $char
+        }
+        
+        $i++
+    }
+    
+    # Add the last component
+    if ($currentComponent.Trim() -ne "") {
+        $parsedComponents += $currentComponent.Trim()
+    }
+    
+    # Process each component to add quotes where needed
+    $processedComponents = @()
+    
+    foreach ($component in $parsedComponents) {
+        # Split on first equals sign to get attribute and value
+        $equalIndex = $component.IndexOf('=')
+        if ($equalIndex -gt 0) {
+            $attribute = $component.Substring(0, $equalIndex).Trim()
+            $value = $component.Substring($equalIndex + 1).Trim()
+            
+            # Clean up escaped commas first
+            $cleanValue = $value -replace '\\,', ','
+            
+            # Check if original value had escaped commas (needs quotes)
+            if ($value -match '\\,') {
+                # This RDN value had escaped commas, so wrap in doubled quotes and escape quotes
+                $escapedValue = $cleanValue -replace '"', '""'
+                $processedComponents += "$attribute=`"`"$escapedValue`"`""
+            } else {
+                # No escaped commas, keep as simple value but escape any existing quotes
+                $escapedValue = $cleanValue -replace '"', '""'
+                $processedComponents += "$attribute=$escapedValue"
+            }
+        } else {
+            # Invalid component format, keep as is
+            $processedComponents += $component
+        }
+    }
+    
+    # Join components back together (no outer quotes needed since it goes in PowerShell string)
+    $subjectString = ($processedComponents -join ',')
+    return $subjectString
+}
+
+# Note: Removed Test-IISBindingConflict function - we now mimic IIS behavior
+# IIS replaces exact matches and allows multiple hostnames (SNI) on same IP:Port
+function Get-IISManagementInfo {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$SiteName
+    )
+
+    $hasIISDrive = Ensure-IISDrive
+    Write-Verbose "IIS Drive available: $hasIISDrive"
+
+    if ($hasIISDrive) {
+        $null = Import-Module WebAdministration
+        $sitePath = "IIS:\Sites\$SiteName"
+        
+        if (-not (Test-Path $sitePath)) {
+            $errorMessage = "Site '$SiteName' not found in IIS drive"
+            Write-Error $errorMessage
+            return @{
+                Success = $false
+                UseIISDrive = $true
+                Result = New-ResultObject -Status Error -Code 201 -Step FindWebSite -ErrorMessage $errorMessage -Details @{ SiteName = $SiteName }
+            }
+        }
+        
+        return @{
+            Success = $true
+            UseIISDrive = $true
+            Result = $null
+        }
+    }
+    else {
+        # ServerManager fallback
+        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
+        $iis = New-Object Microsoft.Web.Administration.ServerManager
+        $site = $iis.Sites[$SiteName]
+
+        if ($null -eq $site) {
+            $errorMessage = "Site '$SiteName' not found in ServerManager"
+            Write-Error $errorMessage
+            return @{
+                Success = $false
+                UseIISDrive = $false
+                Result = New-ResultObject -Status Error -Code 201 -Step FindWebSite -ErrorMessage $errorMessage -Details @{ SiteName = $SiteName }
+            }
+        }
+        
+        return @{
+            Success = $true
+            UseIISDrive = $false
+            Result = $null
+        }
+    }
+}
+function Ensure-IISDrive {
+    [CmdletBinding()]
+    param ()
+
+    # Try to import the WebAdministration module if not already loaded
+    if (-not (Get-Module -Name WebAdministration)) {
+        try {
+            $null = Import-Module WebAdministration -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "WebAdministration module could not be imported. IIS:\ drive will not be available."
+            return $false
+        }
+    }
+
+    # Check if IIS drive is available
+    if (-not (Get-PSDrive -Name 'IIS' -ErrorAction SilentlyContinue)) {
+        Write-Warning "IIS:\ drive not available. Ensure IIS is installed and the WebAdministration module is imported."
+        return $false
+    }
+
+    return $true
 }
