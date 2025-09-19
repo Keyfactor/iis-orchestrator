@@ -209,6 +209,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                     };
 
                                     break;
+
+                                case CertStoreBindingTypeENUM.None:
+                                    
+                                    jobResult = new JobResult
+                                    {
+                                        Result = OrchestratorJobStatusJobResult.Success,
+                                        JobHistoryId = config.JobHistoryId,
+                                        FailureMessage = ""
+                                    };
+
+                                    break;
                             }
                         }
                         else
