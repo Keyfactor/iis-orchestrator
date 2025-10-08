@@ -92,6 +92,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
                 string alias = config.JobCertificate?.Alias?.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
 
+                IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
+
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
 
                 _psHelper.Initialize();
@@ -102,6 +104,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     {
                         case CertStoreOperationType.Add:
                             {
+                                _logger.LogTrace($"Beginning the Adding of Certificate process.");
+
                                 string certificateContents = config.JobCertificate.Contents;
                                 string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
@@ -111,7 +115,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 // Add Certificate to Cert Store
                                 try
                                 {
-                                    IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
 
                                     OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
                                     string failureMessage = "";
