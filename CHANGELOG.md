@@ -1,3 +1,9 @@
+3.0.0
+    * Added Integration Tests to aid in future development and testing.
+    * Improved messaging in the event an Entry Parameter is missing (or does not meet the casing requirements)
+    * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
+    * Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
+
 
 2.6.4
 * Fixed an issue with SSL Flags greater than 3 were not being applied correctly to newer IIS servers.
