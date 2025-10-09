@@ -1,4 +1,4 @@
-﻿# Version 1.3.0
+﻿# Version 1.4.0
 
 # Summary
 # Contains PowerShell functions to execute administration jobs for general Windows certificates, IIS and SQL Server.
@@ -11,6 +11,8 @@
 # 08/29/25  Fixed the add cert to store function to return the correct thumbprint
 #           Made changes to the IIS Binding logic, breaking it into manageable pieces to aid in debugging issues
 # 09/16/25  Updated the Get CSP function to handle null values when reading hybrid certificates
+# 10/08/25  Updated the Get-KFIISBoundCertificates function to fixed the SSL flag not returning the correct value when reading IIS bindings
+#           Updated the New-KFIISSiteBinding to correctly update the SSL flags
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
@@ -140,9 +142,7 @@ function Get-KFIISBoundCertificates {
 
         foreach ($binding in $site.Bindings) {
             if ($binding.Protocol -eq 'https' -and $binding.CertificateHash) {
-
                 $certHash = ($binding.CertificateHash | ForEach-Object { $_.ToString("X2") }) -join ""
-
                 $storeName = if ($binding.CertificateStoreName) { $binding.CertificateStoreName } else { "My" }
 
                 try {
@@ -156,7 +156,6 @@ function Get-KFIISBoundCertificates {
                     }
 
                     $certBase64 = [Convert]::ToBase64String($cert.RawData)
-
                     $ip, $port, $hostname = $binding.BindingInformation -split ":", 3
 
                     $certInfo = [PSCustomObject]@{
@@ -166,7 +165,7 @@ function Get-KFIISBoundCertificates {
                         Port               = $port
                         Hostname           = $hostname
                         Protocol           = $binding.Protocol
-                        SNI                = ($binding.SslFlags -band 1) -eq 1
+                        SNI                = $binding.SslFlags
                         ProviderName       = Get-CertificateCSP $cert
                         SAN                = Get-KFSAN $cert
                         Certificate        = $cert.Subject
@@ -388,17 +387,12 @@ function New-KFIISSiteBinding {
     param (
         [Parameter(Mandatory = $true)]
         [string]$SiteName,
-        
         [string]$IPAddress = "*",
-        
         [int]$Port = 443,
-        
         [AllowEmptyString()]
         [string]$Hostname = "",
-        
         [ValidateSet("http", "https")]
         [string]$Protocol = "https",
-        
         [ValidateScript({
             if ($Protocol -eq 'https' -and [string]::IsNullOrEmpty($_)) {
                 throw "Thumbprint is required when Protocol is 'https'"
@@ -406,14 +400,11 @@ function New-KFIISSiteBinding {
             $true
         })]
         [string]$Thumbprint,
-        
         [string]$StoreName = "My",
-        
         [int]$SslFlags = 0
     )
 
     Write-Information "Entering PowerShell Script: New-KFIISSiteBinding" -InformationAction SilentlyContinue
-    Write-Verbose "Function: New-KFIISSiteBinding"
     Write-Verbose "Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
 
     try {
@@ -438,22 +429,63 @@ function New-KFIISSiteBinding {
             return $removalResult
         }
 
-        # Step 3: Add new binding with SSL certificate
-        Write-Verbose "Adding new binding with SSL certificate"
-        
+        # Step 3: Determine SslFlags supported by Microsoft.Web.Administration
+        if ($SslFlags -gt 3) {
+            Write-Verbose "SslFlags value $SslFlags exceeds managed API range (0–3). Applying reduced flags for creation."
+            $SslFlagsApplied = ($SslFlags -band 3)
+        } else {
+            $SslFlagsApplied = $SslFlags
+        }
+
+        # Step 4: Add the new binding with the reduced flag set
+        Write-Verbose "Adding new binding with SSL certificate (SslFlagsApplied=$SslFlagsApplied)"
+
         $addParams = @{
-            SiteName = $SiteName
-            Protocol = $Protocol
-            IPAddress = $IPAddress
-            Port = $Port
-            Hostname = $Hostname
-            Thumbprint = $Thumbprint
-            StoreName = $StoreName
-            SslFlags = $SslFlags
+            SiteName    = $SiteName
+            Protocol    = $Protocol
+            IPAddress   = $IPAddress
+            Port        = $Port
+            Hostname    = $Hostname
+            Thumbprint  = $Thumbprint
+            StoreName   = $StoreName
+            SslFlags    = $SslFlagsApplied
             UseIISDrive = $managementInfo.UseIISDrive
         }
         
-        $addResult = Add-IISBindingWithSSL @addParams
+        if ($addResult.Status -eq 'Error') {
+            return $addResult
+        }
+
+        # Step 5: If extended flags, update via appcmd.exe
+        if ($SslFlags -gt 3) {
+            Write-Verbose "Applying full SslFlags=$SslFlags via appcmd"
+
+            $appcmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
+
+            # Escape any single quotes in hostname
+            $safeHostname = $Hostname -replace "'", "''"
+            $bindingInfo = "${IPAddress}:${Port}:${safeHostname}"
+
+            # Quote site name only if it contains spaces
+            if ($SiteName -match '\s') {
+                $siteArg = "/site.name:`"$SiteName`""
+            } else {
+                $siteArg = "/site.name:$SiteName"
+            }
+
+            # Build binding argument for appcmd
+            $bindingArg = "/bindings.[protocol='https',bindingInformation='$bindingInfo'].sslFlags:$SslFlags"
+
+            Write-Verbose "Running appcmd: $appcmd $siteArg $bindingArg"
+            & $appcmd set site $siteArg $bindingArg
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "appcmd failed to set extended SslFlags ($SslFlags) for binding $bindingInfo."
+            } else {
+                Write-Verbose "Successfully updated SslFlags to $SslFlags via appcmd."
+            }
+        }
+
         return $addResult
 
     }

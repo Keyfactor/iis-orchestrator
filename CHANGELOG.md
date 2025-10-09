@@ -1,3 +1,9 @@
+3.0.0
+    * Added Integration Tests to aid in future development and testing.
+    * Improved messaging in the event an Entry Parameter is missing (or does not meet the casing requirements)
+    * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
+    * Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
+
 2.6.3
 * Fixed re-enrollment or ODKG job when RDN Components contained escaped commas.
 * Updated renewal job for IIS Certs to delete the old cert if not bound or used by other web sites.
