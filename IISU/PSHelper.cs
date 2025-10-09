@@ -24,6 +24,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Remoting;
@@ -282,8 +283,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     PS.Invoke();
                     CheckErrors();
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    _logger.LogDebug($"Error while removing PSSession: {ex.Message}");
                 }
             }
 
@@ -294,9 +296,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     File.Delete(tempKeyFilePath);
                     _logger.LogTrace($"Temporary KeyFilePath deleted: {tempKeyFilePath}");
                 }
-                catch (Exception)
+                catch (FileNotFoundException)
                 {
-                    _logger.LogError($"Error while deleting KeyFilePath.");
+                    _logger.LogTrace($"Temporary KeyFilePath was not found: {tempKeyFilePath}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug($"Error while deleting KeyFilePath: {ex.Message}");
                 }
             }
 
@@ -304,8 +310,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             {
                 PS.Runspace.Close();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogDebug($"Error while attempting to close the PowerShell Runspace: {ex.Message}");
             }
 
             PS.Dispose();
@@ -580,7 +587,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace($"Created temporary KeyFilePath: {tmpFile}, writing bytes.");
 
             File.WriteAllText(tmpFile, formatPrivateKey(serverPassword));
-
+            
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 _logger.LogTrace($"Changing permissions on Windows temp file: {tmpFile}.");
