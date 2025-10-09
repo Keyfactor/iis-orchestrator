@@ -13,6 +13,7 @@
 # 09/16/25  Updated the Get CSP function to handle null values when reading hybrid certificates
 # 10/08/25  Updated the Get-KFIISBoundCertificates function to fixed the SSL flag not returning the correct value when reading IIS bindings
 #           Updated the New-KFIISSiteBinding to correctly update the SSL flags
+#           Added Test-ValidSslFlags to verify the correct bit flag
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
@@ -46,6 +47,7 @@ $InformationPreference = "Continue"
 # 206	Error	WebAdministration module missing
 # 207	Error	IISAdministration module missing
 # 300	Error	Unknown or unhandled exception
+# 400   Error   Invalid Ssl Flag bit combination
 
 function New-ResultObject {
     param(
@@ -407,7 +409,12 @@ function New-KFIISSiteBinding {
     Write-Verbose "Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
 
     try {
-        # Step 1: Verify site exists and get management info
+        # Step 1: Perform verifications and get management info
+        # Check SslFlags
+        if (-not (Test-ValidSslFlags -SslFlags $SslFlags)) {
+            return New-ResultObject -Status Error 400 -Step "Validation" -ErrorMessage "Invalid SSL Flag bit configuration ($SslFlags)"
+        }
+
         $managementInfo = Get-IISManagementInfo -SiteName $SiteName
         if (-not $managementInfo.Success) {
             return $managementInfo.Result
@@ -485,124 +492,6 @@ function New-KFIISSiteBinding {
         }
 
         return $addResult
-    }
-    catch {
-        $errorMessage = "Unexpected error in New-KFIISSiteBinding: $($_.Exception.Message)"
-        Write-Error $errorMessage
-        return New-ResultObject -Status Error -Code 999 -Step UnexpectedError -ErrorMessage $errorMessage
-    }
-}
-
-function New-KFIISSiteBindingORIG {
-    [CmdletBinding()]
-    [OutputType([pscustomobject])]
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$SiteName,
-        [string]$IPAddress = "*",
-        [int]$Port = 443,
-        [AllowEmptyString()]
-        [string]$Hostname = "",
-        [ValidateSet("http", "https")]
-        [string]$Protocol = "https",
-        [ValidateScript({
-            if ($Protocol -eq 'https' -and [string]::IsNullOrEmpty($_)) {
-                throw "Thumbprint is required when Protocol is 'https'"
-            }
-            $true
-        })]
-        [string]$Thumbprint,
-        [string]$StoreName = "My",
-        [int]$SslFlags = 0
-    )
-
-    Write-Information "Entering PowerShell Script: New-KFIISSiteBinding" -InformationAction SilentlyContinue
-    Write-Verbose "Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
-
-    try {
-        # This function mimics IIS Manager behavior:
-        # - Replaces exact binding matches (same IP:Port:Hostname)
-        # - Allows multiple bindings with different hostnames (SNI)
-        # - Lets IIS handle true conflicts rather than pre-checking
-        
-        # Step 1: Verify site exists and get management approach
-        $managementInfo = Get-IISManagementInfo -SiteName $SiteName
-        if (-not $managementInfo.Success) {
-            return $managementInfo.Result
-        }
-
-        # Step 2: Remove existing HTTPS bindings for this exact binding information
-        # This mimics IIS behavior: replace exact matches, allow different hostnames
-        $searchBindings = "${IPAddress}:${Port}:${Hostname}"
-        Write-Verbose "Removing existing HTTPS bindings for: $searchBindings"
-        
-        $removalResult = Remove-ExistingIISBinding -SiteName $SiteName -BindingInfo $searchBindings -UseIISDrive $managementInfo.UseIISDrive
-        if ($removalResult.Status -eq 'Error') {
-            return $removalResult
-        }
-
-        # Step 3: Determine SslFlags supported by Microsoft.Web.Administration
-        if ($SslFlags -gt 3) {
-            Write-Verbose "SslFlags value $SslFlags exceeds managed API range (0–3). Applying reduced flags for creation."
-            $SslFlagsApplied = ($SslFlags -band 3)
-        } else {
-            $SslFlagsApplied = $SslFlags
-        }
-
-        # Step 4: Add the new binding with the reduced flag set
-        Write-Verbose "Adding new binding with SSL certificate (SslFlagsApplied=$SslFlagsApplied)"
-
-        $addParams = @{
-            SiteName    = $SiteName
-            Protocol    = $Protocol
-            IPAddress   = $IPAddress
-            Port        = $Port
-            Hostname    = $Hostname
-            Thumbprint  = $Thumbprint
-            StoreName   = $StoreName
-            SslFlags    = $SslFlagsApplied
-            UseIISDrive = $managementInfo.UseIISDrive
-        }
-        
-        Write-Verbose $addResult
-
-        if ($addResult.Status -eq 'Error') {
-            return $addResult
-        }
-
-        Write-Verbose "Adding extended flags"
-        # Step 5: If extended flags, update via appcmd.exe
-        if ($SslFlags -gt 3) {
-            Write-Verbose "Applying full SslFlags=$SslFlags via appcmd"
-
-            $appcmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
-
-            # Escape any single quotes in hostname
-            $safeHostname = $Hostname -replace "'", "''"
-            $bindingInfo = "${IPAddress}:${Port}:${safeHostname}"
-
-            # Quote site name only if it contains spaces
-            if ($SiteName -match '\s') {
-                $siteArg = "/site.name:`"$SiteName`""
-            } else {
-                $siteArg = "/site.name:$SiteName"
-            }
-
-            # Build binding argument for appcmd
-            $bindingArg = "/bindings.[protocol='https',bindingInformation='$bindingInfo'].sslFlags:$SslFlags"
-
-            Write-Verbose "Running appcmd: $appcmd $siteArg $bindingArg"
-            & $appcmd set site $siteArg $bindingArg
-
-            if ($LASTEXITCODE -ne 0) {
-                Write-Warning "appcmd failed to set extended SslFlags ($SslFlags) for binding $bindingInfo."
-            } else {
-                Write-Verbose "Successfully updated SslFlags to $SslFlags via appcmd."
-            }
-        }
-
-        return $addResult
-
     }
     catch {
         $errorMessage = "Unexpected error in New-KFIISSiteBinding: $($_.Exception.Message)"
@@ -1613,6 +1502,16 @@ function Parse-DNSubject {
     # Join components back together (no outer quotes needed since it goes in PowerShell string)
     $subjectString = ($processedComponents -join ',')
     return $subjectString
+}
+
+# Function that determines the validity of the SSL bit flags
+function Test-ValidSslFlags {
+    param([int]$SslFlags)
+
+    $validBits = 1,2,4,8,32,64,128
+    $invalidBits = $SslFlags -bxor ($SslFlags -band ($validBits | Measure-Object -Sum).Sum)
+
+    return ($invalidBits -eq 0)
 }
 
 # Note: Removed Test-IISBindingConflict function - we now mimic IIS behavior
