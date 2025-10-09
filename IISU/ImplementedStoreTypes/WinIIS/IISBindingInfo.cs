@@ -23,6 +23,19 @@ using System.Web.Services.Description;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
+    [Flags]
+    public enum SslFlags
+    {
+        None = 0,
+        SslRequireSni = 1,
+        SslNegotiateCert = 2,
+        SslRequireCert = 4,
+        SslMapCert = 8,
+        CentralCertStore = 32,
+        DisableHTTP2 = 64,
+        DisableOCSPStapling = 128
+    }
+
     public class IISBindingInfo
     {
         public string SiteName { get; set; }
@@ -76,6 +89,26 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             };
         }
 
+        public (bool IsValid, string Message) ValidateSslFlags(int flags)
+        {
+            const int validBits = 1 | 2 | 4 | 8 | 32 | 64 | 128;
+
+            // Unknown bits
+            if ((flags & ~validBits) != 0)
+                return (false, $"SslFlags contains unknown bits: {flags}");
+
+            bool negotiate = (flags & (int)SslFlags.SslNegotiateCert) != 0;
+            bool require = (flags & (int)SslFlags.SslRequireCert) != 0;
+            bool mapCert = (flags & (int)SslFlags.SslMapCert) != 0;
+
+            if (negotiate && require)
+                return (false, "Cannot use both SslNegotiateCert (0x2) and SslRequireCert (0x4).");
+
+            if (mapCert && !(negotiate || require))
+                return (false, "SslMapCert (0x8) requires either SslNegotiateCert (0x2) or SslRequireCert (0x4).");
+
+            return (true, $"SslFlags value {flags} is valid.");
+        }
 
         private string MigrateSNIFlag(string input)
         {
