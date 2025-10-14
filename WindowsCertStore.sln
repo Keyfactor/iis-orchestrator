@@ -43,6 +43,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{60C10F
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsCertStore.IntegrationTests", "WindowsCertStore.IntegrationTests\WindowsCertStore.IntegrationTests.csproj", "{74FDA232-BC6D-428F-BC28-C5BF228F04ED}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsCertStore.UnitTests", "WindowsCertStore.UnitTests\WindowsCertStore.UnitTests.csproj", "{84DD1D36-2D35-4483-836F-98EFC44CA132}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -74,6 +76,14 @@ Global
 		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Release|Any CPU.Build.0 = Release|Any CPU
 		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Release|x64.ActiveCfg = Release|Any CPU
 		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Release|x64.Build.0 = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|x64.Build.0 = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|Any CPU.Build.0 = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|x64.ActiveCfg = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
