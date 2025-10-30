@@ -116,21 +116,6 @@
                             "DefaultValue": "",
                             "Options": "",
                             "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
-                        },
-                        {
-                            "Name": "SAN",
-                            "DisplayName": "SAN",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": true
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA."
                         }
                     ],
                     "PasswordOptions": {
@@ -320,22 +305,7 @@
                         "DefaultValue": "",
                         "Options": "",
                         "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
-                      },
-                        {
-                            "Name": "SAN",
-                            "DisplayName": "SAN",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": true
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA."
-                        }
+                      }
                     ],
                     "PasswordOptions": {
                         "EntrySupported": false,
@@ -455,22 +425,7 @@
                         "DefaultValue": "",
                         "Options": "",
                         "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
-                      },
-                        {
-                            "Name": "SAN",
-                            "DisplayName": "SAN",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": true
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs."
-                        }
+                      }
                     ],
                     "PasswordOptions": {
                         "EntrySupported": false,
