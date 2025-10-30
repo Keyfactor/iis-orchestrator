@@ -1,4 +1,5 @@
 3.0.0
+* Removing Entry Parameter "SAN" from integration-manifest.json, but still supporting previous versions of Command in the event the SAN Entry Parameter is passed.  SAN's are now supported via ODKG enrollment page.  Next major version will remove all support for the SAN Entry Parameter.
 * Added Integration Tests to aid in future development and testing.
 * Improved messaging in the event an Entry Parameter is missing (or does not meet the casing requirements)
 * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
