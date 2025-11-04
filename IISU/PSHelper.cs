@@ -32,6 +32,7 @@ using System.Management.Automation.Runspaces;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
+using System.Text;
 using System.Threading;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -86,6 +87,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
+        public PSHelper()
+        {
+            // Empty constructor for unit testing
+            _logger = LogHandler.GetClassLogger<PSHelper>();
+        }
+
         public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword)
         {
             this.protocol = protocol.ToLower();
@@ -122,8 +129,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogDebug($"isLocalMachine flag set to: {isLocalMachine}");
             _logger.LogDebug($"Protocol is set to: {protocol}");
 
-            scriptFileLocation = FindPSLocation(AppDomain.CurrentDomain.BaseDirectory, "WinCertScripts.ps1");
-            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script file: WinCertScripts.ps1"); }
+            scriptFileLocation = FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShellScripts");
+            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script files,"); }
 
             _logger.LogTrace($"Script file located here: {scriptFileLocation}");
 
@@ -148,7 +155,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         HostName          = $hostName
                     } | ConvertTo-Json
                 ";
-            var results = ExecutePowerShell(psInfo,isScript:true);
+            var results = ExecutePowerShell(psInfo, isScript: true);
             foreach (var result in results)
             {
                 _logger.LogTrace($"{result}");
@@ -236,7 +243,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 PS.AddCommand("Invoke-Command")
                     .AddParameter("Session", _PSSession)
-                    .AddParameter("ScriptBlock", ScriptBlock.Create(PSHelper.LoadScript(scriptFileLocation)));
+                    .AddParameter("ScriptBlock", ScriptBlock.Create(LoadAllScripts(scriptFileLocation)));
 
                 var results = PS.Invoke();
                 CheckErrors();
@@ -250,6 +257,78 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         }
 
         private void InitializeLocalSession()
+        {
+            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
+            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
+            rs.Open();
+            PS.Runspace = rs;
+
+            // Set execution policy - ignore informational messages
+            _logger.LogTrace("Setting Execution Policy to Unrestricted");
+            SetExecutionPolicyUnrestricted();
+
+            // Load all scripts
+            _logger.LogTrace("Loading PowerShell scripts");
+            var scriptFiles = GetScriptFiles(scriptFileLocation);
+            _logger.LogInformation($"Found {scriptFiles.Count} script file(s) to load");
+
+            foreach (var scriptFile in scriptFiles)
+            {
+                var fileName = Path.GetFileName(scriptFile);
+                _logger.LogTrace($"Loading script: {fileName}");
+
+                PS.AddScript($". '{scriptFile}'");
+                PS.Invoke();
+                CheckErrors();  // Check errors for actual scripts
+                PS.Commands.Clear();
+            }
+
+            _logger.LogInformation("Local PowerShell session initialized successfully");
+        }
+
+        private void SetExecutionPolicyUnrestricted()
+        {
+            _logger.LogTrace("Setting Execution Policy to Unrestricted");
+
+            try
+            {
+                PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
+                PS.Invoke();
+
+                // Check if there were any errors
+                if (PS.HadErrors)
+                {
+                    foreach (var error in PS.Streams.Error)
+                    {
+                        var errorMsg = error.ToString();
+
+                        // Execution policy messages are informational, not errors
+                        if (errorMsg.Contains("execution policy successfully") ||
+                            errorMsg.Contains("setting is overridden"))
+                        {
+                            _logger.LogInformation($"Execution Policy Info: {errorMsg}");
+                        }
+                        else
+                        {
+                            // Real error
+                            _logger.LogError($"Execution Policy Error: {errorMsg}");
+                            throw new Exception($"Failed to set execution policy: {errorMsg}");
+                        }
+                    }
+                }
+
+                _logger.LogTrace("Execution policy set successfully");
+            }
+            finally
+            {
+                // Always clear errors and commands
+                PS.Streams.Error.Clear();
+                PS.Commands.Clear();
+            }
+        }
+
+        private void InitializeLocalSessionOLD()
         {
             _logger.LogTrace("Creating out-of-process Powershell Runspace.");
             PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
@@ -468,46 +547,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
-        public static string LoadScript(string scriptFileName)
-        {
-            string scriptFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PowerShellScripts", scriptFileName);
-            _logger.LogTrace($"Attempting to load script {scriptFilePath}");
-
-            if (File.Exists(scriptFilePath))
-            {
-                return File.ReadAllText(scriptFilePath);
-            }else
-            { throw new Exception($"File: {scriptFilePath} was not found."); }
-        }
-
-        private static string FindPSLocation(string directory, string fileName)
-        {
-            try
-            {
-                foreach (string file in Directory.GetFiles(directory))
-                {
-                    if (Path.GetFileName(file).Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return Path.GetFullPath(file);
-                    }
-                }
-
-                foreach (string subDir in Directory.GetDirectories(directory))
-                {
-                    string result = FindPSLocation(subDir, fileName);
-                    if (!string.IsNullOrEmpty(result))
-                    {
-                        return result;
-                    }
-                }
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
-
-            return null;
-        }
-
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         public static void ProcessPowerShellScriptEvent(object? sender, DataAddedEventArgs e)
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
@@ -587,7 +626,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace($"Created temporary KeyFilePath: {tmpFile}, writing bytes.");
 
             File.WriteAllText(tmpFile, formatPrivateKey(serverPassword));
-            
+
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 _logger.LogTrace($"Changing permissions on Windows temp file: {tmpFile}.");
@@ -645,6 +684,213 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             String keyType = privateKey.Contains("OPENSSH PRIVATE KEY") ? "OPENSSH" : "RSA";
 
             return privateKey.Replace($" {keyType} PRIVATE ", "^^^").Replace(" ", System.Environment.NewLine).Replace("^^^", $" {keyType} PRIVATE ") + System.Environment.NewLine;
+        }
+
+        public static string FindScriptsDirectory(string rootDirectory, string directoryName)
+        {
+            /*
+             * Searches for the scripts directory starting from searchRoot
+             * 
+             * Example:
+             * FindScriptsDirectory(@"C:\Program Files\MyApp", "Scripts")
+             * Returns: "C:\Program Files\MyApp\Scripts" (if found)
+             */
+
+            try
+            {
+                // Check if the current directory matches
+                if (Path.GetFileName(rootDirectory)
+                        .Equals(directoryName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return rootDirectory;
+                }
+
+                // Recurse into subdirectories
+                foreach (string subDir in Directory.GetDirectories(rootDirectory))
+                {
+                    string result = FindScriptsDirectory(subDir, directoryName);
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        return result;
+                    }
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Skip directories that cannot be accessed
+            }
+            catch (DirectoryNotFoundException)
+            {
+                // Skip directories that might have been deleted
+            }
+
+            return null;
+        }
+        private List<string> GetScriptFiles(string scriptFileLocation)
+        {
+            /*
+             * Gets all .ps1 files from the scripts directory
+             * 
+             * scriptFileLocation can be:
+             * - A file path: C:\MyApp\Scripts\WinCertScripts.ps1
+             * - A directory path: C:\MyApp\Scripts
+             * 
+             * Returns: List of full file paths to all .ps1 files
+             */
+
+            // Determine the scripts directory
+            string scriptsDirectory;
+
+            if (File.Exists(scriptFileLocation))
+            {
+                // It's a file path - get the directory
+                scriptsDirectory = Path.GetDirectoryName(scriptFileLocation);
+                _logger.LogTrace($"Script file provided: {scriptFileLocation}");
+                _logger.LogTrace($"Using directory: {scriptsDirectory}");
+            }
+            else if (Directory.Exists(scriptFileLocation))
+            {
+                // It's already a directory
+                scriptsDirectory = scriptFileLocation;
+                _logger.LogTrace($"Script directory provided: {scriptFileLocation}");
+            }
+            else
+            {
+                throw new DirectoryNotFoundException($"Scripts location not found: {scriptFileLocation}");
+            }
+
+            // Get all .ps1 files, excluding .example files
+            var scriptFiles = Directory.GetFiles(scriptsDirectory, "*.ps1")
+                .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (scriptFiles.Count == 0)
+            {
+                throw new FileNotFoundException($"No .ps1 files found in: {scriptsDirectory}");
+            }
+
+            _logger.LogTrace($"Found {scriptFiles.Count} script file(s): {string.Join(", ", scriptFiles.Select(Path.GetFileName))}");
+
+            return scriptFiles;
+        }
+
+        public static string LoadScript(string scriptFileName)
+        {
+            _logger.LogTrace($"Attempting to load script {scriptFileName}");
+
+            if (File.Exists(scriptFileName))
+            {
+                return File.ReadAllText(scriptFileName);
+            }
+            else
+            { throw new Exception($"File: {scriptFileName} was not found."); }
+        }
+
+        public string LoadAllScripts(string scriptFileLocation)
+        {
+            /*
+             * Loads all .ps1 files from the scripts directory into a single script string
+             * 
+             * scriptFileLocation can be:
+             * - A file path: C:\MyApp\Scripts\WinCertScripts.ps1
+             * - A directory path: C:\MyApp\Scripts
+             * 
+             * Returns: Combined script content of all .ps1 files
+             */
+
+            var scriptBuilder = new StringBuilder();
+
+            // Determine the scripts directory
+            string scriptsDirectory;
+            if (File.Exists(scriptFileLocation))
+            {
+                // It's a file path - get the directory
+                scriptsDirectory = Path.GetDirectoryName(scriptFileLocation);
+                _logger.LogTrace($"Script file provided: {scriptFileLocation}");
+            }
+            else if (Directory.Exists(scriptFileLocation))
+            {
+                // It's already a directory
+                scriptsDirectory = scriptFileLocation;
+                _logger.LogTrace($"Script directory provided: {scriptFileLocation}");
+            }
+            else
+            {
+                throw new DirectoryNotFoundException($"Scripts location not found: {scriptFileLocation}");
+            }
+
+            _logger.LogInformation($"Loading scripts from: {scriptsDirectory}");
+
+            // Load all .ps1 files from the scripts directory
+            var scriptFiles = Directory.GetFiles(scriptsDirectory, "*.ps1").ToList();
+
+            if (scriptFiles.Count == 0)
+            {
+                throw new FileNotFoundException($"No .ps1 files found in: {scriptsDirectory}");
+            }
+
+            _logger.LogInformation($"Found {scriptFiles.Count} script file(s) to load");
+
+            // Load each script file
+            foreach (var scriptFile in scriptFiles)
+            {
+                var fileName = Path.GetFileName(scriptFile);
+                _logger.LogTrace($"Loading script: {fileName}");
+
+                try
+                {
+                    var scriptContent = File.ReadAllText(scriptFile);
+
+                    // Remove auto-initialization lines that won't work remotely
+                    scriptContent = RemoveAutoInitialization(scriptContent);
+
+                    scriptBuilder.AppendLine("# ============================================================================");
+                    scriptBuilder.AppendLine($"# Script: {fileName}");
+                    scriptBuilder.AppendLine("# ============================================================================");
+                    scriptBuilder.AppendLine(scriptContent);
+                    scriptBuilder.AppendLine();
+                    scriptBuilder.AppendLine($"# --- End of {fileName} ---");
+                    scriptBuilder.AppendLine();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Failed to load script {fileName}: {ex.Message}");
+                    throw new Exception($"Failed to load script {fileName}: {ex.Message}", ex);
+                }
+            }
+
+            scriptBuilder.AppendLine("# All scripts loaded.");
+
+            var combinedScript = scriptBuilder.ToString();
+            _logger.LogInformation($"Combined script size: {combinedScript.Length} characters ({scriptFiles.Count} files)");
+
+            return combinedScript;
+        }
+
+        /// <summary>
+        /// Removes auto-initialization lines that won't work in remote context
+        /// </summary>
+        private string RemoveAutoInitialization(string scriptContent)
+        {
+            var lines = scriptContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Remove lines that call Initialize-Extensions or similar initialization
+            var filteredLines = lines.Where(line =>
+            {
+                var trimmedLine = line.Trim();
+
+                // Skip initialization lines that depend on file system
+                if (trimmedLine.Equals("Initialize-Extensions", StringComparison.OrdinalIgnoreCase) ||
+                    trimmedLine.StartsWith("Initialize-Extensions ", StringComparison.OrdinalIgnoreCase) ||
+                    trimmedLine.StartsWith(". $PSScriptRoot", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                return true;
+            });
+
+            return string.Join(Environment.NewLine, filteredLines);
         }
     }
 }
