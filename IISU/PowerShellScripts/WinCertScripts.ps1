@@ -1,4 +1,4 @@
-﻿# Version 1.4.0
+﻿# Version 1.5.0
 
 # Summary
 # Contains PowerShell functions to execute administration jobs for general Windows certificates, IIS and SQL Server.
@@ -14,6 +14,7 @@
 # 10/08/25  Updated the Get-KFIISBoundCertificates function to fixed the SSL flag not returning the correct value when reading IIS bindings
 #           Updated the New-KFIISSiteBinding to correctly update the SSL flags
 #           Added Test-ValidSslFlags to verify the correct bit flag
+# 11/04/25  Updated Get-KFCertificates to get specific certificate by thumbprint
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
@@ -72,7 +73,11 @@ function New-ResultObject {
 
 function Get-KFCertificates {
     param (
-        [string]$StoreName = "My"   # Default store name is "My" (Personal)
+        [Parameter(Mandatory = $false)]
+        [string]$StoreName = "My",   # Default store name is "My" (Personal)
+        
+        [Parameter(Mandatory = $false)]
+        [string]$Thumbprint          # Optional: specific certificate thumbprint to retrieve
     )
 
     # Define the store path using the provided StoreName parameter
@@ -85,8 +90,23 @@ function Get-KFCertificates {
         return
     }
 
-    # Retrieve all certificates from the specified store
-    $certificates = Get-ChildItem -Path $storePath
+    # Retrieve certificates from the specified store
+    if ($Thumbprint) {
+        # If thumbprint is provided, retrieve only that specific certificate
+        # Remove any spaces or special characters from the thumbprint for comparison
+        $cleanThumbprint = $Thumbprint -replace '[^a-fA-F0-9]', ''
+        $certificates = Get-ChildItem -Path $storePath | Where-Object { 
+            ($_.Thumbprint -replace '[^a-fA-F0-9]', '') -eq $cleanThumbprint 
+        }
+        
+        if (-not $certificates) {
+            Write-Error "No certificate found with thumbprint '$Thumbprint' in store '$StoreName'."
+            return
+        }
+    } else {
+        # Retrieve all certificates from the specified store
+        $certificates = Get-ChildItem -Path $storePath
+    }
 
     # Initialize an empty array to store certificate information objects
     $certInfoList = @()
