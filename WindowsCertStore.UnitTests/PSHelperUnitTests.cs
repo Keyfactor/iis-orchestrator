@@ -10,7 +10,7 @@ namespace WindowsCertStore.UnitTests
     public class PSHelperUnitTests
     {
         [Fact]
-        public void Test_LoadAllScripsts()
+        public void Test_LoadAllScripts()
         {
             // Arrange
             var psHelper = new Keyfactor.Extensions.Orchestrator.WindowsCertStore.PSHelper();

@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinADFS;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -19,7 +21,10 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
+using System.Management.Automation;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -30,9 +35,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinADFS
         private ILogger _logger;
         public string ExtensionName => "WinADFSInventory";
 
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+        Collection<PSObject>? results = null;
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+
+
         public Inventory()
         {
-                
+            _logger = LogHandler.GetClassLogger<Inventory>();
         }
 
         public Inventory(IPAMSecretResolver resolver)
@@ -62,26 +72,31 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinADFS
                 string clientMachineName = jobConfiguration.CertificateStoreDetails.ClientMachine;
                 string storePath = jobConfiguration.CertificateStoreDetails.StorePath;
 
-                //using (PSHelper psHelper = new PSHelper(_logger, clientMachineName, serverUserName, serverPassword, protocol, port, IncludePortInSPN))
-                //{
-                //    results = WinADFSInventory.GetCertificates(psHelper, storePath, _logger);
-                //    foreach (var result in results)
-                //    {
-                //        WinADFSCertificateInfo certInfo = new WinADFSCertificateInfo
-                //        {
-                //            StoreName = result.Members["StoreName"].Value.ToString(),
-                //            Certificate = result.Members["Certificate"].Value.ToString(),
-                //            ExpiryDate = result.Members["ExpiryDate"].Value.ToString(),
-                //            Issuer = result.Members["Issuer"].Value.ToString(),
-                //            Thumbprint = result.Members["Thumbprint"].Value.ToString(),
-                //            HasPrivateKey = Convert.ToBoolean(result.Members["HasPrivateKey"].Value),
-                //            SAN = result.Members["SAN"].Value.ToString(),
-                //            ProviderName = result.Members["ProviderName"].Value.ToString(),
-                //            Base64Data = result.Members["Base64Data"].Value.ToString()
-                //        };
-                //        inventoryItems.Add(ConvertToInventoryItem(certInfo));
-                //    }
-                //}
+                if (storePath != null)
+                {
+                    // Create the remote connection class to pass to Inventory Class
+                    RemoteSettings settings = new();
+                    settings.ClientMachineName = jobConfiguration.CertificateStoreDetails.ClientMachine;
+                    settings.Protocol = jobProperties.WinRmProtocol;
+                    settings.Port = jobProperties.WinRmPort;
+                    settings.IncludePortInSPN = jobProperties.SpnPortFlag;
+                    settings.ServerUserName = serverUserName;
+                    settings.ServerPassword = serverPassword;
+                    
+                    _logger.LogTrace($"Querying Window certificate in store: {storePath}");
+                    inventoryItems = QueryWinADFSCertificates(settings, storePath);
+
+                    _logger.LogTrace("Invoking submitInventory..");
+                    submitInventoryUpdate.Invoke(inventoryItems);
+                    _logger.LogTrace($"submitInventory Invoked... {inventoryItems.Count} Items");
+                    
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Success,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = $"Inventory completed returning {inventoryItems.Count} Items."
+                    };
+                }
 
                 return new JobResult
                 {
@@ -95,6 +110,102 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinADFS
             {
 
                 throw;
+            }
+        }
+
+        public List<CurrentInventoryItem> QueryWinADFSCertificates(RemoteSettings settings, string StoreName)
+        {
+            _logger.MethodEntry();
+            List<CurrentInventoryItem> Inventory = new();
+
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            {
+                ps.Initialize();
+
+                // Get ADFS Certificates
+                results = ps.InvokeFunction("Get-AdfsCertificateInventory");
+                if (results == null || results.Count == 0)
+                {
+                    throw new Exception("No ADFS certificates were found on the target machine.");
+                }
+
+                var AdfsCertificates = new List<AdfsCertificateInfo>();
+
+                foreach (PSObject result in results)
+                {
+                    AdfsCertificates.Add(new AdfsCertificateInfo
+                    {
+                        CertificateType = GetPropertyValue(result, "CertificateType"),
+                        IsPrimary = bool.Parse(GetPropertyValue(result, "IsPrimary") ?? "false"),
+                        Thumbprint = GetPropertyValue(result, "Thumbprint"),
+                        Subject = GetPropertyValue(result, "Subject"),
+                        Issuer = GetPropertyValue(result, "Issuer"),
+                        NotBefore = DateTime.Parse(GetPropertyValue(result, "NotBefore")),
+                        NotAfter = DateTime.Parse(GetPropertyValue(result, "NotAfter")),
+                        DaysUntilExpiry = int.Parse(GetPropertyValue(result, "DaysUntilExpiry") ?? "0"),
+                        IsExpired = bool.Parse(GetPropertyValue(result, "IsExpired") ?? "false"),
+                        IsExpiringSoon = bool.Parse(GetPropertyValue(result, "IsExpiringSoon") ?? "false")
+                    });
+                }
+
+                //
+
+                var adfsThumbprint = AdfsCertificates
+                    .FirstOrDefault(cert => cert.CertificateType == "Service-Communications" && cert.IsPrimary)?.Thumbprint;
+
+                var parameters = new Dictionary<string, object>
+                {
+                    { "StoreName", StoreName },
+                    { "Thumbprint", adfsThumbprint }
+                };
+
+                results = ps.ExecutePowerShell("Get-KFCertificates", parameters);
+
+                // If there are certificates, de-serialize the results and send them back to command
+                if (results != null && results.Count > 0)
+                {
+                    var jsonResults = results[0].ToString();
+                    var certInfoList = Certificate.Utilities.DeserializeCertificates<WinCertCertificateInfo>(jsonResults); // JsonConvert.DeserializeObject<List<IISCertificateInfo>>(jsonResults);
+
+                    foreach (WinCertCertificateInfo cert in certInfoList)
+                    {
+                        var siteSettingsDict = new Dictionary<string, object>
+                                {
+                                    { "ProviderName", cert.ProviderName},
+                                    { "SAN", cert.SAN }
+                                };
+
+                        Inventory.Add(
+                            new CurrentInventoryItem
+                            {
+                                Certificates = new[] { cert.Base64Data },
+                                Alias = cert.Thumbprint,
+                                PrivateKeyEntry = cert.HasPrivateKey,
+                                UseChainLevel = false,
+                                ItemStatus = OrchestratorInventoryItemStatus.Unknown,
+                                Parameters = siteSettingsDict
+                            }
+                        );
+                    }
+                }
+                ps.Terminate();
+            }
+
+            return Inventory;
+        }
+
+        /// <summary>
+        /// Helper method to get property value from PSObject
+        /// </summary>
+        private string GetPropertyValue(PSObject psObject, string propertyName)
+        {
+            try
+            {
+                return psObject.Properties[propertyName]?.Value?.ToString();
+            }
+            catch
+            {
+                return null;
             }
         }
     }

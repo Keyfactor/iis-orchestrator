@@ -50,6 +50,9 @@
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="PowerShellScripts\WinADFSScripts.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="PowerShellScripts\WinCertScripts.ps1">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
