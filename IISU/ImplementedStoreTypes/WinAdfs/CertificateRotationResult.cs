@@ -19,25 +19,14 @@ using System.Threading.Tasks;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinAdfs
 {
-    public class AdfsCertificateInfo
+    public class CertificateRotationResult
     {
-        public string CertificateType { get; set; }
-        public bool IsPrimary { get; set; }
+        public bool Success { get; set; }
+        public string Message { get; set; }
         public string Thumbprint { get; set; }
-        public string Subject { get; set; }
-        public string Issuer { get; set; }
-        public DateTime NotBefore { get; set; }
-        public DateTime NotAfter { get; set; }
-        public int DaysUntilExpiry { get; set; }
-        public bool IsExpired { get; set; }
-        public bool IsExpiringSoon { get; set; }
+        public List<string> SuccessfulNodes { get; set; } = new List<string>();
+        public List<string> FailedNodes { get; set; } = new List<string>();
+        public Dictionary<string, string> Errors { get; set; } = new Dictionary<string, string>();
 
-        public override string ToString()
-        {
-            string status = IsExpired ? "EXPIRED" :
-                           IsExpiringSoon ? $"Expires in {DaysUntilExpiry} days" :
-                           "OK";
-            return $"{CertificateType} ({(IsPrimary ? "Primary" : "Secondary")}): {status}";
-        }
     }
 }
