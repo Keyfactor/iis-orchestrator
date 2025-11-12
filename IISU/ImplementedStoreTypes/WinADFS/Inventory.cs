@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2025 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinADFS;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTypes.WinAdfs;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
@@ -28,7 +28,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinADFS
+namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs
 {
     public class Inventory : WinCertJobTypeBase, IInventoryJobExtension
     {
@@ -106,10 +106,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinADFS
                         $"No certificates were found in the Certificate Store Path: {storePath} on server: {clientMachineName}"
                 };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogTrace(LogHandler.FlattenException(ex));
 
-                throw;
+                var failureMessage = $"Inventory job failed for Site '{jobConfiguration.CertificateStoreDetails.StorePath}' on server '{jobConfiguration.CertificateStoreDetails.ClientMachine}' with error: '{ex.Message}'";
+                _logger.LogWarning(failureMessage);
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = jobConfiguration.JobHistoryId,
+                    FailureMessage = failureMessage
+                };
             }
         }
 
@@ -118,7 +127,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinADFS
             _logger.MethodEntry();
             List<CurrentInventoryItem> Inventory = new();
 
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, true))
             {
                 ps.Initialize();
 

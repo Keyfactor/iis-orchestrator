@@ -59,6 +59,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private string serverPassword;
 
         private bool isLocalMachine;
+        private bool isADFSStore = false;
+
         public bool IsLocalMachine
         {
             get { return isLocalMachine; }
@@ -93,7 +95,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = LogHandler.GetClassLogger<PSHelper>();
         }
 
-        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword)
+        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false)
         {
             this.protocol = protocol.ToLower();
             this.port = port;
@@ -109,6 +111,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace($"UseSPN: {this.useSPN}");
             _logger.LogTrace($"ClientMachineName: {ClientMachineName}");
             _logger.LogTrace("Constructor Completed");
+            this.isADFSStore = isADFSStore;
         }
 
         public void Initialize()
@@ -164,6 +167,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private void InitializeRemoteSession()
         {
+            if (this.isADFSStore) throw new Exception("Remote ADFS stores are not supported.");
+
             if (protocol == "ssh")
             {
                 _logger.LogTrace("Initializing SSH connection");
@@ -264,33 +269,162 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             rs.Open();
             PS.Runspace = rs;
 
-            // Set execution policy - ignore informational messages
+            // Set execution policy
             _logger.LogTrace("Setting Execution Policy to Unrestricted");
             SetExecutionPolicyUnrestricted();
+
+            // Check if ADFS module is available (only needed for ADFS stores)
+            bool adfsModuleImported = false;
+            if (this.isADFSStore)
+            {
+                adfsModuleImported = ImportAdfsModule();
+            }
 
             // Load all scripts
             _logger.LogTrace("Loading PowerShell scripts");
             var scriptFiles = GetScriptFiles(scriptFileLocation);
-            _logger.LogInformation($"Found {scriptFiles.Count} script file(s) to load");
 
             foreach (var scriptFile in scriptFiles)
             {
                 var fileName = Path.GetFileName(scriptFile);
-                _logger.LogTrace($"Loading script: {fileName}");
+                bool isAdfsScript = fileName.IndexOf("adfs", StringComparison.OrdinalIgnoreCase) >= 0;
 
-                PS.AddScript($". '{scriptFile}'");
-                PS.Invoke();
-                CheckErrors();  // Check errors for actual scripts
-                PS.Commands.Clear();
+                // Decide whether to load this script
+                if (isAdfsScript)
+                {
+                    if (this.isADFSStore)
+                    {
+                        if (!adfsModuleImported)
+                        {
+                            _logger.LogWarning($"Skipping ADFS script '{fileName}' - ADFS module not available");
+                            continue;
+                        }
+
+                        _logger.LogTrace($"Loading ADFS script: {fileName}");
+                    }
+                    else
+                    {
+                        _logger.LogTrace($"Skipping ADFS script '{fileName}' - not an ADFS store");
+                        continue;
+                    }
+                }
+                else
+                {
+                    _logger.LogTrace($"Loading script: {fileName}");
+                }
+
+                // Load the script
+                try
+                {
+                    PS.AddScript($". '{scriptFile}'");
+                    PS.Invoke();
+
+                    if (PS.HadErrors)
+                    {
+                        _logger.LogError($"Errors loading script '{fileName}':");
+                        foreach (var error in PS.Streams.Error)
+                        {
+                            _logger.LogError($"  {error}");
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogTrace($"  ✓ Successfully loaded {fileName}");
+                    }
+
+                    CheckErrors();
+                    PS.Commands.Clear();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Exception loading script '{fileName}': {ex.Message}");
+                }
             }
 
             _logger.LogInformation("Local PowerShell session initialized successfully");
         }
 
+        /// <summary>
+        /// Import ADFS module if available
+        /// </summary>
+        /// <returns>True if module imported successfully, false otherwise</returns>
+        private bool ImportAdfsModule()
+        {
+            _logger.LogTrace("Attempting to import ADFS module...");
+
+            try
+            {
+                // First check if module is available
+                PS.AddScript("Get-Module -ListAvailable -Name ADFS");
+                var availableModules = PS.Invoke();
+
+                if (availableModules == null || availableModules.Count == 0)
+                {
+                    _logger.LogWarning("ADFS module not found on this machine");
+                    _logger.LogWarning("This may not be an ADFS server or ADFS role is not installed");
+                    PS.Commands.Clear();
+                    return false;
+                }
+
+                PS.Commands.Clear();
+
+                // Module is available, import it
+                _logger.LogTrace("ADFS module found, importing...");
+                PS.AddCommand("Import-Module")
+                    .AddParameter("Name", "ADFS")
+                    .AddParameter("ErrorAction", "Stop");
+
+                var moduleResult = PS.Invoke();
+
+                if (PS.HadErrors)
+                {
+                    _logger.LogWarning("ADFS module import had errors:");
+                    foreach (var error in PS.Streams.Error)
+                    {
+                        _logger.LogWarning($"  {error}");
+                    }
+                    PS.Streams.Error.Clear();
+                    PS.Commands.Clear();
+                    return false;
+                }
+
+                PS.Commands.Clear();
+
+                // Verify module loaded
+                PS.AddScript("Get-Module -Name ADFS");
+                var loadedModules = PS.Invoke();
+
+                if (loadedModules != null && loadedModules.Count > 0)
+                {
+                    var module = loadedModules[0];
+                    var version = module.Properties["Version"]?.Value?.ToString();
+                    _logger.LogInformation($"✓ ADFS module imported successfully (Version: {version})");
+                    PS.Commands.Clear();
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning("ADFS module import reported success but module not loaded");
+                    PS.Commands.Clear();
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Could not import ADFS module: {ex.Message}");
+                _logger.LogWarning("ADFS cmdlets may not be available");
+
+                try
+                {
+                    PS.Commands.Clear();
+                }
+                catch { }
+
+                return false;
+            }
+        }
         private void SetExecutionPolicyUnrestricted()
         {
-            _logger.LogTrace("Setting Execution Policy to Unrestricted");
-
             try
             {
                 PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
@@ -327,7 +461,72 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 PS.Commands.Clear();
             }
         }
+        private void InitializeLocalSessionOLD2()
+        {
+            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
+            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
+            rs.Open();
+            PS.Runspace = rs;
 
+            // Set execution policy - ignore informational messages
+            _logger.LogTrace("Setting Execution Policy to Unrestricted");
+            SetExecutionPolicyUnrestricted();
+
+            // Load all scripts
+            _logger.LogTrace("Loading PowerShell scripts");
+            var scriptFiles = GetScriptFiles(scriptFileLocation);
+            _logger.LogInformation($"Found {scriptFiles.Count} script file(s) to load");
+
+            foreach (var scriptFile in scriptFiles)
+            {
+                var fileName = Path.GetFileName(scriptFile);
+
+                if (this.isADFSStore && fileName.ToLower().Contains("adfs"))
+                {
+                    // Import ADFS module (CRITICAL!)
+                    _logger.LogTrace("Importing ADFS module");
+                    try
+                    {
+                        PS.AddCommand("Import-Module").AddParameter("Name", "ADFS");
+                        var moduleResult = PS.Invoke();
+
+                        if (PS.HadErrors)
+                        {
+                            _logger.LogWarning("ADFS module import had errors (may not be available on this machine)");
+                            foreach (var error in PS.Streams.Error)
+                            {
+                                _logger.LogWarning($"  {error}");
+                            }
+                            PS.Streams.Error.Clear();
+                        }
+                        else
+                        {
+                            _logger.LogInformation("ADFS module imported successfully");
+                        }
+
+                        PS.Commands.Clear();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning($"Could not import ADFS module: {ex.Message}");
+                        _logger.LogWarning("ADFS cmdlets may not be available");
+                    }
+
+                    _logger.LogTrace($"Skipping non-ADFS script: {fileName} for ADFS store type");
+                    continue;
+                }
+
+                _logger.LogTrace($"Loading script: {fileName}");
+
+                PS.AddScript($". '{scriptFile}'");
+                PS.Invoke();
+                CheckErrors();  // Check errors for actual scripts
+                PS.Commands.Clear();
+            }
+
+            _logger.LogInformation("Local PowerShell session initialized successfully");
+        }
         private void InitializeLocalSessionOLD()
         {
             _logger.LogTrace("Creating out-of-process Powershell Runspace.");
@@ -358,9 +557,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             {
                 try
                 {
-                    PS.AddCommand("Remove-PSSession").AddParameter("Session", _PSSession);
-                    PS.Invoke();
-                    CheckErrors();
+                    if (_PSSession != null && _PSSession.Count > 0)
+                    {
+                        _logger.LogTrace("Removing remote PSSession.");
+                        PS.AddCommand("Remove-PSSession").AddParameter("Session", _PSSession);
+                        PS.Invoke();
+                        CheckErrors();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -398,7 +601,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         }
 
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-        public Collection<PSObject>? InvokeFunction(string functionName, Dictionary<string, Object>? parameters = null)
+        public Collection<PSObject>? InvokeFunctionOLD(string functionName, Dictionary<string, Object>? parameters = null)
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         {
             PS.Commands.Clear();
@@ -416,6 +619,77 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             if (parameters != null)
             {
                 PS.AddParameter("ArgumentList", parameters.Values.ToArray());
+            }
+
+            _logger.LogTrace($"Attempting to InvokeFunction: {functionName}");
+            var results = PS.Invoke();
+
+            if (PS.HadErrors)
+            {
+                string errorMessages = string.Join("; ", PS.Streams.Error.Select(e => e.ToString()));
+                throw new Exception($"Error executing function '{functionName}': {errorMessages}");
+            }
+
+            return results;
+        }
+
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+        public Collection<PSObject>? InvokeFunction(string functionName, Dictionary<string, Object>? parameters = null)
+#pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+        {
+            PS.Commands.Clear();
+
+            if (isLocalMachine)
+            {
+                PS.AddCommand(functionName);
+                if (parameters != null)
+                {
+                    foreach (var param in parameters)
+                    {
+                        PS.AddParameter(param.Key, param.Value);
+                    }
+                }
+            }
+            else
+            {
+                string scriptBlock;
+
+                if (parameters != null && parameters.Count > 0)
+                {
+                    // Build parameter list for param() block
+                    var paramNames = parameters.Keys.Select(k => $"${k}").ToArray();
+                    var paramBlock = string.Join(", ", paramNames);
+
+                    // Build function call with named parameters
+                    var functionCall = new System.Text.StringBuilder(functionName);
+                    foreach (var param in parameters)
+                    {
+                        functionCall.Append($" -{param.Key} ${param.Key}");
+                    }
+
+                    // Create ScriptBlock with param() and function call
+                    scriptBlock = $@"
+                param({paramBlock})
+                {functionCall}
+            ";
+
+                    _logger.LogTrace($"Remote ScriptBlock: {scriptBlock}");
+                    _logger.LogTrace($"ArgumentList: {string.Join(", ", parameters.Keys)}");
+
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("Session", _PSSession)
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock))
+                        .AddParameter("ArgumentList", parameters.Values.ToArray());
+                }
+                else
+                {
+                    // No parameters - simple function call
+                    scriptBlock = functionName;
+
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("Session", _PSSession)
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(scriptBlock));
+                }
             }
 
             _logger.LogTrace($"Attempting to InvokeFunction: {functionName}");
@@ -773,7 +1047,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             return scriptFiles;
         }
-
         public static string LoadScript(string scriptFileName)
         {
             _logger.LogTrace($"Attempting to load script {scriptFileName}");
@@ -785,7 +1058,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             else
             { throw new Exception($"File: {scriptFileName} was not found."); }
         }
-
         public string LoadAllScripts(string scriptFileLocation)
         {
             /*

@@ -26,7 +26,7 @@ namespace WindowsCertStore.UnitTests
             };
 
             // Act
-            Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinADFS.Inventory adfs = new();
+            Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs.Inventory adfs = new();
             adfs.QueryWinADFSCertificates(settings, "My");
 
             // Assert
