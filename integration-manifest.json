@@ -442,7 +442,7 @@
                 "StorePathDescription": "Fixed string value 'My' indicating the Personal store on the Local Machine. This denotes the Windows certificate store to be managed for SQL Server."
               },
               {
-                "Name": "WinAdfs",
+                "Name": "ADFS Rotation Manager",
                 "ShortName": "WinAdfs",
                 "Capability": "WinAdfs",
                 "LocalStore": false,
@@ -537,7 +537,7 @@
                 "PowerShell": false,
                 "BlueprintAllowed": true,
                 "CustomAliasAllowed": "Forbidden",
-                "ClientMachineDescription": "Hostname of the PRIMARY ADFS Server containing the Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).  Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server.",
+                "ClientMachineDescription": "Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server.",
                 "StorePathDescription": "Fixed string value of 'My' indicating the Personal store on the Local Machine. All ADFS Service-Communications certificates are located in the 'My' personal store by default."
               }
             ]
