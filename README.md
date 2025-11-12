@@ -292,6 +292,13 @@ the Keyfactor Command Portal
 
    ![WinCert Entry Parameters Tab](docsource/images/WinCert-entry-parameters-store-type-dialog.png)
 
+
+   ##### ProviderName
+
+   ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName.png)
+
+
+
    </details>
 </details>
 
@@ -426,6 +433,43 @@ the Keyfactor Command Portal
 
    ![IISU Entry Parameters Tab](docsource/images/IISU-entry-parameters-store-type-dialog.png)
 
+
+   ##### Port
+
+   ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port.png)
+
+
+   ##### IPAddress
+
+   ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress.png)
+
+
+   ##### HostName
+
+   ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName.png)
+
+
+   ##### SiteName
+
+   ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName.png)
+
+
+   ##### SniFlag
+
+   ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag.png)
+
+
+   ##### Protocol
+
+   ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol.png)
+
+
+   ##### ProviderName
+
+   ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName.png)
+
+
+
    </details>
 </details>
 
@@ -548,6 +592,18 @@ the Keyfactor Command Portal
 
    ![WinSql Entry Parameters Tab](docsource/images/WinSql-entry-parameters-store-type-dialog.png)
 
+
+   ##### InstanceName
+
+   ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName.png)
+
+
+   ##### ProviderName
+
+   ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName.png)
+
+
+
    </details>
 </details>
 
@@ -669,6 +725,13 @@ the Keyfactor Command Portal
    The Entry Parameters tab should look like this:
 
    ![WinAdfs Entry Parameters Tab](docsource/images/WinAdfs-entry-parameters-store-type-dialog.png)
+
+
+   ##### ProviderName
+
+   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName.png)
+
+
 
    </details>
 </details>
