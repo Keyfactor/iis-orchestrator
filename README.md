@@ -32,6 +32,7 @@
 ## Overview
 
 The Windows Certificate Orchestrator Extension is a multi-purpose integration that can remotely manage certificates on a Windows Server's Local Machine Store.  This extension currently manages certificates for the current store types:
+* WinADFS - Rotates the Service-Communications certificate on the primary and secondary AFDS nodes
 * WinCert - Certificates defined by path set for the Certificate Store
 * WinIIS - IIS Bound certificates 
 * WinSQL - Certificates that are bound to the specified SQL Instances
@@ -43,7 +44,7 @@ For a complete list of local machine cert stores you can execute the PowerShell 
 
 The returned list will contain the actual certificate store name to be used when entering store location.
 
-This extension implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
+The ADFS extension performs both Inventory and Management Add jobs.  The other extensions implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
 
 The Keyfactor Universal Orchestrator (UO) and WinCert Extension can be installed on either Windows or Linux operating systems.  A UO service managing certificates on remote servers is considered to be acting as an Orchestrator, while a UO Service managing local certificates on the same server running the service is considered an Agent.  When acting as an Orchestrator, connectivity from the orchestrator server hosting the WinCert extension to the orchestrated server hosting the certificate stores(s) being managed is achieved via either an SSH (for Linux orchestrated servers) or WinRM (for Windows orchestrated servers) connection.  When acting as an agent (Windows only), WinRM may still be used, OR the certificate store can be configured to bypass a WinRM connection and instead directly access the orchestrator server's certificate stores.
 
@@ -76,7 +77,7 @@ The Windows Certificate Universal Orchestrator extension implements 4 Certificat
 
 - [WinSql](#WinSql)
 
-- [WinAdfs](#WinAdfs)
+- [ADFS Rotation Manager](#WinAdfs)
 
 
 ## Compatibility
@@ -612,16 +613,16 @@ the Keyfactor Command Portal
 <details><summary>Click to expand details</summary>
 
 
-TODO Overview is a required section
-TODO Global Store Type Section is an optional section. If this section doesn't seem necessary on initial glance, please delete it. Refer to the docs on [Confluence](https://keyfactor.atlassian.net/wiki/x/SAAyHg) for more info
+WinADFS is a store type designed for managing certificates within Microsoft Active Directory Federation Services (ADFS) environments. This store type enables users to automate the management of certificates used for securing ADFS communications, including tasks such as adding, removing, and renewing certificates associated with ADFS services.
+* NOTE: Only the Service-Communications certificate is currently supported.  Follow your ADFS best practices for token encrypt and decrypt certificate management.
+* NOTE: This extension also supports the auto-removal of expired certificates from the ADFS stores on the Primary and Secondary nodes during the certificate rotation process, along with restarting the ADFS service to apply changes.
 
 
 
 
+#### ADFS Rotation Manager Requirements
 
-#### WinAdfs Requirements
-
-TODO Requirements is an optional section. If this section doesn't seem necessary on initial glance, please delete it. Refer to the docs on [Confluence](https://keyfactor.atlassian.net/wiki/x/SAAyHg) for more info
+When using WinADFS, the Universal Orchestrator must act as an agent and be installed on the Primary ADFS server within the ADFS farm. This is necessary because ADFS configurations and certificate management operations must be performed directly on the ADFS server itself to ensure proper functionality and security.
 
 
 
@@ -645,7 +646,7 @@ For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out 
    ##### Using online definition from GitHub:
    This will reach out to GitHub and pull the latest store-type definition
    ```shell
-   # WinAdfs
+   # ADFS Rotation Manager
    kfutil store-types create WinAdfs
    ```
 
@@ -669,7 +670,7 @@ the Keyfactor Command Portal
    ##### Basic Tab
    | Attribute | Value | Description |
    | --------- | ----- | ----- |
-   | Name | WinAdfs | Display name for the store type (may be customized) |
+   | Name | ADFS Rotation Manager | Display name for the store type (may be customized) |
    | Short Name | WinAdfs | Short display name for the store type |
    | Capability | WinAdfs | Store type name orchestrator will register with. Check the box to allow entry of value |
    | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
@@ -1065,11 +1066,9 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 </details>
 
-<details><summary>WinAdfs (WinAdfs)</summary>
+<details><summary>ADFS Rotation Manager (WinAdfs)</summary>
 
-TODO Global Store Type Section is an optional section. If this section doesn't seem necessary on initial glance, please delete it. Refer to the docs on [Confluence](https://keyfactor.atlassian.net/wiki/x/SAAyHg) for more info
-
-TODO Certificate Store Configuration is an optional section. If this section doesn't seem necessary on initial glance, please delete it. Refer to the docs on [Confluence](https://keyfactor.atlassian.net/wiki/x/SAAyHg) for more info
+When creating a Certificate Store for WinADFS, the Client Machine name must be set as an agent and use the LocalMachine moniker, for example: myADFSPrimary|LocalMachine.
 
 
 ### Store Creation
@@ -1088,9 +1087,9 @@ TODO Certificate Store Configuration is an optional section. If this section doe
 
    | Attribute | Description                                             |
    | --------- |---------------------------------------------------------|
-   | Category | Select "WinAdfs" or the customized certificate store name from the previous step. |
+   | Category | Select "ADFS Rotation Manager" or the customized certificate store name from the previous step. |
    | Container | Optional container to associate certificate store with. |
-   | Client Machine | Hostname of the PRIMARY ADFS Server containing the Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).  Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server. |
+   | Client Machine | Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server. |
    | Store Path | Fixed string value of 'My' indicating the Personal store on the Local Machine. All ADFS Service-Communications certificates are located in the 'My' personal store by default. |
    | Orchestrator | Select an approved orchestrator capable of managing `WinAdfs` certificates. Specifically, one with the `WinAdfs` capability. |
    | spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
@@ -1119,9 +1118,9 @@ TODO Certificate Store Configuration is an optional section. If this section doe
 
    | Attribute | Description |
    | --------- | ----------- |
-   | Category | Select "WinAdfs" or the customized certificate store name from the previous step. |
+   | Category | Select "ADFS Rotation Manager" or the customized certificate store name from the previous step. |
    | Container | Optional container to associate certificate store with. |
-   | Client Machine | Hostname of the PRIMARY ADFS Server containing the Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).  Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server. |
+   | Client Machine | Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server. |
    | Store Path | Fixed string value of 'My' indicating the Personal store on the Local Machine. All ADFS Service-Communications certificates are located in the 'My' personal store by default. |
    | Orchestrator | Select an approved orchestrator capable of managing `WinAdfs` certificates. Specifically, one with the `WinAdfs` capability. |
    | Properties.spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
@@ -1160,17 +1159,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 
 </details>
-
-## Discovering Certificate Stores with the Discovery Job
-
-
-
-
-### WinAdfs Discovery Job
-TODO Global Store Type Section is an optional section. If this section doesn't seem necessary on initial glance, please delete it. Refer to the docs on [Confluence](https://keyfactor.atlassian.net/wiki/x/SAAyHg) for more info
-
-
-TODO Discovery Job Configuration is an optional section. If this section doesn't seem necessary on initial glance, please delete it. Refer to the docs on [Confluence](https://keyfactor.atlassian.net/wiki/x/SAAyHg) for more info
 
 
 
