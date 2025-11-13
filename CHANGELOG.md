@@ -1,7 +1,7 @@
 3.0.0
 * As of this version of the extension, SANs will be handled through the ODKG Enrollment page in Command, and will no longer use the SAN Entry Parameter. This version, we are removing the Entry Parameter "SAN" from the integration-manifest.json, but will still support previous versions of Command in the event the SAN Entry Parameter is passed. The next major version (4.0) will remove all support for the SAN Entry Parameter.
-* Added WinADFS Store Type for rotating certificates in ADFS environments.
-* Added Integration Tests to aid in future development and testing.
+* Added WinADFS Store Type for rotating certificates in ADFS environments.  Please note, only the service-communications certificate is rotated throughout your farm.
+* Internal only: Added Integration Tests to aid in future development and testing.
 * Improved messaging in the event an Entry Parameter is missing (or does not meet the casing requirements)
 * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
 * Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
