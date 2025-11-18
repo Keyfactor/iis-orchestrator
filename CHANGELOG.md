@@ -5,16 +5,15 @@
 * Improved messaging in the event an Entry Parameter is missing (or does not meet the casing requirements)
 * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
 * Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
-* Added SSL Flag validation to make sure the bit flag is correct.  These are the current SSL Flags:
-    * 0   No SNI
-    * 1   SNI Enabled
-    * 2   Non SNI binding which uses Central Certificate Store
-    * 3   SNI binding which uses Central Certificate Store
-    * 4   Use App ID (Requires AppID parameter to be set)
-    * 8   Use Central Certificate Store (Non SNI)
-    * 32  Central Certificate Store
-    * 64  Disable HTTP2
-    * 128 Disable OCSP Stapling
+* Added SSL Flag validation to make sure the bit flag is correct.  These are the current SSL Flags (NOTE:  Values greater than 4 are only supported in IIS 10 version 1809 and higher. The default value is 0):
+      * 0	The secure connection made using an IP/Port combination. Only one certificate can be bound to a combination of IP address and the port.
+      * 1	The secure connection made using the port number and the host name obtained by using Server Name Indication (SNI).
+      * 2	The secure connection be made using the centralized SSL certificate store.
+      * 4	Disable HTTP/2.
+      * 8	Disable OCSP Stapling.
+      * 16	Disable QUIC.
+      * 32	Disable TLS 1.3 over TCP.
+      * 64	Disable Legacy TLS.
 
 2.6.3
 * Fixed re-enrollment or ODKG job when RDN Components contained escaped commas.
