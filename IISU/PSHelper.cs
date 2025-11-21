@@ -955,9 +955,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private static string formatPrivateKey(string privateKey)
         {
-            String keyType = privateKey.Contains("OPENSSH PRIVATE KEY") ? "OPENSSH" : "RSA";
+            string header = privateKey.Substring(0, privateKey.IndexOf("KEY-----") + 8);
+            string footer = privateKey.Substring(privateKey.IndexOf("-----END"));
 
-            return privateKey.Replace($" {keyType} PRIVATE ", "^^^").Replace(" ", System.Environment.NewLine).Replace("^^^", $" {keyType} PRIVATE ") + System.Environment.NewLine;
+            return privateKey.Replace(header, "HEADER").Replace(footer, "FOOTER").Replace(" ", Environment.NewLine).Replace("HEADER", header).Replace("FOOTER", footer) + Environment.NewLine;
         }
 
         public static string FindScriptsDirectory(string rootDirectory, string directoryName)
