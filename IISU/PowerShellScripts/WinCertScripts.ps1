@@ -331,7 +331,7 @@ function Remove-KFCertificateFromStore {
     return $isSuccessful
 }
 
-# IIS Functions
+##### IIS Functions
 function Get-KFIISBoundCertificates {
     $certificates = @()
     $totalBoundCertificates = 0
@@ -648,9 +648,8 @@ function Add-IISBindingWithSSL {
         return New-ResultObject -Status Error -Code 202 -Step AddBinding -ErrorMessage $errorMessage
     }
 }
-#
 
-# May want to replace this function with Remove-ExistingIISBinding in future version
+# May want to replace this function with Remove-ExistingIISBinding in future version, this is currently being called on certificate removal only
 function Remove-KFIISSiteBinding {
     [CmdletBinding()]
     param (
@@ -762,7 +761,7 @@ function Remove-KFIISCertificateIfUnused {
         Write-Error "An error occurred while attempting to delete IIS Certificate: $_"
     }
 }
-
+#####
 
 # Function to get certificate information for a SQL Server instance
 function GET-KFSQLInventory {
@@ -918,7 +917,7 @@ function Set-KFSQLCertificateBinding {
     Switch to restart the SQL Server service after binding
     
     .EXAMPLE
-    Set-KFCertificateBinding -InstanceName "MSSQLSERVER" -NewThumbprint "ABC123..." -RestartService
+    Set-KFSQLCertificateBinding -InstanceName "MSSQLSERVER" -NewThumbprint "ABC123..." -RestartService
     #>
     
     [CmdletBinding()]
@@ -1497,10 +1496,10 @@ function Unbind-KFSqlCertificate {
     }
 
     return $unBindingSuccess
-}
 
 # Example usage:
 # Bind-CertificateToSqlInstance -Thumbprint "123ABC456DEF" -SqlInstanceName "MSSQLSERVER"
+}
 
 function Get-SqlServiceName {
     param (
@@ -1528,12 +1527,13 @@ function Get-SQLServiceUser {
         Write-Error "SQL Server instance '$SQLInstanceName' not found or no service user associated."
         return $null
     }
-}
 
 # Example usage:
 # Get-SQLServiceUser -SQLInstanceName "MSSQLSERVER"
+}
+#####
 
-##### ReEnrollment functions
+##### ReEnrollment (ODKG) functions
 function New-CSREnrollment {
     param (
         [string]$SubjectText,
