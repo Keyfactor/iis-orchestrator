@@ -80,7 +80,7 @@
                             "DependsOn": "",
                             "DefaultValue": "",
                             "Required": false,
-                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
+                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'.  (This field is automatically created)"
                         },
                       {
                         "Name": "ServerPassword",
@@ -89,7 +89,7 @@
                         "DependsOn": "",
                         "DefaultValue": "",
                         "Required": false,
-                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
                       },
                         {
                             "Name": "ServerUseSsl",
@@ -172,15 +172,15 @@
                             "Required": true,
                             "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
                         },
-                        {
-                            "Name": "ServerUsername",
-                            "DisplayName": "Server Username",
-                            "Type": "Secret",
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Required": false,
-                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
-                        },
+                      {
+                        "Name": "ServerUsername",
+                        "DisplayName": "Server Username",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+                      },
                       {
                         "Name": "ServerPassword",
                         "DisplayName": "Server Password",
@@ -188,7 +188,7 @@
                         "DependsOn": "",
                         "DefaultValue": "",
                         "Required": false,
-                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
                       },
                         {
                             "Name": "ServerUseSsl",
