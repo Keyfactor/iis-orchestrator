@@ -321,126 +321,126 @@
                     "ClientMachineDescription": "Hostname of the Windows Server containing the IIS certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.  For more information, see [Client Machine](#note-regarding-client-machine).",
                     "StorePathDescription": "Windows certificate store path to manage. Choose 'My' for the Personal store or 'WebHosting' for the Web Hosting store."
                 },
-              {
-                "Name": "WinSql",
-                "ShortName": "WinSql",
-                "Capability": "WinSql",
-                "LocalStore": false,
-                "SupportedOperations": {
-                  "Add": true,
-                  "Create": false,
-                  "Discovery": false,
-                  "Enrollment": false,
-                  "Remove": true
-                },
-                "Properties": [
-                  {
-                    "Name": "spnwithport",
-                    "DisplayName": "SPN With Port",
-                    "Type": "Bool",
-                    "DependsOn": "",
-                    "DefaultValue": "false",
-                    "Required": false,
-                    "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
-                  },
-                  {
-                    "Name": "WinRM Protocol",
-                    "DisplayName": "WinRM Protocol",
-                    "Type": "MultipleChoice",
-                    "DependsOn": "",
-                    "DefaultValue": "https,http,ssh",
-                    "Required": true,
-                    "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
-                  },
-                  {
-                    "Name": "WinRM Port",
-                    "DisplayName": "WinRM Port",
-                    "Type": "String",
-                    "DependsOn": "",
-                    "DefaultValue": "5986",
-                    "Required": true,
-                    "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
-                  },
-                  {
-                    "Name": "ServerUsername",
-                    "DisplayName": "Server Username",
-                    "Type": "Secret",
-                    "DependsOn": "",
-                    "DefaultValue": "",
-                    "Required": false,
-                    "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
-                  },
-                  {
-                    "Name": "ServerPassword",
-                    "DisplayName": "Server Password",
-                    "Type": "Secret",
-                    "DependsOn": "",
-                    "DefaultValue": "",
-                    "Required": false,
-                    "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
-                  },
-                  {
-                    "Name": "ServerUseSsl",
-                    "DisplayName": "Use SSL",
-                    "Type": "Bool",
-                    "DependsOn": "",
-                    "DefaultValue": "true",
-                    "Required": true,
-                    "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
-                  },
-                  {
-                    "Name": "RestartService",
-                    "DisplayName": "Restart SQL Service After Cert Installed",
-                    "Type": "Bool",
-                    "DependsOn": "",
-                    "DefaultValue": "false",
-                    "Required": true,
-                    "Description": "Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation."
-                  }
-                ],
-                "EntryParameters": [
-                  {
-                    "Name": "InstanceName",
-                    "DisplayName": "Instance Name",
-                    "Type": "String",
-                    "RequiredWhen": {
-                      "HasPrivateKey": false,
-                      "OnAdd": false,
-                      "OnRemove": false,
-                      "OnReenrollment": false
+                {
+                    "Name": "WinSql",
+                    "ShortName": "WinSql",
+                    "Capability": "WinSql",
+                    "LocalStore": false,
+                    "SupportedOperations": {
+                      "Add": true,
+                      "Create": false,
+                      "Discovery": false,
+                      "Enrollment": false,
+                      "Remove": true
                     },
-                    "Description": "String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance."
-                  },
-                  {
-                    "Name": "ProviderName",
-                    "DisplayName": "Crypto Provider Name",
-                    "Type": "String",
-                    "RequiredWhen": {
-                      "HasPrivateKey": false,
-                      "OnAdd": false,
-                      "OnRemove": false,
-                      "OnReenrollment": false
-                    },
-                    "DependsOn": "",
-                    "DefaultValue": "",
-                    "Options": "",
-                    "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
-                  }
-                ],
-                "PasswordOptions": {
-                  "EntrySupported": false,
-                  "StoreRequired": false,
-                  "Style": "Default"
+                    "Properties": [
+                        {
+                            "Name": "spnwithport",
+                            "DisplayName": "SPN With Port",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "false",
+                            "Required": false,
+                            "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+                        },
+                        {
+                            "Name": "WinRM Protocol",
+                            "DisplayName": "WinRM Protocol",
+                            "Type": "MultipleChoice",
+                            "DependsOn": "",
+                            "DefaultValue": "https,http,ssh",
+                            "Required": true,
+                            "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
+                        },
+                        {
+                            "Name": "WinRM Port",
+                            "DisplayName": "WinRM Port",
+                            "Type": "String",
+                            "DependsOn": "",
+                            "DefaultValue": "5986",
+                            "Required": true,
+                            "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+                        },
+                      {
+                        "Name": "ServerUsername",
+                        "DisplayName": "Server Username",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+                      },
+                      {
+                        "Name": "ServerPassword",
+                        "DisplayName": "Server Password",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
+                      },
+                        {
+                            "Name": "ServerUseSsl",
+                            "DisplayName": "Use SSL",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "true",
+                            "Required": true,
+                            "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+                        },
+                        {
+                            "Name": "RestartService",
+                            "DisplayName": "Restart SQL Service After Cert Installed",
+                            "Type": "Bool",
+                            "DependsOn": "",
+                            "DefaultValue": "false",
+                            "Required": true,
+                            "Description": "Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation."
+                        }
+                    ],
+                    "EntryParameters": [
+                        {
+                            "Name": "InstanceName",
+                            "DisplayName": "Instance Name",
+                            "Type": "String",
+                            "RequiredWhen": {
+                                "HasPrivateKey": false,
+                                "OnAdd": false,
+                                "OnRemove": false,
+                                "OnReenrollment": false
+                            },
+                            "Description": "String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance."
+                        },
+                        {
+                          "Name": "ProviderName",
+                          "DisplayName": "Crypto Provider Name",
+                          "Type": "String",
+                          "RequiredWhen": {
+                              "HasPrivateKey": false,
+                              "OnAdd": false,
+                              "OnRemove": false,
+                              "OnReenrollment": false
+                          },
+                          "DependsOn": "",
+                          "DefaultValue": "",
+                          "Options": "",
+                          "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+                        }
+                    ],
+                    "PasswordOptions": {
+                        "EntrySupported": false,
+                        "StoreRequired": false,
+                        "Style": "Default"
+                      },
+                    "StorePathValue": "My",
+                    "PrivateKeyAllowed": "Optional",
+                    "ServerRequired": true,
+                    "PowerShell": false,
+                    "BlueprintAllowed": true,
+                    "CustomAliasAllowed": "Forbidden",
+                    "ClientMachineDescription": "Hostname of the Windows Server containing the SQL Server Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).",
+                    "StorePathDescription": "Fixed string value 'My' indicating the Personal store on the Local Machine. This denotes the Windows certificate store to be managed for SQL Server."
                 },
-                "StorePathValue": "My",
-                "PrivateKeyAllowed": "Optional",
-                "ServerRequired": true,
-                "PowerShell": false,
-                "BlueprintAllowed": true,
-                "CustomAliasAllowed": "Forbidden",
-                "ClientMachineDescription": "Hostname of the Windows Server containing the SQL Server Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).",
-                "StorePathDescription": "Fixed string value 'My' indicating the Personal store on the Local Machine. This denotes the Windows certificate store to be managed for SQL Server."
-              },
               {
                 "Name": "ADFS Rotation Manager",
                 "ShortName": "WinAdfs",
@@ -488,7 +488,7 @@
                     "DependsOn": "",
                     "DefaultValue": "",
                     "Required": false,
-                    "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
+                    "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
                   },
                   {
                     "Name": "ServerPassword",
@@ -497,7 +497,7 @@
                     "DependsOn": "",
                     "DefaultValue": "",
                     "Required": false,
-                    "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                    "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
                   },
                   {
                     "Name": "ServerUseSsl",
