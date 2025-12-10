@@ -2,6 +2,7 @@
 * Fixed an issue with SSL Flags greater than 3 were not being applied correctly to newer IIS servers.
 * Fixed an issue when formatting private RSA keys when connecting using the ssh protocol.
 * When using ssh protocol in containers, the SQL ACL on private keys was not being updating correctly.  This has been fixed.
+* Updated documentation to indicate that the username and password fields on the Cert Store are automatically added by Command.
 
 2.6.3
 * Fixed re-enrollment or ODKG job when RDN Components contained escaped commas.
