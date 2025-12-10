@@ -32,6 +32,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
     {
+
+
         public string ExtensionName => "WinIISUManagement";
         private ILogger _logger;
 
@@ -92,6 +94,26 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
                 string alias = config.JobCertificate?.Alias?.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
 
+                // Assign the binding information
+                IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
+
+                // Check if the Ssl flags are set correctly
+                if (bindingInfo.Protocol.ToLower() == "https" && string.IsNullOrEmpty(bindingInfo.SniFlag))
+                {
+                    throw new ArgumentException("SniFlag must be set when using HTTPS protocol.  Valid values are 0 (None), 1 (SNI Enabled), or 2 (IP Based).");
+                }
+                else if (bindingInfo.Protocol.ToLower() != "https")
+                {
+                    bindingInfo.SniFlag = "0"; // Set to None if not using HTTPS
+                }
+
+                var (isValid, SslErrorMessage) = bindingInfo.ValidateSslFlags(int.Parse(bindingInfo.SniFlag));
+                if (!isValid)
+                {
+                    throw new ArgumentException($"Invalid SSL Flag Combination: {SslErrorMessage}");
+                }
+
+
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
 
                 _psHelper.Initialize();
@@ -102,6 +124,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     {
                         case CertStoreOperationType.Add:
                             {
+                                _logger.LogTrace($"Beginning the Adding of Certificate process.");
+
                                 string certificateContents = config.JobCertificate.Contents;
                                 string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
@@ -111,7 +135,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 // Add Certificate to Cert Store
                                 try
                                 {
-                                    IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
 
                                     OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
                                     string failureMessage = "";
@@ -265,7 +288,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             }
             finally 
             { 
-                _psHelper.Terminate();
+                if (_psHelper != null) _psHelper.Terminate();
                 _logger.MethodExit(); 
             }
         }

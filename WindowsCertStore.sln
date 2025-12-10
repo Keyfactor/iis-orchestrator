@@ -38,28 +38,12 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WinCertTestConsole", "WinCertTestConsole\WinCertTestConsole.csproj", "{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docsource", "docsource", "{CFCAC7FE-C9E1-4822-A1B5-45F16E62F5FF}"
-	ProjectSection(SolutionItems) = preProject
-		docsource\content.md = docsource\content.md
-		docsource\iisu.md = docsource\iisu.md
-		docsource\wincert.md = docsource\wincert.md
-		docsource\winsql.md = docsource\winsql.md
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{60C10FF8-54FC-4C18-A2EA-F3580ABF0405}"
-	ProjectSection(SolutionItems) = preProject
-		docsource\images\IISU-advanced-store-type-dialog.png = docsource\images\IISU-advanced-store-type-dialog.png
-		docsource\images\IISU-basic-store-type-dialog.png = docsource\images\IISU-basic-store-type-dialog.png
-		docsource\images\IISU-custom-fields-store-type-dialog.png = docsource\images\IISU-custom-fields-store-type-dialog.png
-		docsource\images\IISU-entry-parameters-store-type-dialog.png = docsource\images\IISU-entry-parameters-store-type-dialog.png
-		docsource\images\WinCert-advanced-store-type-dialog.png = docsource\images\WinCert-advanced-store-type-dialog.png
-		docsource\images\WinCert-basic-store-type-dialog.png = docsource\images\WinCert-basic-store-type-dialog.png
-		docsource\images\WinCert-custom-fields-store-type-dialog.png = docsource\images\WinCert-custom-fields-store-type-dialog.png
-		docsource\images\WinCert-entry-parameters-store-type-dialog.png = docsource\images\WinCert-entry-parameters-store-type-dialog.png
-		docsource\images\WinSql-advanced-store-type-dialog.png = docsource\images\WinSql-advanced-store-type-dialog.png
-		docsource\images\WinSql-basic-store-type-dialog.png = docsource\images\WinSql-basic-store-type-dialog.png
-		docsource\images\WinSql-custom-fields-store-type-dialog.png = docsource\images\WinSql-custom-fields-store-type-dialog.png
-		docsource\images\WinSql-entry-parameters-store-type-dialog.png = docsource\images\WinSql-entry-parameters-store-type-dialog.png
-	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsCertStore.IntegrationTests", "WindowsCertStore.IntegrationTests\WindowsCertStore.IntegrationTests.csproj", "{74FDA232-BC6D-428F-BC28-C5BF228F04ED}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WindowsCertStore.UnitTests", "WindowsCertStore.UnitTests\WindowsCertStore.UnitTests.csproj", "{84DD1D36-2D35-4483-836F-98EFC44CA132}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -84,6 +68,22 @@ Global
 		{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D0F4A3CC-5236-4393-9C97-AE55ACE319F2}.Release|x64.ActiveCfg = Release|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Debug|x64.Build.0 = Debug|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Release|x64.ActiveCfg = Release|Any CPU
+		{74FDA232-BC6D-428F-BC28-C5BF228F04ED}.Release|x64.Build.0 = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Debug|x64.Build.0 = Debug|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|Any CPU.Build.0 = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|x64.ActiveCfg = Release|Any CPU
+		{84DD1D36-2D35-4483-836F-98EFC44CA132}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

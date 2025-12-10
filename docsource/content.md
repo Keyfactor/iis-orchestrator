@@ -1,5 +1,6 @@
 ## Overview
 The Windows Certificate Orchestrator Extension is a multi-purpose integration that can remotely manage certificates on a Windows Server's Local Machine Store.  This extension currently manages certificates for the current store types:
+* WinADFS - Rotates the Service-Communications certificate on the primary and secondary AFDS nodes
 * WinCert - Certificates defined by path set for the Certificate Store
 * WinIIS - IIS Bound certificates 
 * WinSQL - Certificates that are bound to the specified SQL Instances
@@ -11,7 +12,7 @@ For a complete list of local machine cert stores you can execute the PowerShell 
 
 The returned list will contain the actual certificate store name to be used when entering store location.
 
-This extension implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
+The ADFS extension performs both Inventory and Management Add jobs.  The other extensions implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
 
 The Keyfactor Universal Orchestrator (UO) and WinCert Extension can be installed on either Windows or Linux operating systems.  A UO service managing certificates on remote servers is considered to be acting as an Orchestrator, while a UO Service managing local certificates on the same server running the service is considered an Agent.  When acting as an Orchestrator, connectivity from the orchestrator server hosting the WinCert extension to the orchestrated server hosting the certificate stores(s) being managed is achieved via either an SSH (for Linux orchestrated servers) or WinRM (for Windows orchestrated servers) connection.  When acting as an agent (Windows only), WinRM may still be used, OR the certificate store can be configured to bypass a WinRM connection and instead directly access the orchestrator server's certificate stores.
 

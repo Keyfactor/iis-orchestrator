@@ -80,7 +80,7 @@
                             "DependsOn": "",
                             "DefaultValue": "",
                             "Required": false,
-                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
+                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'.  (This field is automatically created)"
                         },
                       {
                         "Name": "ServerPassword",
@@ -89,7 +89,7 @@
                         "DependsOn": "",
                         "DefaultValue": "",
                         "Required": false,
-                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
                       },
                         {
                             "Name": "ServerUseSsl",
@@ -116,21 +116,6 @@
                             "DefaultValue": "",
                             "Options": "",
                             "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
-                        },
-                        {
-                            "Name": "SAN",
-                            "DisplayName": "SAN",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": true
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA."
                         }
                     ],
                     "PasswordOptions": {
@@ -187,15 +172,15 @@
                             "Required": true,
                             "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
                         },
-                        {
-                            "Name": "ServerUsername",
-                            "DisplayName": "Server Username",
-                            "Type": "Secret",
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Required": false,
-                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
-                        },
+                      {
+                        "Name": "ServerUsername",
+                        "DisplayName": "Server Username",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+                      },
                       {
                         "Name": "ServerPassword",
                         "DisplayName": "Server Password",
@@ -203,7 +188,7 @@
                         "DependsOn": "",
                         "DefaultValue": "",
                         "Required": false,
-                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
                       },
                         {
                             "Name": "ServerUseSsl",
@@ -320,22 +305,7 @@
                         "DefaultValue": "",
                         "Options": "",
                         "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
-                      },
-                        {
-                            "Name": "SAN",
-                            "DisplayName": "SAN",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": true
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA."
-                        }
+                      }
                     ],
                     "PasswordOptions": {
                         "EntrySupported": false,
@@ -357,11 +327,11 @@
                     "Capability": "WinSql",
                     "LocalStore": false,
                     "SupportedOperations": {
-                        "Add": true,
-                        "Create": false,
-                        "Discovery": false,
-                        "Enrollment": false,
-                        "Remove": true
+                      "Add": true,
+                      "Create": false,
+                      "Discovery": false,
+                      "Enrollment": false,
+                      "Remove": true
                     },
                     "Properties": [
                         {
@@ -373,33 +343,33 @@
                             "Required": false,
                             "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
                         },
-                      {
-                        "Name": "WinRM Protocol",
-                        "DisplayName": "WinRM Protocol",
-                        "Type": "MultipleChoice",
-                        "DependsOn": "",
-                        "DefaultValue": "https,http,ssh",
-                        "Required": true,
-                        "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
-                      },
-                      {
-                        "Name": "WinRM Port",
-                        "DisplayName": "WinRM Port",
-                        "Type": "String",
-                        "DependsOn": "",
-                        "DefaultValue": "5986",
-                        "Required": true,
-                        "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
-                      },
                         {
-                            "Name": "ServerUsername",
-                            "DisplayName": "Server Username",
-                            "Type": "Secret",
+                            "Name": "WinRM Protocol",
+                            "DisplayName": "WinRM Protocol",
+                            "Type": "MultipleChoice",
                             "DependsOn": "",
-                            "DefaultValue": "",
-                            "Required": false,
-                            "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'."
+                            "DefaultValue": "https,http,ssh",
+                            "Required": true,
+                            "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
                         },
+                        {
+                            "Name": "WinRM Port",
+                            "DisplayName": "WinRM Port",
+                            "Type": "String",
+                            "DependsOn": "",
+                            "DefaultValue": "5986",
+                            "Required": true,
+                            "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+                        },
+                      {
+                        "Name": "ServerUsername",
+                        "DisplayName": "Server Username",
+                        "Type": "Secret",
+                        "DependsOn": "",
+                        "DefaultValue": "",
+                        "Required": false,
+                        "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+                      },
                       {
                         "Name": "ServerPassword",
                         "DisplayName": "Server Password",
@@ -407,7 +377,7 @@
                         "DependsOn": "",
                         "DefaultValue": "",
                         "Required": false,
-                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key."
+                        "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
                       },
                         {
                             "Name": "ServerUseSsl",
@@ -441,42 +411,27 @@
                             },
                             "Description": "String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance."
                         },
-                      {
-                        "Name": "ProviderName",
-                        "DisplayName": "Crypto Provider Name",
-                        "Type": "String",
-                        "RequiredWhen": {
-                          "HasPrivateKey": false,
-                          "OnAdd": false,
-                          "OnRemove": false,
-                          "OnReenrollment": false
-                        },
-                        "DependsOn": "",
-                        "DefaultValue": "",
-                        "Options": "",
-                        "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
-                      },
                         {
-                            "Name": "SAN",
-                            "DisplayName": "SAN",
-                            "Type": "String",
-                            "RequiredWhen": {
-                                "HasPrivateKey": false,
-                                "OnAdd": false,
-                                "OnRemove": false,
-                                "OnReenrollment": true
-                            },
-                            "DependsOn": "",
-                            "DefaultValue": "",
-                            "Options": "",
-                            "Description": "String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs."
+                          "Name": "ProviderName",
+                          "DisplayName": "Crypto Provider Name",
+                          "Type": "String",
+                          "RequiredWhen": {
+                              "HasPrivateKey": false,
+                              "OnAdd": false,
+                              "OnRemove": false,
+                              "OnReenrollment": false
+                          },
+                          "DependsOn": "",
+                          "DefaultValue": "",
+                          "Options": "",
+                          "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
                         }
                     ],
                     "PasswordOptions": {
                         "EntrySupported": false,
                         "StoreRequired": false,
                         "Style": "Default"
-                    },
+                      },
                     "StorePathValue": "My",
                     "PrivateKeyAllowed": "Optional",
                     "ServerRequired": true,
@@ -485,7 +440,106 @@
                     "CustomAliasAllowed": "Forbidden",
                     "ClientMachineDescription": "Hostname of the Windows Server containing the SQL Server Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine).",
                     "StorePathDescription": "Fixed string value 'My' indicating the Personal store on the Local Machine. This denotes the Windows certificate store to be managed for SQL Server."
-                }
+                },
+              {
+                "Name": "ADFS Rotation Manager",
+                "ShortName": "WinAdfs",
+                "Capability": "WinAdfs",
+                "LocalStore": false,
+                "SupportedOperations": {
+                  "Add": true,
+                  "Create": false,
+                  "Discovery": false,
+                  "Enrollment": false,
+                  "Remove": false
+                },
+                "Properties": [
+                  {
+                    "Name": "spnwithport",
+                    "DisplayName": "SPN With Port",
+                    "Type": "Bool",
+                    "DependsOn": "",
+                    "DefaultValue": "false",
+                    "Required": false,
+                    "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+                  },
+                  {
+                    "Name": "WinRM Protocol",
+                    "DisplayName": "WinRM Protocol",
+                    "Type": "MultipleChoice",
+                    "DependsOn": "",
+                    "DefaultValue": "https,http,ssh",
+                    "Required": true,
+                    "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
+                  },
+                  {
+                    "Name": "WinRM Port",
+                    "DisplayName": "WinRM Port",
+                    "Type": "String",
+                    "DependsOn": "",
+                    "DefaultValue": "5986",
+                    "Required": true,
+                    "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+                  },
+                  {
+                    "Name": "ServerUsername",
+                    "DisplayName": "Server Username",
+                    "Type": "Secret",
+                    "DependsOn": "",
+                    "DefaultValue": "",
+                    "Required": false,
+                    "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+                  },
+                  {
+                    "Name": "ServerPassword",
+                    "DisplayName": "Server Password",
+                    "Type": "Secret",
+                    "DependsOn": "",
+                    "DefaultValue": "",
+                    "Required": false,
+                    "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
+                  },
+                  {
+                    "Name": "ServerUseSsl",
+                    "DisplayName": "Use SSL",
+                    "Type": "Bool",
+                    "DependsOn": "",
+                    "DefaultValue": "true",
+                    "Required": true,
+                    "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+                  }
+                ],
+                "EntryParameters": [
+                  {
+                    "Name": "ProviderName",
+                    "DisplayName": "Crypto Provider Name",
+                    "Type": "String",
+                    "RequiredWhen": {
+                      "HasPrivateKey": false,
+                      "OnAdd": false,
+                      "OnRemove": false,
+                      "OnReenrollment": false
+                    },
+                    "DependsOn": "",
+                    "DefaultValue": "",
+                    "Options": "",
+                    "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+                  }
+                ],
+                "PasswordOptions": {
+                  "EntrySupported": false,
+                  "StoreRequired": false,
+                  "Style": "Default"
+                },
+                "StorePathValue": "My",
+                "PrivateKeyAllowed": "Required",
+                "ServerRequired": true,
+                "PowerShell": false,
+                "BlueprintAllowed": true,
+                "CustomAliasAllowed": "Forbidden",
+                "ClientMachineDescription": "Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server.",
+                "StorePathDescription": "Fixed string value of 'My' indicating the Personal store on the Local Machine. All ADFS Service-Communications certificates are located in the 'My' personal store by default."
+              }
             ]
         }
     }
