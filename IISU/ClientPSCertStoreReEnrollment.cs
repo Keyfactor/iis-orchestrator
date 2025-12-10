@@ -34,7 +34,7 @@ using System.Numerics;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 {
-    internal class ClientPSCertStoreReEnrollment
+    public class ClientPSCertStoreReEnrollment
     {
         private readonly ILogger _logger;
         private readonly IPAMSecretResolver _resolver;
@@ -43,6 +43,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
         private Collection<PSObject>? _results;
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+
+        // Empty constructor for testing purposes
+        public ClientPSCertStoreReEnrollment()
+        {
+            _logger = LogHandler.GetClassLogger(typeof(ClientPSCertStoreReEnrollment));
+        }
 
         public ClientPSCertStoreReEnrollment(ILogger logger, IPAMSecretResolver resolver)
         {
@@ -65,7 +71,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 var subjectText = config.JobProperties["subjectText"] as string;
                 var providerName = config.JobProperties["ProviderName"] as string;
                 var keyType = config.JobProperties["keyType"] as string;
-                var SAN = config.JobProperties["SAN"] as string;
+
+                // Prior to Version 3.0, SANs were passed using config.JobProperties.
+                // Now they are passed as a config parameter, but we will check both to maintain backward compatibility.
+                // Version 3.0 and greater will default to the new SANs parameter.
+                var SAN = ResolveSANString(config);
 
                 int keySize = 0;
                 if (config.JobProperties["keySize"] is not null && int.TryParse(config.JobProperties["keySize"].ToString(), out int size))
@@ -373,5 +383,40 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
         }
 
+        public string ResolveSANString(ReenrollmentJobConfiguration config)
+        {
+            if (config == null)
+                throw new ArgumentNullException(nameof(config));
+
+            string sourceUsed;
+            string sanValue = string.Empty;
+
+            if (config.SANs != null && config.SANs.Count > 0)
+            {
+                var builder = new SANBuilder(config.SANs);
+                sanValue = builder.BuildSanString();
+                sourceUsed = "config.SANs (preferred)";
+            }
+            else if (config.JobProperties != null &&
+                config.JobProperties.TryGetValue("SAN", out object legacySanValue) &&
+                !string.IsNullOrWhiteSpace(legacySanValue.ToString()))
+            {
+                sanValue = legacySanValue.ToString().Trim();
+                sourceUsed = "config.JobProperties[\"SAN\"] (legacy)";
+            }
+            else
+            {
+                sanValue = string.Empty;
+                sourceUsed = "none (no SANs provided)";
+            }
+
+            _logger.LogTrace($"[SAN Resolver] Source used: {sourceUsed}");
+            if (!string.IsNullOrEmpty(sanValue))
+                _logger.LogTrace($"[SAN Resolver] Value: {sanValue}");
+            else
+                _logger.LogTrace("[SAN Resolver] No SAN values found.");
+
+            return sanValue;
+        }
     }
 }
