@@ -110,7 +110,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             try
             {
                 // JobCertificate
-                managementParser.JobCertificateProperties.Thumbprint = config.JobCertificate.Thumbprint ?? string.Empty;
+                managementParser.JobCertificateProperties.Thumbprint = config.JobCertificate.Thumbprint;
                 managementParser.JobCertificateProperties.Contents = config.JobCertificate.Contents;
                 managementParser.JobCertificateProperties.Alias = config.JobCertificate.Alias;
                 managementParser.JobCertificateProperties.PrivateKeyPassword = "**********";
@@ -140,7 +140,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             inventoryParser.Capability = config.Capability;
 
             // JobProperties
-            JobProperties jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails?.Properties ?? "{}", new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
+            JobProperties jobProperties = JsonConvert.DeserializeObject<JobProperties>(config.CertificateStoreDetails.Properties, new JsonSerializerSettings { DefaultValueHandling = DefaultValueHandling.Populate });
             inventoryParser.JobConfigurationProperties = jobProperties;
 
             // PreviousInventoryItem
