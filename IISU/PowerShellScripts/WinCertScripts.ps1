@@ -455,9 +455,17 @@ function New-KFIISSiteBinding {
             return $removalResult
         }
 
-        # Step 3: Add new binding with SSL certificate
-        Write-Verbose "Adding new binding with SSL certificate"
-        
+        # Step 3: Determine SslFlags supported by Microsoft.Web.Administration
+        if ($SslFlags -gt 3) {
+            Write-Verbose "SslFlags value $SslFlags exceeds managed API range (0–3). Applying reduced flags for creation."
+            $SslFlagsApplied = ($SslFlags -band 3)
+        } else {
+            $SslFlagsApplied = $SslFlags
+        }
+
+        # Step 4: Add the new binding with the reduced flag set
+        Write-Verbose "Adding new binding with SSL certificate (SslFlagsApplied=$SslFlagsApplied)"
+    
         $addParams = @{
             SiteName    = $SiteName
             Protocol    = $Protocol
@@ -471,8 +479,45 @@ function New-KFIISSiteBinding {
         }
     
         $addResult = Add-IISBindingWithSSL @addParams
-        return $addResult
 
+        if ($addResult.Status -eq 'Error') {
+            return $addResult
+        }
+
+        # Step 5: If extended flags, update via appcmd.exe
+        if ($SslFlags -gt 3) {
+            Write-Verbose "Applying full SslFlags=$SslFlags via appcmd"
+
+            $appcmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
+
+            # Escape any single quotes in hostname
+            $safeHostname = $Hostname -replace "'", "''"
+            $bindingInfo = "${IPAddress}:${Port}:${safeHostname}"
+
+            # Quote site name only if it contains spaces
+            if ($SiteName -match '\s') {
+                $siteArg = "/site.name:`"$SiteName`""
+            } else {
+                $siteArg = "/site.name:$SiteName"
+            }
+
+            # Build binding argument for appcmd
+            $bindingArg = "/bindings.[protocol='https',bindingInformation='$bindingInfo'].sslFlags:$SslFlags"
+
+            Write-Verbose "Running appcmd: $appcmd $siteArg $bindingArg"
+            $appcmdOutput = & $appcmd set site $siteArg $bindingArg 2>&1
+            Write-Verbose "appcmd output: $appcmdOutput"
+        
+            #& $appcmd set site $siteArg $bindingArg | Out-Null
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "appcmd failed to set extended SslFlags ($SslFlags) for binding $bindingInfo."
+            } else {
+                Write-Verbose "Successfully updated SslFlags to $SslFlags via appcmd."
+            }
+        }
+
+        return $addResult
     }
     catch {
         $errorMessage = "Unexpected error in New-KFIISSiteBinding: $($_.Exception.Message)"
@@ -1942,6 +1987,15 @@ function Parse-DNSubject {
     # Join components back together (no outer quotes needed since it goes in PowerShell string)
     $subjectString = ($processedComponents -join ',')
     return $subjectString
+}
+
+function Test-ValidSslFlags {
+    param([int]$SslFlags)
+
+    $validBits = 1,2,4,8,32,64,128
+    $invalidBits = $SslFlags -bxor ($SslFlags -band ($validBits | Measure-Object -Sum).Sum)
+
+    return ($invalidBits -eq 0)
 }
 
 # Note: Removed Test-IISBindingConflict function - we now mimic IIS behavior
