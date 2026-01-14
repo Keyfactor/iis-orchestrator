@@ -17,12 +17,12 @@ namespace WindowsCertStore.UnitTests
             // Arrange
             RemoteSettings settings = new RemoteSettings
             {
-                ClientMachineName = "192.168.230.253",
+                ClientMachineName = "{IPAddress}}",
                 Protocol = "http",
                 Port = "5985",
                 IncludePortInSPN = true,
-                ServerUserName = @"ad\administrator",
-                ServerPassword = "@dminP@ssword%"
+                ServerUserName = @"{username}",
+                ServerPassword = "{password}"
             };
 
             // Act

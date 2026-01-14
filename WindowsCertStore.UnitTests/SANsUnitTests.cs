@@ -1,6 +1,5 @@
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore;
 using Keyfactor.Orchestrators.Extensions;
-using System.Security.Permissions;
 
 namespace WindowsCertStore.UnitTests
 {

@@ -87,8 +87,8 @@ namespace WindowsCertStore.IntegrationTests.Factories
             // Define test inputs (machine, username, and password)
             var testCases = new[]
             {
-                    new { Machine = "192.168.230.137", Username = "ad\\administrator", Password = "C:\\Users\\bpokorny\\.ssh\\my_rsa" },
-                    new { Machine = "192.168.230.137", Username = "ad\\administrator", Password = "C:\\Users\\bpokorny\\.ssh\\my_rsa" }
+                    new { Machine = "{IPAddressToClient}", Username = "{username}", Password = "{path_to_.ssh\\my_rsa}" },
+                    new { Machine = "{IUAddressToClient}", Username = "{username}", Password = "{path_to_.ssh\\my_rsa}" }
                 };
 
             foreach (var testCase in testCases)
