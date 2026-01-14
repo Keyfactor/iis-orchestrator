@@ -32,7 +32,7 @@
 ## Overview
 
 The Windows Certificate Orchestrator Extension is a multi-purpose integration that can remotely manage certificates on a Windows Server's Local Machine Store.  This extension currently manages certificates for the current store types:
-* WinADFS - Rotates the Service-Communications certificate on the primary and secondary AFDS nodes
+* WinADFS - Rotates the Service-Communications certificate on the primary and secondary ADFS nodes
 * WinCert - Certificates defined by path set for the Certificate Store
 * WinIIS - IIS Bound certificates 
 * WinSQL - Certificates that are bound to the specified SQL Instances
