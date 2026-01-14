@@ -20,7 +20,7 @@
 #                   Updated the New-KFIISSiteBinding to correctly update the SSL flags
 #                   Added Test-ValidSslFlags to verify the correct bit flag
 # 11/04/25  3.0     Updated Get-KFCertificates to get specific certificate by thumbprint
-
+# 01/14/26  3.0     Released version 3.0.0 with updated function documentation and error handling
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
