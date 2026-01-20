@@ -1,4 +1,4 @@
-﻿# Version 1.4.0
+﻿# Version 1.5.0
 
 # Summary
 # Contains PowerShell functions to execute administration jobs for general Windows certificates, IIS and SQL Server.
@@ -16,6 +16,12 @@
 # 11/21/25          Renamed Set-KFCertificateBinding to Set-KFSQLCertificateBinding
 #                   Fixed the Set-KFSQLCertificateBinding function to correctly bind and set the ACL permissions on the private key when using Windows-to-Windows and SSH-based remote connections.
 #                   Updated the Set-KFSQLCertificateBinding to handle both CNG (modern) and CAPI (legacy) certificate key storage providers when setting ACLs on private keys.
+# 10/08/25  3.0     Updated the Get-KFIISBoundCertificates function to fixed the SSL flag not returning the correct value when reading IIS bindings
+#                   Updated the New-KFIISSiteBinding to correctly update the SSL flags
+#                   Added Test-ValidSslFlags to verify the correct bit flag
+# 11/04/25  3.0     Updated Get-KFCertificates to get specific certificate by thumbprint
+# 01/14/26  3.0     Released version 3.0.0 with updated function documentation and error handling
+# 01/20/26  3.0     Fixed a problem for invalid SSL flags depending on the version of IIS and Windows Server is being used
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
@@ -49,6 +55,7 @@ $InformationPreference = "Continue"
 # 206	Error	WebAdministration module missing
 # 207	Error	IISAdministration module missing
 # 300	Error	Unknown or unhandled exception
+# 400   Error   Invalid Ssl Flag bit combination
 
 function New-ResultObject {
     param(
@@ -73,7 +80,11 @@ function New-ResultObject {
 
 function Get-KFCertificates {
     param (
-        [string]$StoreName = "My"   # Default store name is "My" (Personal)
+        [Parameter(Mandatory = $false)]
+        [string]$StoreName = "My",   # Default store name is "My" (Personal)
+        
+        [Parameter(Mandatory = $false)]
+        [string]$Thumbprint          # Optional: specific certificate thumbprint to retrieve
     )
 
     # Define the store path using the provided StoreName parameter
@@ -86,8 +97,23 @@ function Get-KFCertificates {
         return
     }
 
-    # Retrieve all certificates from the specified store
-    $certificates = Get-ChildItem -Path $storePath
+    # Retrieve certificates from the specified store
+    if ($Thumbprint) {
+        # If thumbprint is provided, retrieve only that specific certificate
+        # Remove any spaces or special characters from the thumbprint for comparison
+        $cleanThumbprint = $Thumbprint -replace '[^a-fA-F0-9]', ''
+        $certificates = Get-ChildItem -Path $storePath | Where-Object { 
+            ($_.Thumbprint -replace '[^a-fA-F0-9]', '') -eq $cleanThumbprint 
+        }
+        
+        if (-not $certificates) {
+            Write-Error "No certificate found with thumbprint '$Thumbprint' in store '$StoreName'."
+            return
+        }
+    } else {
+        # Retrieve all certificates from the specified store
+        $certificates = Get-ChildItem -Path $storePath
+    }
 
     # Initialize an empty array to store certificate information objects
     $certInfoList = @()
@@ -121,86 +147,6 @@ function Get-KFCertificates {
     } else {
         # Write a warning if no certificates were found in the specified store
         Write-Warning "No certificates were found in the store '$StoreName'."
-    }
-}
-
-function Get-KFIISBoundCertificates {
-    $certificates = @()
-    $totalBoundCertificates = 0
-
-    try {
-        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"  #  -AssemblyName "Microsoft.Web.Administration"
-        $serverManager = New-Object Microsoft.Web.Administration.ServerManager
-    } catch {
-        Write-Error "Failed to create ServerManager. IIS might not be installed."
-        return
-    }
-
-    $websites = $serverManager.Sites
-    Write-Information "There were $($websites.Count) websites found."
-
-    foreach ($site in $websites) {
-        $siteName = $site.Name
-        $siteBoundCertificateCount = 0
-
-        foreach ($binding in $site.Bindings) {
-            if ($binding.Protocol -eq 'https' -and $binding.CertificateHash) {
-
-                $certHash = ($binding.CertificateHash | ForEach-Object { $_.ToString("X2") }) -join ""
-
-                $storeName = if ($binding.CertificateStoreName) { $binding.CertificateStoreName } else { "My" }
-
-                try {
-                    $cert = Get-ChildItem -Path "Cert:\LocalMachine\$storeName" | Where-Object {
-                        $_.Thumbprint -eq $certHash
-                    }
-
-                    if (-not $cert) {
-                        Write-Warning "Certificate with thumbprint not found in Cert:\LocalMachine\$storeName"
-                        continue
-                    }
-
-                    $certBase64 = [Convert]::ToBase64String($cert.RawData)
-
-                    $ip, $port, $hostname = $binding.BindingInformation -split ":", 3
-
-                    $certInfo = [PSCustomObject]@{
-                        SiteName           = $siteName
-                        Binding            = $binding.BindingInformation
-                        IPAddress          = $ip
-                        Port               = $port
-                        Hostname           = $hostname
-                        Protocol           = $binding.Protocol
-                        SNI                = ($binding.SslFlags -band 1) -eq 1
-                        ProviderName       = Get-CertificateCSP $cert
-                        SAN                = Get-KFSAN $cert
-                        Certificate        = $cert.Subject
-                        ExpiryDate         = $cert.NotAfter
-                        Issuer             = $cert.Issuer
-                        Thumbprint         = $cert.Thumbprint
-                        HasPrivateKey      = $cert.HasPrivateKey
-                        CertificateBase64  = $certBase64
-                    }
-
-                    $certificates += $certInfo
-                    $siteBoundCertificateCount++
-                    $totalBoundCertificates++
-                } catch {
-                    Write-Warning "Could not retrieve certificate details for hash $certHash in store $storeName."
-                    Write-Warning $_
-                }
-            }
-        }
-
-        Write-Information "Website: $siteName has $siteBoundCertificateCount bindings with certificates."
-    }
-
-    Write-Information "A total of $totalBoundCertificates bindings with valid certificates were found."
-
-    if ($totalBoundCertificates -gt 0) {
-        $certificates | ConvertTo-Json
-    } else {
-        Write-Information "No valid certificates were found bound to websites."
     }
 }
 
@@ -386,7 +332,83 @@ function Remove-KFCertificateFromStore {
     return $isSuccessful
 }
 
-# IIS Functions
+##### IIS Functions
+function Get-KFIISBoundCertificates {
+    $certificates = @()
+    $totalBoundCertificates = 0
+
+    try {
+        Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"  #  -AssemblyName "Microsoft.Web.Administration"
+        $serverManager = New-Object Microsoft.Web.Administration.ServerManager
+    } catch {
+        Write-Error "Failed to create ServerManager. IIS might not be installed."
+        return
+    }
+
+    $websites = $serverManager.Sites
+    Write-Information "There were $($websites.Count) websites found."
+
+    foreach ($site in $websites) {
+        $siteName = $site.Name
+        $siteBoundCertificateCount = 0
+
+        foreach ($binding in $site.Bindings) {
+            if ($binding.Protocol -eq 'https' -and $binding.CertificateHash) {
+                $certHash = ($binding.CertificateHash | ForEach-Object { $_.ToString("X2") }) -join ""
+                $storeName = if ($binding.CertificateStoreName) { $binding.CertificateStoreName } else { "My" }
+
+                try {
+                    $cert = Get-ChildItem -Path "Cert:\LocalMachine\$storeName" | Where-Object {
+                        $_.Thumbprint -eq $certHash
+                    }
+
+                    if (-not $cert) {
+                        Write-Warning "Certificate with thumbprint not found in Cert:\LocalMachine\$storeName"
+                        continue
+                    }
+
+                    $certBase64 = [Convert]::ToBase64String($cert.RawData)
+                    $ip, $port, $hostname = $binding.BindingInformation -split ":", 3
+
+                    $certInfo = [PSCustomObject]@{
+                        SiteName           = $siteName
+                        Binding            = $binding.BindingInformation
+                        IPAddress          = $ip
+                        Port               = $port
+                        Hostname           = $hostname
+                        Protocol           = $binding.Protocol
+                        SNI                = $binding.SslFlags
+                        ProviderName       = Get-CertificateCSP $cert
+                        SAN                = Get-KFSAN $cert
+                        Certificate        = $cert.Subject
+                        ExpiryDate         = $cert.NotAfter
+                        Issuer             = $cert.Issuer
+                        Thumbprint         = $cert.Thumbprint
+                        HasPrivateKey      = $cert.HasPrivateKey
+                        CertificateBase64  = $certBase64
+                    }
+
+                    $certificates += $certInfo
+                    $siteBoundCertificateCount++
+                    $totalBoundCertificates++
+                } catch {
+                    Write-Warning "Could not retrieve certificate details for hash $certHash in store $storeName."
+                    Write-Warning $_
+                }
+            }
+        }
+
+        Write-Information "Website: $siteName has $siteBoundCertificateCount bindings with certificates."
+    }
+
+    Write-Information "A total of $totalBoundCertificates bindings with valid certificates were found."
+
+    if ($totalBoundCertificates -gt 0) {
+        $certificates | ConvertTo-Json
+    } else {
+        Write-Information "No valid certificates were found bound to websites."
+    }
+}
 function New-KFIISSiteBinding {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -416,8 +438,9 @@ function New-KFIISSiteBinding {
     try {
         # Step 1: Perform verifications and get management info
         # Check SslFlags
-        if (-not (Test-ValidSslFlags -SslFlags $SslFlags)) {
-            return New-ResultObject -Status Error 400 -Step "Validation" -ErrorMessage "Invalid SSL Flag bit configuration ($SslFlags)"
+        $sslValidationResult = Test-ValidSslFlags -Flags $SslFlags
+        if (-not $sslValidationResult.IsValid) {
+            return New-ResultObject -Status Error 400 -Step "SSL Validation" -ErrorMessage $sslValidationResult.Message
         }
 
         $managementInfo = Get-IISManagementInfo -SiteName $SiteName
@@ -523,6 +546,7 @@ function Remove-ExistingIISBinding {
 
     try {
         if ($UseIISDrive) {
+            Write-Verbose "Using IIS Drive to remove binding"
             $sitePath = "IIS:\Sites\$SiteName"
             $site = Get-Item $sitePath
             $httpsBindings = $site.Bindings.Collection | Where-Object {
@@ -539,6 +563,7 @@ function Remove-ExistingIISBinding {
             }
         }
         else {
+            Write-Verbose "Using Web Administration assembly to remove binding"
             # ServerManager fallback
             Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
             $iis = New-Object Microsoft.Web.Administration.ServerManager
@@ -551,9 +576,11 @@ function Remove-ExistingIISBinding {
             foreach ($binding in $httpsBindings) {
                 Write-Verbose "Removing binding: $($binding.BindingInformation)"
                 $site.Bindings.Remove($binding)
+                Write-Verbose "Successfully removed binding"
             }
             
             $iis.CommitChanges()
+            Write-Verbose "Committed changes to IIS"
         }
 
         return New-ResultObject -Status Success -Code 0 -Step RemoveBinding -Message "Successfully removed existing bindings"
@@ -668,9 +695,8 @@ function Add-IISBindingWithSSL {
         return New-ResultObject -Status Error -Code 202 -Step AddBinding -ErrorMessage $errorMessage
     }
 }
-#
 
-# May want to replace this function with Remove-ExistingIISBinding in future version
+# May want to replace this function with Remove-ExistingIISBinding in future version, this is currently being called on certificate removal only
 function Remove-KFIISSiteBinding {
     [CmdletBinding()]
     param (
@@ -782,7 +808,7 @@ function Remove-KFIISCertificateIfUnused {
         Write-Error "An error occurred while attempting to delete IIS Certificate: $_"
     }
 }
-
+#####
 
 # Function to get certificate information for a SQL Server instance
 function GET-KFSQLInventory {
@@ -938,7 +964,7 @@ function Set-KFSQLCertificateBinding {
     Switch to restart the SQL Server service after binding
     
     .EXAMPLE
-    Set-KFCertificateBinding -InstanceName "MSSQLSERVER" -NewThumbprint "ABC123..." -RestartService
+    Set-KFSQLCertificateBinding -InstanceName "MSSQLSERVER" -NewThumbprint "ABC123..." -RestartService
     #>
     
     [CmdletBinding()]
@@ -1517,10 +1543,10 @@ function Unbind-KFSqlCertificate {
     }
 
     return $unBindingSuccess
-}
 
 # Example usage:
 # Bind-CertificateToSqlInstance -Thumbprint "123ABC456DEF" -SqlInstanceName "MSSQLSERVER"
+}
 
 function Get-SqlServiceName {
     param (
@@ -1548,12 +1574,13 @@ function Get-SQLServiceUser {
         Write-Error "SQL Server instance '$SQLInstanceName' not found or no service user associated."
         return $null
     }
-}
 
 # Example usage:
 # Get-SQLServiceUser -SQLInstanceName "MSSQLSERVER"
+}
+#####
 
-##### ReEnrollment functions
+##### ReEnrollment (ODKG) functions
 function New-CSREnrollment {
     param (
         [string]$SubjectText,
@@ -1964,14 +1991,151 @@ function Parse-DNSubject {
     return $subjectString
 }
 
-function Test-ValidSslFlags {
-    param([int]$SslFlags)
-
-    $validBits = 1,2,4,8,32,64,128
-    $invalidBits = $SslFlags -bxor ($SslFlags -band ($validBits | Measure-Object -Sum).Sum)
-
-    return ($invalidBits -eq 0)
+#### Functions to test SSL flags
+function Get-ValidSslFlagsForSystem {
+    <#
+    .SYNOPSIS
+    Gets the valid SSL flag bits for the current Windows Server version
+    #>
+    [CmdletBinding()]
+    param()
+    
+    $build = [System.Environment]::OSVersion.Version.Build
+    
+    # Return array of valid flag values based on Windows Server version
+    if ($build -ge 20348) {
+        # Windows Server 2022+ (IIS 10.0.20348+)
+        Write-Verbose "Detected Windows Server 2022 or later (Build: $build)"
+        return @(1, 4, 8, 16, 32, 64)  # Include unknowns for testing
+    }
+    elseif ($build -ge 17763) {
+        # Windows Server 2019 (IIS 10.0.17763)
+        Write-Verbose "Detected Windows Server 2019 (Build: $build)"
+        return @(1, 4, 8)
+    }
+    elseif ($build -ge 14393) {
+        # Windows Server 2016 (IIS 10.0)
+        Write-Verbose "Detected Windows Server 2016 (Build: $build)"
+        return @(1, 4)
+    }
+    else {
+        # Windows Server 2012 R2 and earlier (IIS 8.5)
+        Write-Verbose "Detected Windows Server 2012 R2 or earlier (Build: $build)"
+        return @(1, 2)
+    }
 }
+function Test-ValidSslFlags {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$Flags,
+        
+        [Parameter(Mandatory = $false)]
+        [switch]$ThrowOnError
+    )
+    
+    $build = [System.Environment]::OSVersion.Version.Build
+    $validBits = Get-ValidSslFlagsForSystem
+    
+    # Calculate valid bitmask
+    $validMask = 0
+    foreach ($bit in $validBits) {
+        $validMask = $validMask -bor $bit
+    }
+    
+    # Check for unknown/unsupported bits
+    $unknownBits = $Flags -band (-bnot $validMask)
+    if ($unknownBits -ne 0) {
+        $errorMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) contains unsupported bits " +
+                    "for this Windows Server version (Build: $build): $unknownBits (0x$($unknownBits.ToString('X'))). " +
+                    "Supported flags: $($validBits -join ', ')"
+        
+        if ($ThrowOnError) {
+            throw $errorMsg
+        }
+        else {
+            return [PSCustomObject]@{
+                IsValid = $false
+                ErrorCode = 400
+                Message = $errorMsg
+                WindowsBuild = $build
+                ValidFlags = $validBits
+                InvalidBits = $unknownBits
+            }
+        }
+    }
+    
+    # Check for known invalid combinations
+    $hasSni = ($Flags -band 1) -ne 0
+    $hasCentralCert = ($Flags -band 2) -ne 0
+    
+    if ($hasCentralCert -and -not $hasSni) {
+        $errorMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) is invalid: " +
+                    "CentralCertStore (0x2) requires SNI (0x1) to be enabled."
+        
+        if ($ThrowOnError) {
+            throw $errorMsg
+        }
+        else {
+            return [PSCustomObject]@{
+                IsValid = $false
+                ErrorCode = 400
+                Message = $errorMsg
+                WindowsBuild = $build
+                ValidFlags = $validBits
+                InvalidBits = 0
+            }
+        }
+    }
+    
+    # Validation passed
+    $successMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) is valid for this system (Build: $build)."
+    
+    if ($ThrowOnError) {
+        Write-Verbose $successMsg
+        return $true
+    }
+    else {
+        return [PSCustomObject]@{
+            IsValid = $true
+            ErrorCode = 0
+            Message = $successMsg
+            WindowsBuild = $build
+            ValidFlags = $validBits
+            InvalidBits = 0
+        }
+    }
+}
+function Get-SslFlagDescription {
+    <#
+    .SYNOPSIS
+    Returns a human-readable description of SSL flags
+    
+    .PARAMETER Flags
+    The SSL flags value to describe
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$Flags
+    )
+    
+    $descriptions = @()
+    
+    if (($Flags -band 1) -ne 0) { $descriptions += "SNI (Server Name Indication)" }
+    if (($Flags -band 2) -ne 0) { $descriptions += "CentralCertStore (Centralized Certificate Store)" }
+    if (($Flags -band 4) -ne 0) { $descriptions += "DisableHTTP2 (Disable HTTP/2)" }
+    if (($Flags -band 16) -ne 0) { $descriptions += "DisableQUIC (Disable QUIC/HTTP3)" }
+    if (($Flags -band 32) -ne 0) { $descriptions += "DisableTLS13 (Disable TLS 1.3 over TCP)" }
+    if (($Flags -band 64) -ne 0) { $descriptions += "DisableLegacyTLS (Disable Legacy TLS)" }
+    
+    if ($descriptions.Count -eq 0) {
+        return "None (0x0)"
+    }
+    
+    return ($descriptions -join ", ")
+}
+####
 
 # Note: Removed Test-IISBindingConflict function - we now mimic IIS behavior
 # IIS replaces exact matches and allows multiple hostnames (SNI) on same IP:Port
