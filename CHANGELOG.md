@@ -6,23 +6,23 @@
 * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
 * Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
 * Added SSL Flag validation to make sure the bit flag is correct.  These are the valid bit flags for the version of Windows:
-  * Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5):
+  ### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5):
   * 0	No SNI
   * 1	Use SNI
   * 2	Use Centralized SSL certificate store.
 
-  * Windows Server 2016 (IIS 10.0):
+  ### Windows Server 2016 (IIS 10.0):
   * 0	No SNI
   * 1	Use SNI
   * 4	Disable HTTP/2.
 
-  * Windows Server 2019 (IIS 10.0.17763)
+  ### Windows Server 2019 (IIS 10.0.17763)
   * 0	No SNI
   * 1	Use SNI
   * 4	Disable HTTP/2.
   * 8	Disable OCSP Stapling.
 
-  * Windows Server 2022+ (IIS 10.0.20348+)
+  ### Windows Server 2022+ (IIS 10.0.20348+)
   * 0	No SNI
   * 1	Use SNI
   * 4	Disable HTTP/2.
