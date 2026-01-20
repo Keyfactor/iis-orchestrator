@@ -107,13 +107,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     bindingInfo.SniFlag = "0"; // Set to None if not using HTTPS
                 }
 
-                var (isValid, SslErrorMessage) = bindingInfo.ValidateSslFlags(int.Parse(bindingInfo.SniFlag));
-                if (!isValid)
-                {
-                    throw new ArgumentException($"Invalid SSL Flag Combination: {SslErrorMessage}");
-                }
-
-
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
 
                 _psHelper.Initialize();

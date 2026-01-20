@@ -21,6 +21,7 @@
 #                   Added Test-ValidSslFlags to verify the correct bit flag
 # 11/04/25  3.0     Updated Get-KFCertificates to get specific certificate by thumbprint
 # 01/14/26  3.0     Released version 3.0.0 with updated function documentation and error handling
+# 01/20/26  3.0     Fixed a problem for invalid SSL flags depending on the version of IIS and Windows Server is being used
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
@@ -437,8 +438,9 @@ function New-KFIISSiteBinding {
     try {
         # Step 1: Perform verifications and get management info
         # Check SslFlags
-        if (-not (Test-ValidSslFlags -SslFlags $SslFlags)) {
-            return New-ResultObject -Status Error 400 -Step "Validation" -ErrorMessage "Invalid SSL Flag bit configuration ($SslFlags)"
+        $sslValidationResult = Test-ValidSslFlags -Flags $SslFlags
+        if (-not $sslValidationResult.IsValid) {
+            return New-ResultObject -Status Error 400 -Step "SSL Validation" -ErrorMessage $sslValidationResult.Message
         }
 
         $managementInfo = Get-IISManagementInfo -SiteName $SiteName
@@ -1989,14 +1991,151 @@ function Parse-DNSubject {
     return $subjectString
 }
 
-function Test-ValidSslFlags {
-    param([int]$SslFlags)
-
-    $validBits = 1,2,4,8,32,64,128
-    $invalidBits = $SslFlags -bxor ($SslFlags -band ($validBits | Measure-Object -Sum).Sum)
-
-    return ($invalidBits -eq 0)
+#### Functions to test SSL flags
+function Get-ValidSslFlagsForSystem {
+    <#
+    .SYNOPSIS
+    Gets the valid SSL flag bits for the current Windows Server version
+    #>
+    [CmdletBinding()]
+    param()
+    
+    $build = [System.Environment]::OSVersion.Version.Build
+    
+    # Return array of valid flag values based on Windows Server version
+    if ($build -ge 20348) {
+        # Windows Server 2022+ (IIS 10.0.20348+)
+        Write-Verbose "Detected Windows Server 2022 or later (Build: $build)"
+        return @(1, 4, 8, 16, 32, 64)  # Include unknowns for testing
+    }
+    elseif ($build -ge 17763) {
+        # Windows Server 2019 (IIS 10.0.17763)
+        Write-Verbose "Detected Windows Server 2019 (Build: $build)"
+        return @(1, 4, 8)
+    }
+    elseif ($build -ge 14393) {
+        # Windows Server 2016 (IIS 10.0)
+        Write-Verbose "Detected Windows Server 2016 (Build: $build)"
+        return @(1, 4)
+    }
+    else {
+        # Windows Server 2012 R2 and earlier (IIS 8.5)
+        Write-Verbose "Detected Windows Server 2012 R2 or earlier (Build: $build)"
+        return @(1, 2)
+    }
 }
+function Test-ValidSslFlags {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$Flags,
+        
+        [Parameter(Mandatory = $false)]
+        [switch]$ThrowOnError
+    )
+    
+    $build = [System.Environment]::OSVersion.Version.Build
+    $validBits = Get-ValidSslFlagsForSystem
+    
+    # Calculate valid bitmask
+    $validMask = 0
+    foreach ($bit in $validBits) {
+        $validMask = $validMask -bor $bit
+    }
+    
+    # Check for unknown/unsupported bits
+    $unknownBits = $Flags -band (-bnot $validMask)
+    if ($unknownBits -ne 0) {
+        $errorMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) contains unsupported bits " +
+                    "for this Windows Server version (Build: $build): $unknownBits (0x$($unknownBits.ToString('X'))). " +
+                    "Supported flags: $($validBits -join ', ')"
+        
+        if ($ThrowOnError) {
+            throw $errorMsg
+        }
+        else {
+            return [PSCustomObject]@{
+                IsValid = $false
+                ErrorCode = 400
+                Message = $errorMsg
+                WindowsBuild = $build
+                ValidFlags = $validBits
+                InvalidBits = $unknownBits
+            }
+        }
+    }
+    
+    # Check for known invalid combinations
+    $hasSni = ($Flags -band 1) -ne 0
+    $hasCentralCert = ($Flags -band 2) -ne 0
+    
+    if ($hasCentralCert -and -not $hasSni) {
+        $errorMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) is invalid: " +
+                    "CentralCertStore (0x2) requires SNI (0x1) to be enabled."
+        
+        if ($ThrowOnError) {
+            throw $errorMsg
+        }
+        else {
+            return [PSCustomObject]@{
+                IsValid = $false
+                ErrorCode = 400
+                Message = $errorMsg
+                WindowsBuild = $build
+                ValidFlags = $validBits
+                InvalidBits = 0
+            }
+        }
+    }
+    
+    # Validation passed
+    $successMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) is valid for this system (Build: $build)."
+    
+    if ($ThrowOnError) {
+        Write-Verbose $successMsg
+        return $true
+    }
+    else {
+        return [PSCustomObject]@{
+            IsValid = $true
+            ErrorCode = 0
+            Message = $successMsg
+            WindowsBuild = $build
+            ValidFlags = $validBits
+            InvalidBits = 0
+        }
+    }
+}
+function Get-SslFlagDescription {
+    <#
+    .SYNOPSIS
+    Returns a human-readable description of SSL flags
+    
+    .PARAMETER Flags
+    The SSL flags value to describe
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$Flags
+    )
+    
+    $descriptions = @()
+    
+    if (($Flags -band 1) -ne 0) { $descriptions += "SNI (Server Name Indication)" }
+    if (($Flags -band 2) -ne 0) { $descriptions += "CentralCertStore (Centralized Certificate Store)" }
+    if (($Flags -band 4) -ne 0) { $descriptions += "DisableHTTP2 (Disable HTTP/2)" }
+    if (($Flags -band 16) -ne 0) { $descriptions += "DisableQUIC (Disable QUIC/HTTP3)" }
+    if (($Flags -band 32) -ne 0) { $descriptions += "DisableTLS13 (Disable TLS 1.3 over TCP)" }
+    if (($Flags -band 64) -ne 0) { $descriptions += "DisableLegacyTLS (Disable Legacy TLS)" }
+    
+    if ($descriptions.Count -eq 0) {
+        return "None (0x0)"
+    }
+    
+    return ($descriptions -join ", ")
+}
+####
 
 # Note: Removed Test-IISBindingConflict function - we now mimic IIS behavior
 # IIS replaces exact matches and allows multiple hostnames (SNI) on same IP:Port
