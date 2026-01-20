@@ -97,16 +97,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 // Assign the binding information
                 IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
 
-                // Check if the Ssl flags are set correctly
-                if (bindingInfo.Protocol.ToLower() == "https" && string.IsNullOrEmpty(bindingInfo.SniFlag))
-                {
-                    throw new ArgumentException("SniFlag must be set when using HTTPS protocol.  Valid values are 0 (None), 1 (SNI Enabled), or 2 (IP Based).");
-                }
-                else if (bindingInfo.Protocol.ToLower() != "https")
-                {
-                    bindingInfo.SniFlag = "0"; // Set to None if not using HTTPS
-                }
-
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
 
                 _psHelper.Initialize();
