@@ -36,6 +36,14 @@
       "CertStores.WinSql.ReEnrollment": {
         "assemblypath": "WindowsCertStore.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql.ReEnrollment"
+      },
+      "CertStores.WinAdfs.Inventory": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs.Inventory"
+      },
+      "CertStores.WinAdfs.Management": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs.Management"
       }
     }
   }
