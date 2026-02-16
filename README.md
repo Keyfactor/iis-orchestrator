@@ -288,6 +288,7 @@ the Keyfactor Command Portal
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
    ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-dialog.png)
+   ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-validation-options-dialog.png)
 
 
 
@@ -295,6 +296,7 @@ the Keyfactor Command Portal
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
    ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-dialog.png)
+   ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-validation-options-dialog.png)
 
 
 
@@ -302,6 +304,7 @@ the Keyfactor Command Portal
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
    ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-dialog.png)
+   ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-validation-options-dialog.png)
 
 
 
@@ -329,6 +332,7 @@ the Keyfactor Command Portal
    Determine whether the server uses SSL or not (This field is automatically created)
 
    ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-dialog.png)
+   ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-validation-options-dialog.png)
 
 
 
@@ -349,6 +353,7 @@ the Keyfactor Command Portal
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
    ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName.png)
+   ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
 
@@ -360,53 +365,7 @@ the Keyfactor Command Portal
 <details><summary>Click to expand details</summary>
 
 
-The IIS Bound Certificate Store Type, identified by its short name 'IISU,' is designed for the management of certificates bound to IIS (Internet Information Services) servers. This store type allows users to automate and streamline the process of adding, removing, and reenrolling certificates for IIS sites, making it significantly easier to manage web server certificates.
-
-#### Key Features and Representation
-
-The IISU store type represents the IIS servers and their certificate bindings. It specifically caters to managing SSL/TLS certificates tied to IIS websites, allowing bind operations such as specifying site names, IP addresses, ports, and enabling Server Name Indication (SNI). By default, it supports job types like Inventory, Add, Remove, and Reenrollment, thereby offering comprehensive management capabilities for IIS certificates.
-
-#### Understanding SSL Flags
-
-When binding certificates to IIS sites, certain SSL flags can be configured to modify the behavior of the SSL bindings. Depending on what version of Windows Server and IIS, these are the following flags are available:
-
-######### Windows Server 2016 (IIS 10.0):  #### Windows Server 2016 (IIS 10.0)
-
-  * 0    No SNI
-  * 1    Use SNI
-  * 4    Disable HTTP/2.
-
-##### Windows Server 2019 (IIS 10.0.17763)
-
-  * 0    No SNI
-  * 1    Use SNI
-  * 4    Disable HTTP/2.
-  * 8    Disable OCSP Stapling.
-
-##### Windows Server 2022+ (IIS 10.0.20348+)
-
-  * 0    No SNI
-  * 1    Use SNI
-  * 4    Disable HTTP/2.
-  * 8    Disable OCSP Stapling.
-  * 16    Disable QUIC.
-  * 32    Disable TLS 1.3 over TCP.
-  * 64    Disable Legacy TLS.
-
-The SSL bitwise flags can be combined by adding their values together. For example, to enable SNI and disable HTTP/2, you would set the SSL Flags to 5 (1 + 4).
-
-<b>Note:</B> SSL Flag 2 - Centralized Certificate Storage, is currently not supported.<br>
-Using this flag will result in an error message and the job not being completed successfully.
-
-#### Limitations and Areas of Confusion
-
-* **Caveats:** It's important to ensure that the Windows Remote Management (WinRM) is properly configured on the target server. The orchestrator relies on WinRM to perform its tasks, such as manipulating the Windows Certificate Stores. Misconfiguration of WinRM may lead to connection and permission issues.
-<br><br>When performing <b>Inventory</b>, all bound certificates <i>regardless</i> to their store location will be returned.
-<br><br>When executing an Add or Renew Management job, the Store Location will be considered and place the certificate in that location.
-
-* **Limitations:** Users should be aware that for this store type to function correctly, certain permissions are necessary. While some advanced users successfully use non-administrator accounts with specific permissions, it is officially supported only with Local Administrator permissions. Complexities with interactions between Group Policy, WinRM, User Account Control, and other environmental factors may impede operations if not properly configured.
-
-* **Custom Alias and Private Keys:** The store type does not support custom aliases for individual entries and requires private keys because IIS certificates without private keys would be invalid.
+TODO Overview is a required section
 
 
 
@@ -507,6 +466,7 @@ the Keyfactor Command Portal
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
    ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-dialog.png)
+   ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-validation-options-dialog.png)
 
 
 
@@ -514,6 +474,7 @@ the Keyfactor Command Portal
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
    ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-dialog.png)
+   ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-validation-options-dialog.png)
 
 
 
@@ -521,6 +482,7 @@ the Keyfactor Command Portal
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
    ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-dialog.png)
+   ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-validation-options-dialog.png)
 
 
 
@@ -548,6 +510,7 @@ the Keyfactor Command Portal
    Determine whether the server uses SSL or not (This field is automatically created)
 
    ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-dialog.png)
+   ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-validation-options-dialog.png)
 
 
 
@@ -574,42 +537,49 @@ the Keyfactor Command Portal
    String value specifying the IP port to bind the certificate to for the IIS site. Example: '443' for HTTPS.
 
    ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port.png)
+   ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port-validation-options.png)
 
 
    ##### IP Address
    String value specifying the IP address to bind the certificate to for the IIS site. Example: '*' for all IP addresses or '192.168.1.1' for a specific IP address.
 
    ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress.png)
+   ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress-validation-options.png)
 
 
    ##### Host Name
    String value specifying the host name (host header) to bind the certificate to for the IIS site. Leave blank for all host names or enter a specific hostname such as 'www.example.com'.
 
    ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName.png)
+   ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName-validation-options.png)
 
 
    ##### IIS Site Name
    String value specifying the name of the IIS web site to bind the certificate to. Example: 'Default Web Site' or any custom site name such as 'MyWebsite'.
 
    ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName.png)
+   ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName-validation-options.png)
 
 
    ##### SSL Flags
    A 128-Bit Flag that determines what type of SSL settings you wish to use.  The default is 0, meaning No SNI.  For more information, check IIS documentation for the appropriate bit setting.)
 
    ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag.png)
+   ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag-validation-options.png)
 
 
    ##### Protocol
    Multiple choice value specifying the protocol to bind to. Example: 'https' for secure communication.
 
    ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol.png)
+   ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol-validation-options.png)
 
 
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
    ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName.png)
+   ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
 
@@ -729,6 +699,7 @@ the Keyfactor Command Portal
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
    ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-dialog.png)
+   ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-validation-options-dialog.png)
 
 
 
@@ -736,6 +707,7 @@ the Keyfactor Command Portal
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
    ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-dialog.png)
+   ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-validation-options-dialog.png)
 
 
 
@@ -743,6 +715,7 @@ the Keyfactor Command Portal
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
    ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-dialog.png)
+   ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-validation-options-dialog.png)
 
 
 
@@ -770,6 +743,7 @@ the Keyfactor Command Portal
    Determine whether the server uses SSL or not (This field is automatically created)
 
    ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-dialog.png)
+   ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-validation-options-dialog.png)
 
 
 
@@ -777,6 +751,7 @@ the Keyfactor Command Portal
    Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation.
 
    ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-dialog.png)
+   ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-validation-options-dialog.png)
 
 
 
@@ -798,12 +773,14 @@ the Keyfactor Command Portal
    String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance.
 
    ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName.png)
+   ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName-validation-options.png)
 
 
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
    ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName.png)
+   ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
 
@@ -924,6 +901,7 @@ the Keyfactor Command Portal
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
    ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-dialog.png)
+   ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-validation-options-dialog.png)
 
 
 
@@ -931,6 +909,7 @@ the Keyfactor Command Portal
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
    ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-dialog.png)
+   ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-validation-options-dialog.png)
 
 
 
@@ -938,6 +917,7 @@ the Keyfactor Command Portal
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
    ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-dialog.png)
+   ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-validation-options-dialog.png)
 
 
 
@@ -965,6 +945,7 @@ the Keyfactor Command Portal
    Determine whether the server uses SSL or not (This field is automatically created)
 
    ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-dialog.png)
+   ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-validation-options-dialog.png)
 
 
 
@@ -985,6 +966,7 @@ the Keyfactor Command Portal
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
    ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName.png)
+   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
 
