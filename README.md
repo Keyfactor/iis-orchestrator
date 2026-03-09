@@ -32,6 +32,7 @@
 ## Overview
 
 The Windows Certificate Orchestrator Extension is a multi-purpose integration that can remotely manage certificates on a Windows Server's Local Machine Store.  This extension currently manages certificates for the current store types:
+* WinADFS - Rotates the Service-Communications certificate on the primary and secondary ADFS nodes
 * WinCert - Certificates defined by path set for the Certificate Store
 * WinIIS - IIS Bound certificates 
 * WinSQL - Certificates that are bound to the specified SQL Instances
@@ -43,7 +44,7 @@ For a complete list of local machine cert stores you can execute the PowerShell 
 
 The returned list will contain the actual certificate store name to be used when entering store location.
 
-This extension implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
+The ADFS extension performs both Inventory and Management Add jobs.  The other extensions implements four job types:  Inventory, Management Add/Remove, and Reenrollment.
 
 The Keyfactor Universal Orchestrator (UO) and WinCert Extension can be installed on either Windows or Linux operating systems.  A UO service managing certificates on remote servers is considered to be acting as an Orchestrator, while a UO Service managing local certificates on the same server running the service is considered an Agent.  When acting as an Orchestrator, connectivity from the orchestrator server hosting the WinCert extension to the orchestrated server hosting the certificate stores(s) being managed is achieved via either an SSH (for Linux orchestrated servers) or WinRM (for Windows orchestrated servers) connection.  When acting as an agent (Windows only), WinRM may still be used, OR the certificate store can be configured to bypass a WinRM connection and instead directly access the orchestrator server's certificate stores.
 
@@ -68,13 +69,15 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note: If Looking to use GMSA Accounts to run the Service Keyfactor Command 10.2 or greater is required for No Value checkbox to work**
 
-The Windows Certificate Universal Orchestrator extension implements 3 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
+The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
 
 - [Windows Certificate](#WinCert)
 
 - [IIS Bound Certificate](#IISU)
 
 - [WinSql](#WinSql)
+
+- [ADFS Rotation Manager](#WinAdfs)
 
 
 ## Compatibility
@@ -167,7 +170,7 @@ Below is a brief summary of the CSPs and their support for RSA and ECC algorithm
 
 To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your use-case. This only needs to happen _once_ per Keyfactor Command instance.
 
-The Windows Certificate Universal Orchestrator extension implements 3 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types.
+The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types.
 
 ### WinCert
 
@@ -285,6 +288,7 @@ the Keyfactor Command Portal
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
    ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-dialog.png)
+   ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-validation-options-dialog.png)
 
 
 
@@ -292,6 +296,7 @@ the Keyfactor Command Portal
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
    ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-dialog.png)
+   ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-validation-options-dialog.png)
 
 
 
@@ -299,6 +304,7 @@ the Keyfactor Command Portal
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
    ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-dialog.png)
+   ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-validation-options-dialog.png)
 
 
 
@@ -326,6 +332,7 @@ the Keyfactor Command Portal
    Determine whether the server uses SSL or not (This field is automatically created)
 
    ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-dialog.png)
+   ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-validation-options-dialog.png)
 
 
 
@@ -336,7 +343,6 @@ the Keyfactor Command Portal
    | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
    | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
-   | SAN | SAN | String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | ✅ Checked |
 
    The Entry Parameters tab should look like this:
 
@@ -347,12 +353,7 @@ the Keyfactor Command Portal
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
    ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName.png)
-
-
-   ##### SAN
-   String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA.
-
-   ![WinCert Entry Parameter - SAN](docsource/images/WinCert-entry-parameters-store-type-dialog-SAN.png)
+   ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
 
@@ -364,21 +365,7 @@ the Keyfactor Command Portal
 <details><summary>Click to expand details</summary>
 
 
-The IIS Bound Certificate Store Type, identified by its short name 'IISU,' is designed for the management of certificates bound to IIS (Internet Information Services) servers. This store type allows users to automate and streamline the process of adding, removing, and reenrolling certificates for IIS sites, making it significantly easier to manage web server certificates.
-
-#### Key Features and Representation
-
-The IISU store type represents the IIS servers and their certificate bindings. It specifically caters to managing SSL/TLS certificates tied to IIS websites, allowing bind operations such as specifying site names, IP addresses, ports, and enabling Server Name Indication (SNI). By default, it supports job types like Inventory, Add, Remove, and Reenrollment, thereby offering comprehensive management capabilities for IIS certificates.
-
-#### Limitations and Areas of Confusion
-
-- **Caveats:** It's important to ensure that the Windows Remote Management (WinRM) is properly configured on the target server. The orchestrator relies on WinRM to perform its tasks, such as manipulating the Windows Certificate Stores. Misconfiguration of WinRM may lead to connection and permission issues.
-<br><br>When performing <b>Inventory</b>, all bound certificates <i>regardless</i> to their store location will be returned.
-<br><br>When executing an Add or Renew Management job, the Store Location will be considered and place the certificate in that location.
-
-- **Limitations:** Users should be aware that for this store type to function correctly, certain permissions are necessary. While some advanced users successfully use non-administrator accounts with specific permissions, it is officially supported only with Local Administrator permissions. Complexities with interactions between Group Policy, WinRM, User Account Control, and other environmental factors may impede operations if not properly configured.
-
-- **Custom Alias and Private Keys:** The store type does not support custom aliases for individual entries and requires private keys because IIS certificates without private keys would be invalid.
+TODO Overview is a required section
 
 
 
@@ -479,6 +466,7 @@ the Keyfactor Command Portal
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
    ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-dialog.png)
+   ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-validation-options-dialog.png)
 
 
 
@@ -486,6 +474,7 @@ the Keyfactor Command Portal
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
    ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-dialog.png)
+   ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-validation-options-dialog.png)
 
 
 
@@ -493,6 +482,7 @@ the Keyfactor Command Portal
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
    ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-dialog.png)
+   ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-validation-options-dialog.png)
 
 
 
@@ -520,6 +510,7 @@ the Keyfactor Command Portal
    Determine whether the server uses SSL or not (This field is automatically created)
 
    ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-dialog.png)
+   ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-validation-options-dialog.png)
 
 
 
@@ -536,7 +527,6 @@ the Keyfactor Command Portal
    | SniFlag | SSL Flags | A 128-Bit Flag that determines what type of SSL settings you wish to use.  The default is 0, meaning No SNI.  For more information, check IIS documentation for the appropriate bit setting.) | String | 0 | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
    | Protocol | Protocol | Multiple choice value specifying the protocol to bind to. Example: 'https' for secure communication. | MultipleChoice | https | 🔲 Unchecked | ✅ Checked | ✅ Checked | ✅ Checked |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
-   | SAN | SAN | String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | ✅ Checked |
 
    The Entry Parameters tab should look like this:
 
@@ -547,48 +537,49 @@ the Keyfactor Command Portal
    String value specifying the IP port to bind the certificate to for the IIS site. Example: '443' for HTTPS.
 
    ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port.png)
+   ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port-validation-options.png)
 
 
    ##### IP Address
    String value specifying the IP address to bind the certificate to for the IIS site. Example: '*' for all IP addresses or '192.168.1.1' for a specific IP address.
 
    ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress.png)
+   ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress-validation-options.png)
 
 
    ##### Host Name
    String value specifying the host name (host header) to bind the certificate to for the IIS site. Leave blank for all host names or enter a specific hostname such as 'www.example.com'.
 
    ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName.png)
+   ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName-validation-options.png)
 
 
    ##### IIS Site Name
    String value specifying the name of the IIS web site to bind the certificate to. Example: 'Default Web Site' or any custom site name such as 'MyWebsite'.
 
    ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName.png)
+   ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName-validation-options.png)
 
 
    ##### SSL Flags
    A 128-Bit Flag that determines what type of SSL settings you wish to use.  The default is 0, meaning No SNI.  For more information, check IIS documentation for the appropriate bit setting.)
 
    ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag.png)
+   ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag-validation-options.png)
 
 
    ##### Protocol
    Multiple choice value specifying the protocol to bind to. Example: 'https' for secure communication.
 
    ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol.png)
+   ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol-validation-options.png)
 
 
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
    ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName.png)
-
-
-   ##### SAN
-   String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. Can be made optional if RFC 2818 is disabled on the CA.
-
-   ![IISU Entry Parameter - SAN](docsource/images/IISU-entry-parameters-store-type-dialog-SAN.png)
+   ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
 
@@ -708,6 +699,7 @@ the Keyfactor Command Portal
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
    ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-dialog.png)
+   ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-validation-options-dialog.png)
 
 
 
@@ -715,6 +707,7 @@ the Keyfactor Command Portal
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
    ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-dialog.png)
+   ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-validation-options-dialog.png)
 
 
 
@@ -722,6 +715,7 @@ the Keyfactor Command Portal
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
    ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-dialog.png)
+   ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-validation-options-dialog.png)
 
 
 
@@ -749,6 +743,7 @@ the Keyfactor Command Portal
    Determine whether the server uses SSL or not (This field is automatically created)
 
    ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-dialog.png)
+   ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-validation-options-dialog.png)
 
 
 
@@ -756,6 +751,7 @@ the Keyfactor Command Portal
    Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation.
 
    ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-dialog.png)
+   ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-validation-options-dialog.png)
 
 
 
@@ -767,7 +763,6 @@ the Keyfactor Command Portal
    | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
    | InstanceName | Instance Name | String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
-   | SAN | SAN | String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | ✅ Checked |
 
    The Entry Parameters tab should look like this:
 
@@ -778,18 +773,200 @@ the Keyfactor Command Portal
    String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance.
 
    ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName.png)
+   ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName-validation-options.png)
 
 
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
    ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName.png)
+   ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
-   ##### SAN
-   String value specifying the Subject Alternative Name (SAN) to be used when performing reenrollment jobs. Format as a list of <san_type>=<san_value> entries separated by ampersands; Example: 'dns=www.example.com&dns=www.example2.com' for multiple SANs.
 
-   ![WinSql Entry Parameter - SAN](docsource/images/WinSql-entry-parameters-store-type-dialog-SAN.png)
+   </details>
+</details>
+
+### WinAdfs
+
+<details><summary>Click to expand details</summary>
+
+
+WinADFS is a store type designed for managing certificates within Microsoft Active Directory Federation Services (ADFS) environments. This store type enables users to automate the management of certificates used for securing ADFS communications, including tasks such as adding, removing, and renewing certificates associated with ADFS services.
+* NOTE: Only the Service-Communications certificate is currently supported.  Follow your ADFS best practices for token encrypt and decrypt certificate management.
+* NOTE: This extension also supports the auto-removal of expired certificates from the ADFS stores on the Primary and Secondary nodes during the certificate rotation process, along with restarting the ADFS service to apply changes.
+
+
+
+
+#### ADFS Rotation Manager Requirements
+
+When using WinADFS, the Universal Orchestrator must act as an agent and be installed on the Primary ADFS server within the ADFS farm. This is necessary because ADFS configurations and certificate management operations must be performed directly on the ADFS server itself to ensure proper functionality and security.
+
+
+
+#### Supported Operations
+
+| Operation    | Is Supported                                                                                                           |
+|--------------|------------------------------------------------------------------------------------------------------------------------|
+| Add          | ✅ Checked        |
+| Remove       | 🔲 Unchecked     |
+| Discovery    | 🔲 Unchecked  |
+| Reenrollment | 🔲 Unchecked |
+| Create       | 🔲 Unchecked     |
+
+#### Store Type Creation
+
+##### Using kfutil:
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
+For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+   <details><summary>Click to expand WinAdfs kfutil details</summary>
+
+   ##### Using online definition from GitHub:
+   This will reach out to GitHub and pull the latest store-type definition
+   ```shell
+   # ADFS Rotation Manager
+   kfutil store-types create WinAdfs
+   ```
+
+   ##### Offline creation using integration-manifest file:
+   If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+   You would first download the [integration-manifest.json](./integration-manifest.json) and then run the following command
+   in your offline environment.
+   ```shell
+   kfutil store-types create --from-file integration-manifest.json
+   ```
+   </details>
+
+
+#### Manual Creation
+Below are instructions on how to create the WinAdfs store type manually in
+the Keyfactor Command Portal
+   <details><summary>Click to expand manual WinAdfs details</summary>
+
+   Create a store type called `WinAdfs` with the attributes in the tables below:
+
+   ##### Basic Tab
+   | Attribute | Value | Description |
+   | --------- | ----- | ----- |
+   | Name | ADFS Rotation Manager | Display name for the store type (may be customized) |
+   | Short Name | WinAdfs | Short display name for the store type |
+   | Capability | WinAdfs | Store type name orchestrator will register with. Check the box to allow entry of value |
+   | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
+   | Supports Remove | 🔲 Unchecked |  Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | 🔲 Unchecked |  Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | 🔲 Unchecked |  Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
+   | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
+   | Blueprint Allowed | ✅ Checked | Determines if store type may be included in an Orchestrator blueprint |
+   | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
+   | Requires Store Password | 🔲 Unchecked | Enables users to optionally specify a store password when defining a Certificate Store. |
+   | Supports Entry Password | 🔲 Unchecked | Determines if an individual entry within a store can have a password. |
+
+   The Basic tab should look like this:
+
+   ![WinAdfs Basic Tab](docsource/images/WinAdfs-basic-store-type-dialog.png)
+
+   ##### Advanced Tab
+   | Attribute | Value | Description |
+   | --------- | ----- | ----- |
+   | Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias. |
+   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
+   | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
+
+   The Advanced tab should look like this:
+
+   ![WinAdfs Advanced Tab](docsource/images/WinAdfs-advanced-store-type-dialog.png)
+
+   > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
+
+   ##### Custom Fields Tab
+   Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed. The following custom fields should be added to the store type:
+
+   | Name | Display Name | Description | Type | Default Value/Options | Required |
+   | ---- | ------------ | ---- | --------------------- | -------- | ----------- |
+   | spnwithport | SPN With Port | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. | Bool | false | 🔲 Unchecked |
+   | WinRM Protocol | WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. | MultipleChoice | https,http,ssh | ✅ Checked |
+   | WinRM Port | WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. | String | 5986 | ✅ Checked |
+   | ServerUsername | Server Username | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) | Secret |  | 🔲 Unchecked |
+   | ServerPassword | Server Password | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) | Secret |  | 🔲 Unchecked |
+   | ServerUseSsl | Use SSL | Determine whether the server uses SSL or not (This field is automatically created) | Bool | true | ✅ Checked |
+
+   The Custom Fields tab should look like this:
+
+   ![WinAdfs Custom Fields Tab](docsource/images/WinAdfs-custom-fields-store-type-dialog.png)
+
+
+   ###### SPN With Port
+   Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+
+   ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-dialog.png)
+   ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-validation-options-dialog.png)
+
+
+
+   ###### WinRM Protocol
+   Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
+
+   ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-dialog.png)
+   ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-validation-options-dialog.png)
+
+
+
+   ###### WinRM Port
+   String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
+
+   ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-dialog.png)
+   ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-validation-options-dialog.png)
+
+
+
+   ###### Server Username
+   Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created)
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+
+
+   ###### Server Password
+   Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+
+
+   ###### Use SSL
+   Determine whether the server uses SSL or not (This field is automatically created)
+
+   ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-dialog.png)
+   ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-validation-options-dialog.png)
+
+
+
+
+
+   ##### Entry Parameters Tab
+
+   | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
+   | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
+   | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+
+   The Entry Parameters tab should look like this:
+
+   ![WinAdfs Entry Parameters Tab](docsource/images/WinAdfs-entry-parameters-store-type-dialog.png)
+
+
+   ##### Crypto Provider Name
+   Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
+
+   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName.png)
+   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
 
 
 
@@ -844,7 +1021,7 @@ the Keyfactor Command Portal
 
 ## Defining Certificate Stores
 
-The Windows Certificate Universal Orchestrator extension implements 3 Certificate Store Types, each of which implements different functionality. Refer to the individual instructions below for each Certificate Store Type that you deemed necessary for your use case from the installation section.
+The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types, each of which implements different functionality. Refer to the individual instructions below for each Certificate Store Type that you deemed necessary for your use case from the installation section.
 
 <details><summary>Windows Certificate (WinCert)</summary>
 
@@ -1098,6 +1275,100 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
     ```shell
     kfutil stores import csv --store-type-name WinSql --file WinSql.csv
+    ```
+
+</details>
+
+
+#### PAM Provider Eligible Fields
+<details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
+
+If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+
+Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
+> Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
+
+</details>
+
+
+> The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+
+</details>
+
+<details><summary>ADFS Rotation Manager (WinAdfs)</summary>
+
+When creating a Certificate Store for WinADFS, the Client Machine name must be set as an agent and use the LocalMachine moniker, for example: myADFSPrimary|LocalMachine.
+
+
+### Store Creation
+
+#### Manually with the Command UI
+
+<details><summary>Click to expand details</summary>
+
+1. **Navigate to the _Certificate Stores_ page in Keyfactor Command.**
+
+    Log into Keyfactor Command, toggle the _Locations_ dropdown, and click _Certificate Stores_.
+
+2. **Add a Certificate Store.**
+
+    Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
+
+   | Attribute | Description                                             |
+   | --------- |---------------------------------------------------------|
+   | Category | Select "ADFS Rotation Manager" or the customized certificate store name from the previous step. |
+   | Container | Optional container to associate certificate store with. |
+   | Client Machine | Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server. |
+   | Store Path | Fixed string value of 'My' indicating the Personal store on the Local Machine. All ADFS Service-Communications certificates are located in the 'My' personal store by default. |
+   | Orchestrator | Select an approved orchestrator capable of managing `WinAdfs` certificates. Specifically, one with the `WinAdfs` capability. |
+   | spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
+   | WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. |
+   | WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. |
+   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+   | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+
+</details>
+
+
+
+#### Using kfutil CLI
+
+<details><summary>Click to expand details</summary>
+
+1. **Generate a CSV template for the WinAdfs certificate store**
+
+    ```shell
+    kfutil stores import generate-template --store-type-name WinAdfs --outpath WinAdfs.csv
+    ```
+2. **Populate the generated CSV file**
+
+    Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | Category | Select "ADFS Rotation Manager" or the customized certificate store name from the previous step. |
+   | Container | Optional container to associate certificate store with. |
+   | Client Machine | Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server. |
+   | Store Path | Fixed string value of 'My' indicating the Personal store on the Local Machine. All ADFS Service-Communications certificates are located in the 'My' personal store by default. |
+   | Orchestrator | Select an approved orchestrator capable of managing `WinAdfs` certificates. Specifically, one with the `WinAdfs` capability. |
+   | Properties.spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
+   | Properties.WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. |
+   | Properties.WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. |
+   | Properties.ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+   | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+
+3. **Import the CSV file to create the certificate stores**
+
+    ```shell
+    kfutil stores import csv --store-type-name WinAdfs --file WinAdfs.csv
     ```
 
 </details>
