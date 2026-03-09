@@ -1,3 +1,35 @@
+3.0.0
+* As of this version of the extension, SANs will be handled through the ODKG Enrollment page in Command, and will no longer use the SAN Entry Parameter. This version, we are removing the Entry Parameter "SAN" from the integration-manifest.json, but will still support previous versions of Command in the event the SAN Entry Parameter is passed. The next major version (4.0) will remove all support for the SAN Entry Parameter.
+* Added WinADFS Store Type for rotating certificates in ADFS environments.  Please note, only the service-communications certificate is rotated throughout your farm.
+* Internal only: Added Integration Tests to aid in future development and testing.
+* Improved messaging in the event an Entry Parameter is missing (or does not meet the casing requirements)
+* Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
+* Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
+* Added SSL Flag validation to make sure the bit flag is correct.  These are the valid bit flags for the version of Windows:
+  ### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5):
+  * 0	No SNI
+  * 1	Use SNI
+  * 2	Use Centralized SSL certificate store.
+
+  ### Windows Server 2016 (IIS 10.0):
+  * 0	No SNI
+  * 1	Use SNI
+  * 4	Disable HTTP/2.
+
+  ### Windows Server 2019 (IIS 10.0.17763)
+  * 0	No SNI
+  * 1	Use SNI
+  * 4	Disable HTTP/2.
+  * 8	Disable OCSP Stapling.
+
+  ### Windows Server 2022+ (IIS 10.0.20348+)
+  * 0	No SNI
+  * 1	Use SNI
+  * 4	Disable HTTP/2.
+  * 8	Disable OCSP Stapling.
+  * 16	Disable QUIC.
+  * 32	Disable TLS 1.3 over TCP.
+  * 64	Disable Legacy TLS.
 
 2.6.4
 * Fixed an issue with SSL Flags greater than 3 were not being applied correctly to newer IIS servers.

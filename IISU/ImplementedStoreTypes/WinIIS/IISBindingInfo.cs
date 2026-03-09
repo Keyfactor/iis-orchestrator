@@ -23,6 +23,19 @@ using System.Web.Services.Description;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
+    [Flags]
+    public enum SslFlags
+    {
+        None = 0,
+        SslRequireSni = 1,
+        SslNegotiateCert = 2,
+        SslRequireCert = 4,
+        SslMapCert = 8,
+        CentralCertStore = 32,
+        DisableHTTP2 = 64,
+        DisableOCSPStapling = 128
+    }
+
     public class IISBindingInfo
     {
         public string SiteName { get; set; }
@@ -42,12 +55,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
         public IISBindingInfo(Dictionary<string, object> bindingInfo)
         {
-            SiteName = bindingInfo["SiteName"].ToString();
-            Protocol = bindingInfo["Protocol"].ToString();
-            IPAddress = bindingInfo["IPAddress"].ToString();
-            Port = bindingInfo["Port"].ToString();
-            HostName = bindingInfo["HostName"]?.ToString();
-            SniFlag = MigrateSNIFlag(bindingInfo["SniFlag"].ToString());
+            try
+            {
+                SiteName = bindingInfo["SiteName"].ToString();
+                Protocol = bindingInfo["Protocol"].ToString();
+                IPAddress = bindingInfo["IPAddress"].ToString();
+                Port = bindingInfo["Port"].ToString();
+                HostName = bindingInfo["HostName"]?.ToString();
+                SniFlag = MigrateSNIFlag(bindingInfo["SniFlag"].ToString());
+            }
+            catch (KeyNotFoundException ex)
+            {
+                throw new ArgumentException($"An Entry Parameter was missing. Please check the Cert Store Type Definition, note that entry parameters are case sensitive. Message: {ex.Message}");
+            }
         }
 
         public static IISBindingInfo ParseAliaseBindingString(string alias)
@@ -68,7 +88,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 HostName = parts.Length == 5 ? parts[4] : null
             };
         }
-
 
         private string MigrateSNIFlag(string input)
         {
