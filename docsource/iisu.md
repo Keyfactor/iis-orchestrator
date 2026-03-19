@@ -1,4 +1,4 @@
-### Key Features and Representation
+## Overview
 
 The IISU store type represents the IIS servers and their certificate bindings. It specifically caters to managing SSL/TLS certificates tied to IIS websites, allowing bind operations such as specifying site names, IP addresses, ports, and enabling Server Name Indication (SNI). By default, it supports job types like Inventory, Add, Remove, and Reenrollment, thereby offering comprehensive management capabilities for IIS certificates.
 
@@ -94,7 +94,5 @@ Using this flag will result in an error and the job will not complete successful
 
 - **Custom Alias and Private Keys:** The store type does not support custom aliases for individual entries and requires private keys because IIS certificates without private keys would be invalid.
 
-## Overview
 
-TODO Overview is a required section
 
