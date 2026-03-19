@@ -1,3 +1,6 @@
+3.0.1
+* Fixed an issues when renewing ECC Certificates
+
 3.0.0
 * As of this version of the extension, SANs will be handled through the ODKG Enrollment page in Command, and will no longer use the SAN Entry Parameter. This version, we are removing the Entry Parameter "SAN" from the integration-manifest.json, but will still support previous versions of Command in the event the SAN Entry Parameter is passed. The next major version (4.0) will remove all support for the SAN Entry Parameter.
 * Added WinADFS Store Type for rotating certificates in ADFS environments.  Please note, only the service-communications certificate is rotated throughout your farm.
