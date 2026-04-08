@@ -1,4 +1,4 @@
-﻿# Version 1.5.0
+﻿# Version 1.5.1
 
 # Summary
 # Contains PowerShell functions to execute administration jobs for general Windows certificates, IIS and SQL Server.
@@ -22,6 +22,7 @@
 # 11/04/25  3.0     Updated Get-KFCertificates to get specific certificate by thumbprint
 # 01/14/26  3.0     Released version 3.0.0 with updated function documentation and error handling
 # 01/20/26  3.0     Fixed a problem for invalid SSL flags depending on the version of IIS and Windows Server is being used
+# 03/18/26  3.0.1   Updated the Get-CertificateCSP that adds ECC (ECDsa) key detection, consolidates the CNG provider lookup into a reusable helper, and handles DSA as a bonus
 
 # Set preferences globally at the script level
 $DebugPreference = "Continue"
@@ -1764,29 +1765,13 @@ function Get-CertificateCSP {
     param(
         [System.Security.Cryptography.X509Certificates.X509Certificate2]$cert
     )
-    
-    try {
-        # Check if certificate has a private key
-        if (-not $cert.HasPrivateKey) {
-            return "No private key"
-        }
-        
-        # Get the private key
-        $privateKey = $cert.PrivateKey
-        
-        if ($privateKey -and $privateKey.CspKeyContainerInfo) {
-            # For older .NET Framework
-            $cspKeyContainerInfo = $privateKey.CspKeyContainerInfo
-            
-            if ($cspKeyContainerInfo -and $cspKeyContainerInfo.ProviderName) {
-                return [string]$cspKeyContainerInfo.ProviderName
-            }
-        }
-        
-        # For newer .NET Core/5+ or CNG keys
+
+    # Helper: extract KSP/provider name from a CNG key object
+    function Get-CngProviderName {
+        param($key)
         try {
-            $key = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
-            if ($key -and $key.GetType().Name -eq "RSACng") {
+            # RSACng / ECDsaCng expose a .Key property (CngKey)
+            if ($key.PSObject.Properties['Key']) {
                 $cngKey = $key.Key
                 if ($cngKey -and $cngKey.Provider -and $cngKey.Provider.Provider) {
                     return [string]$cngKey.Provider.Provider
@@ -1794,51 +1779,74 @@ function Get-CertificateCSP {
             }
         }
         catch {
-            Write-Verbose "CNG key detection failed: $($_.Exception.Message)"
+            Write-Verbose "CNG provider lookup failed: $($_.Exception.Message)"
         }
-        
-        # Ensure we always return a string
-        return "Unknown provider"
-        
-    }
-    catch {
-        return "Error retrieving CSP: $($_.Exception.Message)"
-    }
-}
-
-function Get-CertificateCSPV2 {
-    param (
-        [Parameter(Mandatory = $true)]
-        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Cert
-    )
-
-    # Check if the certificate has a private key
-    if (-not $Cert.HasPrivateKey) {
-        Write-Warning "Certificate does not have a private key associated with it"
         return $null
-    }
-
-    $privateKey = $Cert.PrivateKey
-    if ($privateKey) {
-        # For older .NET Framework
-        $cspKeyContainerInfo = $privateKey.CspKeyContainerInfo
-
-        if ($cspKeyContainerInfo) {
-            return $cspKeyContainerInfo.ProviderName
-        }
     }
 
     try {
-        $key = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
-        if ($key -and $key.GetType().Name -eq "RSACng") {
-            $cngKey = $key.Key
-                
-            return $cngKey.Provider.Provider
+        if (-not $cert.HasPrivateKey) {
+            return "No private key"
         }
+
+        # ── 1. Legacy CryptoAPI path (RSACryptoServiceProvider) ──────────────
+        $privateKey = $cert.PrivateKey
+        if ($privateKey -and $privateKey.CspKeyContainerInfo) {
+            $providerName = $privateKey.CspKeyContainerInfo.ProviderName
+            if ($providerName) {
+                return [string]$providerName
+            }
+        }
+
+        # ── 2. CNG RSA (RSACng) ───────────────────────────────────────────────
+        try {
+            $rsaKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+            if ($rsaKey) {
+                $providerName = Get-CngProviderName $rsaKey
+                if ($providerName) { return $providerName }
+            }
+        }
+        catch {
+            Write-Verbose "RSA CNG detection failed: $($_.Exception.Message)"
+        }
+
+        # ── 3. ECC / ECDsa (ECDsaCng) ─────────────────────────────────────────
+        # ECC keys always use CNG (KSPs), never legacy CSPs
+        try {
+            $ecKey = [System.Security.Cryptography.X509Certificates.ECDsaCertificateExtensions]::GetECDsaPrivateKey($cert)
+            if ($ecKey) {
+                $providerName = Get-CngProviderName $ecKey
+                if ($providerName) { return $providerName }
+
+                Write-Verbose "ECC key detected but no resolvable provider name (type: $($ecKey.GetType().Name))"
+                return ""
+            }
+        }
+        catch {
+            Write-Verbose "ECDsa CNG detection failed: $($_.Exception.Message)"
+        }
+
+        # ── 4. DSA (bonus) ────────────────────────────────────────────────────
+        try {
+            $dsaKey = [System.Security.Cryptography.X509Certificates.DSACertificateExtensions]::GetDSAPrivateKey($cert)
+            if ($dsaKey) {
+                $providerName = Get-CngProviderName $dsaKey
+                if ($providerName) { return $providerName }
+
+                Write-Verbose "DSA key detected but no resolvable provider name (type: $($dsaKey.GetType().Name))"
+                return ""
+            }
+        }
+        catch {
+            Write-Verbose "DSA CNG detection failed: $($_.Exception.Message)"
+        }
+
+        Write-Verbose "No supported key type detected; provider name could not be determined"
+        return ""
     }
     catch {
-        Write-Warning "CNG key detection failed: $($_.Exception.Message)"
-        return $null
+        Write-Warning "Error retrieving CSP for certificate '$($cert.Subject)': $($_.Exception.Message)"
+        return ""
     }
 }
 
