@@ -152,8 +152,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 InitializeLocalSession();
             }
 
-            // Display Hosting information
-            string psInfo = @"
+            // Display hosting information.
+            // Skipped in JEA sessions: [System.Environment] and [System.Net.Dns] are blocked
+            // by ConstrainedLanguage and this script runs as untrusted inline code, not as a
+            // trusted module function.
+            // TODO: Create Get-KeyfactorHostInfo in Keyfactor.WinCert.Common so JEA sessions
+            //       can also log host details at startup.
+            if (!useJea)
+            {
+                string psInfo = @"
                     $psVersion = $PSVersionTable.PSVersion
                     $os = [System.Environment]::OSVersion
                     $hostName = [System.Net.Dns]::GetHostName()
@@ -164,10 +171,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         HostName          = $hostName
                     } | ConvertTo-Json
                 ";
-            var results = ExecutePowerShell(psInfo, isScript: true);
-            foreach (var result in results)
-            {
-                _logger.LogTrace($"{result}");
+                var results = ExecutePowerShell(psInfo, isScript: true);
+                foreach (var result in results)
+                {
+                    _logger.LogTrace($"{result}");
+                }
             }
         }
 
@@ -766,14 +774,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
                 else
                 {
-                    // For remote execution, use Invoke-Command
-                    var scriptBlock = isScript
-                        ? ScriptBlock.Create(commandOrScript) // Use the script as a ScriptBlock
-                        : ScriptBlock.Create($"& {{ {commandOrScript} }}"); // Wrap commands in ScriptBlock
-
+                    // For remote execution use Invoke-Command. The command/script becomes the
+                    // scriptblock body directly — no & { } child-scope wrapper, which can
+                    // prevent JEA ConstrainedLanguage sessions from seeing visible functions.
                     PS.AddCommand("Invoke-Command")
                       .AddParameter("Session", _PSSession)
-                      .AddParameter("ScriptBlock", scriptBlock);
+                      .AddParameter("ScriptBlock", ScriptBlock.Create(commandOrScript));
                 }
 
                 // Add Parameters if provided
@@ -788,12 +794,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     }
                     else
                     {
-                        // Remote execution: Use ArgumentList for parameters
-                        var paramBlock = string.Join(", ", parameters.Select(p =>
-                        {
-                            string typeName = p.Value?.GetType().Name ?? "object";
-                            return $"[{typeName}] ${p.Key}";
-                        }));
+                        // Remote execution: Use ArgumentList for parameters.
+                        // No type annotations in the param block — they are unnecessary for
+                        // correct ArgumentList binding and some CLR types (arrays, nulls) produce
+                        // names that break ConstrainedLanguage JEA sessions.
+                        var paramBlock = string.Join(", ", parameters.Keys.Select(k => $"${k}"));
 
                         var paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
 
