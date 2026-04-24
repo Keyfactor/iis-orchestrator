@@ -60,6 +60,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private bool isLocalMachine;
         private bool isADFSStore = false;
+        private bool useJea = false;
+        private string jeaEndpoint = "keyfactor.wincert";
 
         public bool IsLocalMachine
         {
@@ -95,7 +97,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = LogHandler.GetClassLogger<PSHelper>();
         }
 
-        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false)
+        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false, bool useJea = false, string jeaEndpoint = "keyfactor.wincert")
         {
             this.protocol = protocol.ToLower();
             this.port = port;
@@ -103,6 +105,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             ClientMachineName = clientMachineName;
             this.serverUserName = serverUserName;
             this.serverPassword = serverPassword;
+            this.isADFSStore = isADFSStore;
+            this.useJea = useJea;
+            this.jeaEndpoint = jeaEndpoint;
 
             _logger = LogHandler.GetClassLogger<PSHelper>();
             _logger.LogTrace("Entered PSHelper Constructor");
@@ -110,8 +115,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace($"Port: {this.port}");
             _logger.LogTrace($"UseSPN: {this.useSPN}");
             _logger.LogTrace($"ClientMachineName: {ClientMachineName}");
+            _logger.LogTrace($"UseJEA: {this.useJea}");
+            _logger.LogTrace($"JEAEndpoint: {this.jeaEndpoint}");
             _logger.LogTrace("Constructor Completed");
-            this.isADFSStore = isADFSStore;
         }
 
         public void Initialize()
@@ -132,8 +138,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogDebug($"isLocalMachine flag set to: {isLocalMachine}");
             _logger.LogDebug($"Protocol is set to: {protocol}");
 
-            scriptFileLocation = FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShellScripts");
-            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script files,"); }
+            scriptFileLocation = FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShell");
+            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script files."); }
 
             _logger.LogTrace($"Script file located here: {scriptFileLocation}");
 
@@ -168,6 +174,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private void InitializeRemoteSession()
         {
             if (this.isADFSStore) throw new Exception("Remote ADFS stores are not supported.");
+            if (this.useJea && protocol == "ssh") throw new Exception("JEA is not supported over SSH. Use WinRM (http/https) for JEA.");
 
             if (protocol == "ssh")
             {
@@ -213,6 +220,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     .AddParameter("Port", port)
                     .AddParameter("SessionOption", sessionOption);
 
+                    if (useJea)
+                    {
+                        PS.AddParameter("ConfigurationName", jeaEndpoint);
+                        _logger.LogDebug($"JEA enabled - connecting to endpoint: {jeaEndpoint}");
+                    }
+
                     if (protocol == "https")
                     {
                         _logger.LogTrace($"Using HTTPS to connect to: {clientMachineName}");
@@ -246,13 +259,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 PS.Commands.Clear();
                 _logger.LogTrace("PS-Session established");
 
-                PS.AddCommand("Invoke-Command")
-                    .AddParameter("Session", _PSSession)
-                    .AddParameter("ScriptBlock", ScriptBlock.Create(LoadAllScripts(scriptFileLocation)));
+                if (!useJea)
+                {
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("Session", _PSSession)
+                        .AddParameter("ScriptBlock", ScriptBlock.Create(LoadAllScripts(scriptFileLocation)));
 
-                var results = PS.Invoke();
-                CheckErrors();
-                _logger.LogTrace("Script loaded into remote session successfully.");
+                    PS.Invoke();
+                    CheckErrors();
+                    _logger.LogTrace("Scripts loaded into remote session successfully.");
+                }
+                else
+                {
+                    _logger.LogDebug($"JEA session active on endpoint '{jeaEndpoint}' - skipping script injection, functions are pre-registered.");
+                }
             }
             else
             {
@@ -280,40 +300,53 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 adfsModuleImported = ImportAdfsModule();
             }
 
-            // Load all scripts
+            // Import the Keyfactor.WinCert.Common module (handles Private-before-Public load order internally)
             _logger.LogTrace("Loading PowerShell scripts");
-            var scriptFiles = GetScriptFiles(scriptFileLocation);
+            string moduleFile = Path.Combine(scriptFileLocation, "Keyfactor.WinCert.Common", "Keyfactor.WinCert.Common.psm1");
+            if (File.Exists(moduleFile))
+            {
+                _logger.LogTrace($"Importing module: {moduleFile}");
+                PS.AddCommand("Import-Module")
+                    .AddParameter("Name", moduleFile)
+                    .AddParameter("Force");
+                PS.Invoke();
 
-            foreach (var scriptFile in scriptFiles)
+                if (PS.HadErrors)
+                {
+                    _logger.LogError("Errors importing Keyfactor.WinCert.Common module:");
+                    foreach (var error in PS.Streams.Error)
+                        _logger.LogError($"  {error}");
+                    PS.Streams.Error.Clear();
+                }
+                else
+                {
+                    _logger.LogInformation("Keyfactor.WinCert.Common module imported successfully.");
+                }
+                PS.Commands.Clear();
+            }
+            else
+            {
+                _logger.LogWarning($"Keyfactor.WinCert.Common module not found at: {moduleFile}");
+            }
+
+            // Load flat legacy .ps1 scripts from the PowerShell root directory
+            var rootScripts = Directory.GetFiles(scriptFileLocation, "*.ps1")
+                .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f)
+                .ToList();
+
+            foreach (var scriptFile in rootScripts)
             {
                 var fileName = Path.GetFileName(scriptFile);
                 bool isAdfsScript = fileName.IndexOf("adfs", StringComparison.OrdinalIgnoreCase) >= 0;
 
-                // Decide whether to load this script
-                if (isAdfsScript)
+                if (isAdfsScript && (!this.isADFSStore || !adfsModuleImported))
                 {
-                    if (this.isADFSStore)
-                    {
-                        if (!adfsModuleImported)
-                        {
-                            _logger.LogWarning($"Skipping ADFS script '{fileName}' - ADFS module not available");
-                            continue;
-                        }
-
-                        _logger.LogTrace($"Loading ADFS script: {fileName}");
-                    }
-                    else
-                    {
-                        _logger.LogTrace($"Skipping ADFS script '{fileName}' - not an ADFS store");
-                        continue;
-                    }
-                }
-                else
-                {
-                    _logger.LogTrace($"Loading script: {fileName}");
+                    _logger.LogTrace($"Skipping ADFS script '{fileName}'");
+                    continue;
                 }
 
-                // Load the script
+                _logger.LogTrace($"Loading script: {fileName}");
                 try
                 {
                     PS.AddScript($". '{scriptFile}'");
@@ -323,16 +356,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     {
                         _logger.LogError($"Errors loading script '{fileName}':");
                         foreach (var error in PS.Streams.Error)
-                        {
                             _logger.LogError($"  {error}");
-                        }
+                        PS.Streams.Error.Clear();
                     }
                     else
                     {
-                        _logger.LogTrace($"  ✓ Successfully loaded {fileName}");
+                        _logger.LogTrace($"  Successfully loaded {fileName}");
                     }
 
-                    CheckErrors();
                     PS.Commands.Clear();
                 }
                 catch (Exception ex)
@@ -961,6 +992,46 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             return privateKey.Replace(header, "HEADER").Replace(footer, "FOOTER").Replace(" ", Environment.NewLine).Replace("HEADER", header).Replace("FOOTER", footer) + Environment.NewLine;
         }
 
+        private static List<string> GetOrderedScriptFiles(string scriptsDirectory)
+        {
+            /*
+             * Returns .ps1 files in dependency order for remote non-JEA sessions:
+             *   1. Flat .ps1 files in the root PowerShell directory (legacy scripts)
+             *   2. For each module subdirectory: Private/*.ps1 first, then Public/*.ps1
+             */
+            var ordered = new List<string>();
+
+            // Root flat scripts (WinCertScripts.ps1, WinADFSScripts.ps1, etc.)
+            ordered.AddRange(
+                Directory.GetFiles(scriptsDirectory, "*.ps1")
+                    .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(f => f));
+
+            // Module subdirectories: Private before Public so helpers are defined first
+            foreach (var subDir in Directory.GetDirectories(scriptsDirectory).OrderBy(d => d))
+            {
+                var privatePath = Path.Combine(subDir, "Private");
+                if (Directory.Exists(privatePath))
+                {
+                    ordered.AddRange(
+                        Directory.GetFiles(privatePath, "*.ps1", SearchOption.AllDirectories)
+                            .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(f => f));
+                }
+
+                var publicPath = Path.Combine(subDir, "Public");
+                if (Directory.Exists(publicPath))
+                {
+                    ordered.AddRange(
+                        Directory.GetFiles(publicPath, "*.ps1", SearchOption.AllDirectories)
+                            .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(f => f));
+                }
+            }
+
+            return ordered;
+        }
+
         public static string FindScriptsDirectory(string rootDirectory, string directoryName)
         {
             /*
@@ -1094,8 +1165,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             _logger.LogInformation($"Loading scripts from: {scriptsDirectory}");
 
-            // Load all .ps1 files from the scripts directory
-            var scriptFiles = Directory.GetFiles(scriptsDirectory, "*.ps1").ToList();
+            // Load scripts in dependency order: root files first, then module Private then Public
+            var scriptFiles = GetOrderedScriptFiles(scriptsDirectory);
 
             if (scriptFiles.Count == 0)
             {

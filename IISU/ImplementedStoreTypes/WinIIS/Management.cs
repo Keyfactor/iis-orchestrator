@@ -92,12 +92,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
+                bool useJea = jobProperties?.UseJEA ?? false;
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "keyfactor.wincert";
                 string alias = config.JobCertificate?.Alias?.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
 
                 // Assign the binding information
                 IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, useJea: useJea, jeaEndpoint: jeaEndpoint);
 
                 _psHelper.Initialize();
 

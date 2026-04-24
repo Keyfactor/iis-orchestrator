@@ -1,0 +1,90 @@
+#
+# KeyfactorWinCert.pssc
+# JEA Session Configuration file for Keyfactor Windows Certificate Store management
+#
+# ============================================================
+# PREREQUISITES (run once per target machine as Administrator)
+# ============================================================
+#
+# 1. Install the module to the system module path so it is treated as trusted code:
+#
+#      $dest = 'C:\Program Files\WindowsPowerShell\Modules\Keyfactor.WinCert.Common'
+#      Copy-Item -Path '.\Keyfactor.WinCert.Common' -Destination $dest -Recurse -Force
+#
+# 2. Create the transcript directory for audit logging:
+#
+#      New-Item -ItemType Directory -Path 'C:\ProgramData\Keyfactor\JEA\Transcripts' -Force
+#
+# 3. Register this session configuration (required once; re-run after any change):
+#
+#      Register-PSSessionConfiguration `
+#          -Name 'keyfactor.wincert' `
+#          -Path 'C:\path\to\KeyfactorWinCert.pssc' `
+#          -Force
+#      Restart-Service WinRM
+#
+# 4. Verify the endpoint is registered:
+#
+#      Get-PSSessionConfiguration | Where-Object Name -eq 'keyfactor.wincert'
+#
+# 5. To update or remove the endpoint:
+#
+#      Unregister-PSSessionConfiguration -Name 'keyfactor.wincert'
+#      Restart-Service WinRM
+#
+# ============================================================
+# TESTING THE ENDPOINT
+# ============================================================
+#
+#   # Connect and list available commands (should show only the 4 Keyfactor functions)
+#   $s = New-PSSession -ComputerName <target> `
+#            -ConfigurationName 'keyfactor.wincert' `
+#            -Credential (Get-Credential)
+#   Invoke-Command -Session $s -ScriptBlock { Get-Command }
+#
+#   # Run an inventory
+#   Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorCertificates -StoreName 'My' }
+#
+#   Remove-PSSession $s
+#
+# ============================================================
+@{
+    SchemaVersion = '2.0.0.0'
+    GUID          = '4d1866a4-858a-4c60-866c-b46f546dc014'
+    Author        = 'Keyfactor'
+    Description   = 'JEA session configuration for Keyfactor Windows Certificate Store management'
+
+    # RestrictedRemoteServer limits the session to only what is explicitly permitted.
+    SessionType = 'RestrictedRemoteServer'
+
+    # ConstrainedLanguage allows param() blocks and variable usage in caller scriptblocks
+    # (required for PSHelper's parameter-passing pattern). Module functions installed under
+    # C:\Program Files\WindowsPowerShell\Modules\ run as FULLY TRUSTED regardless of this setting.
+    LanguageMode = 'ConstrainedLanguage'
+
+    # --- Run-As Account ---
+    # For development/testing: RunAsVirtualAccount creates a temporary local admin account.
+    # For production: comment out RunAsVirtualAccount and use a Group Managed Service Account
+    # that has been granted only the rights needed (read/write the certificate store).
+    #
+    #   Production example:
+    #     GroupManagedServiceAccount = 'DOMAIN\KeyfactorJEA$'
+    #
+    RunAsVirtualAccount = $true
+
+    # Transcript every session to this directory for audit purposes.
+    # Directory must exist before registering -- see Prerequisites step 2 above.
+    TranscriptDirectory = 'C:\ProgramData\Keyfactor\JEA\Transcripts'
+
+    # --- Role Definitions ---
+    # Map the connecting user/group to the Keyfactor.WinCert.Common role capability.
+    # Replace 'BUILTIN\Administrators' with the AD group or local group whose members
+    # are authorized to connect (e.g. 'DOMAIN\KeyfactorOrchestrators').
+    #
+    # Multiple groups can be granted the same or different roles:
+    #   'DOMAIN\CertAdmins'         = @{ RoleCapabilities = 'Keyfactor.WinCert.Common' }
+    #   'DOMAIN\CertReadOnly'       = @{ RoleCapabilities = 'Keyfactor.WinCert.ReadOnly' }
+    RoleDefinitions = @{
+        'BUILTIN\Administrators' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common' }
+    }
+}

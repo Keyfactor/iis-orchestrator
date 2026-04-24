@@ -91,7 +91,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
-                
+                bool useJea = jobProperties?.UseJEA ?? false;
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "keyfactor.wincert";
+
                 RestartSQLService = jobProperties.RestartService;
 
                 if (config.JobProperties.ContainsKey("InstanceName"))
@@ -104,7 +106,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     RenewalThumbprint = config.JobProperties["RenewalThumbprint"]?.ToString();
                 }
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, useJea: useJea, jeaEndpoint: jeaEndpoint);
 
                 _psHelper.Initialize();
 

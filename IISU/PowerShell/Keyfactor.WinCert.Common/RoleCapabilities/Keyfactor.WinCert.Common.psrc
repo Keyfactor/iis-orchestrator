@@ -1,0 +1,65 @@
+#
+# Keyfactor.WinCert.Common.psrc
+# JEA Role Capability file for Keyfactor Windows Certificate Store (Common operations)
+#
+# INSTALL LOCATION:
+#   This file must live inside the module folder that PowerShell can discover:
+#     C:\Program Files\WindowsPowerShell\Modules\
+#       Keyfactor.WinCert.Common\
+#         RoleCapabilities\
+#           Keyfactor.WinCert.Common.psrc   <-- this file
+#
+#   PowerShell finds the role capability by name ('Keyfactor.WinCert.Common') by searching
+#   all modules in $env:PSModulePath for a RoleCapabilities subfolder with a matching .psrc.
+#
+# LANGUAGE MODE NOTE:
+#   The session configuration (KeyfactorWinCert.pssc) sets LanguageMode = 'ConstrainedLanguage'.
+#   Module code loaded from a trusted path ($env:PSModulePath) runs as FULLY TRUSTED and can
+#   use .NET APIs freely. The ConstrainedLanguage restriction only applies to caller scriptblocks
+#   sent by the orchestrator (e.g., param() blocks for parameter passing).
+#
+@{
+    GUID        = 'c068f073-354c-4a88-a325-23d1e778334d'
+    Author      = 'Keyfactor'
+    Description = 'Role capabilities for Keyfactor Windows Certificate Store common operations (inventory, add, remove)'
+
+    # Import the module so its functions are pre-loaded and run as trusted code.
+    # The module MUST be installed under C:\Program Files\WindowsPowerShell\Modules\ so that
+    # PowerShell treats it as trusted (required for .NET API usage in ConstrainedLanguage sessions).
+    ModulesToImport = @('Keyfactor.WinCert.Common')
+
+    # Functions the orchestrator is allowed to invoke in this JEA session.
+    # Private helper functions (Get-CertificateCSP, Get-CertificateSAN, etc.) are intentionally
+    # excluded -- they are called internally by the public functions, not by the orchestrator.
+    VisibleFunctions = @(
+        'Get-KeyfactorCertificates',
+        'Add-KeyfactorCertificate',
+        'Remove-KeyfactorCertificate',
+        'New-KeyfactorResult'
+    )
+
+    # Cmdlets available to caller scriptblocks (param() wrappers sent by PSHelper).
+    # Module functions are trusted and can use any cmdlet internally regardless of this list.
+    VisibleCmdlets = @(
+        'ConvertTo-Json',
+        'ConvertFrom-Json',
+        'Write-Output',
+        'Write-Verbose',
+        'Write-Warning',
+        'Write-Error',
+        'Write-Information'
+    )
+
+    # certutil.exe is called directly via the PowerShell pipeline by Get-CryptoProviders.
+    # Full path is required. Add-KeyfactorCertificate uses certutil via .NET ProcessStartInfo
+    # and does NOT need it listed here.
+    VisibleExternalCommands = @(
+        'C:\Windows\System32\certutil.exe'
+    )
+
+    # No variables need to be pre-defined for the orchestrator.
+    VisibleVariables = @()
+
+    # No aliases beyond what the module exports.
+    VisibleAliases = @()
+}

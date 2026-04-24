@@ -50,11 +50,26 @@
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="PowerShellScripts\WinADFSScripts.ps1">
+    <None Update="PowerShell\Keyfactor.WinCert.Common\**\*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="PowerShellScripts\WinCertScripts.ps1">
+    <None Update="PowerShell\Build\KeyfactorWinCert.pssc">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="PowerShell\WinADFSScripts.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShell\WinCertScripts.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="PowerShell\Build\" />
+    <Folder Include="PowerShell\Documentation\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.Common\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.IIS\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.SQL\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.ADFS\" />
   </ItemGroup>
 </Project>

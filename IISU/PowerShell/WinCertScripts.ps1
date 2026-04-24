@@ -58,6 +58,7 @@ $InformationPreference = "Continue"
 # 300	Error	Unknown or unhandled exception
 # 400   Error   Invalid Ssl Flag bit combination
 
+# Migrated
 function New-ResultObject {
     param(
         [ValidateSet("Success", "Warning", "Error", "Skipped")]
@@ -79,6 +80,7 @@ function New-ResultObject {
     }
 }
 
+# Migrated
 function Get-KFCertificates {
     param (
         [Parameter(Mandatory = $false)]
@@ -151,6 +153,7 @@ function Get-KFCertificates {
     }
 }
 
+# Migrated
 function Add-KFCertificateToStore{
     param (
         [Parameter(Mandatory = $true)]
@@ -280,6 +283,7 @@ function Add-KFCertificateToStore{
     }
 }
 
+# Migrated
 function Remove-KFCertificateFromStore {
     param (
         [string]$Thumbprint,
@@ -1736,6 +1740,7 @@ function Import-SignedCertificate {
 
 # Shared Functions
 # Function to get SAN (Subject Alternative Names) from a certificate
+# Migrated
 function Get-KFSAN($cert) {
     $san = $cert.Extensions | Where-Object { $_.Oid.FriendlyName -eq "Subject Alternative Name" }
     if ($san) {
@@ -1745,6 +1750,7 @@ function Get-KFSAN($cert) {
 }
 
 #Function to verify if the given CSP is found on the computer
+# Migrated
 function Test-CryptoServiceProvider {
     param(
         [Parameter(Mandatory = $true)]
@@ -1761,6 +1767,7 @@ function Test-CryptoServiceProvider {
 }
 
 # Function that takes an x509 certificate object and returns the csp
+# Migrated
 function Get-CertificateCSP {
     param(
         [System.Security.Cryptography.X509Certificates.X509Certificate2]$cert
@@ -1850,6 +1857,7 @@ function Get-CertificateCSP {
     }
 }
 
+# Migrated
 function Get-CryptoProviders {
     # Retrieves the list of available Crypto Service Providers using certutil
     try {
@@ -1878,6 +1886,7 @@ function Get-CryptoProviders {
     }
 }
 
+# Migrated
 function Validate-CryptoProvider {
     param (
         [Parameter(Mandatory)]

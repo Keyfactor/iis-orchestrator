@@ -81,6 +81,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     settings.IncludePortInSPN = jobProperties.SpnPortFlag;
                     settings.ServerUserName = serverUserName;
                     settings.ServerPassword = serverPassword;
+                    settings.UseJEA = jobProperties.UseJEA;
+                    settings.JEAEndpointName = jobProperties.JEAEndpointName;
 
                     _logger.LogTrace($"Querying Window certificate in store: {storePath}");
                     inventoryItems = QueryWinCertCertificates(settings, storePath);
@@ -126,7 +128,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, useJea: settings.UseJEA, jeaEndpoint: settings.JEAEndpointName))
             {
                 ps.Initialize();
 
@@ -135,7 +137,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     { "StoreName", StoreName }
                 };
 
-                results = ps.ExecutePowerShell("Get-KFCertificates", parameters);
+                results = ps.ExecutePowerShell("Get-KefactorCertificates", parameters);
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)
@@ -147,8 +149,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     {
                         var siteSettingsDict = new Dictionary<string, object>
                                 {
-                                    { "ProviderName", cert.ProviderName},
-                                    { "SAN", cert.SAN }
+                                    { "ProviderName", cert.ProviderName}
                                 };
 
                         Inventory.Add(
