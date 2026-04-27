@@ -895,7 +895,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             if (infoMessages != null)
                             {
                                 var infoMessage = infoMessages[e.Index];
-                                _logger.LogInformation($"INFO: {infoMessage.MessageData.ToString()}");
+                                _logger.LogInformation($"INFO: {infoMessage.MessageData}");
                             }
                             break;
 

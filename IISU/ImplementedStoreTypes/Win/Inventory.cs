@@ -137,7 +137,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     { "StoreName", StoreName }
                 };
 
-                results = ps.ExecutePowerShell("Get-KefactorCertificates", parameters);
+                results = ps.ExecutePowerShell("Get-KeyfactorCertificates", parameters);
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)
