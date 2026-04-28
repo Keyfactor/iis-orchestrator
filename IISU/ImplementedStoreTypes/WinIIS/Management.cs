@@ -297,7 +297,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                 if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
 
-                _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
+                _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
                 _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
 
                 // This should return the thumbprint of the certificate

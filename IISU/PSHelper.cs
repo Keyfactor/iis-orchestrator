@@ -281,6 +281,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 {
                     _logger.LogDebug($"JEA session active on endpoint '{jeaEndpoint}' - skipping script injection, functions are pre-registered.");
                 }
+
+                // Set $InformationPreference globally so Write-Information output is forwarded
+                // back to PSHelper's Information stream listener for all function calls in this session.
+                PS.AddCommand("Invoke-Command")
+                    .AddParameter("Session", _PSSession)
+                    .AddParameter("ScriptBlock", ScriptBlock.Create("$global:InformationPreference = 'Continue'"));
+                PS.Invoke();
+                PS.Commands.Clear();
+                _logger.LogTrace("Remote session preference variables configured.");
             }
             else
             {
@@ -301,6 +310,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace("Setting Execution Policy to Unrestricted");
             SetExecutionPolicyUnrestricted();
 
+            // Set $InformationPreference globally so Write-Information output is forwarded
+            // back to PSHelper's Information stream listener for all function calls in this session.
+            PS.AddScript("$global:InformationPreference = 'Continue'");
+            PS.Invoke();
+            PS.Commands.Clear();
+            _logger.LogTrace("Local session preference variables configured.");
+
             // Check if ADFS module is available (only needed for ADFS stores)
             bool adfsModuleImported = false;
             if (this.isADFSStore)
@@ -308,33 +324,41 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 adfsModuleImported = ImportAdfsModule();
             }
 
-            // Import the Keyfactor.WinCert.Common module (handles Private-before-Public load order internally)
-            _logger.LogTrace("Loading PowerShell scripts");
-            string moduleFile = Path.Combine(scriptFileLocation, "Keyfactor.WinCert.Common", "Keyfactor.WinCert.Common.psm1");
-            if (File.Exists(moduleFile))
+            // Import all module .psm1 files alphabetically (ensures Common loads before IIS, etc.)
+            _logger.LogTrace("Loading PowerShell modules");
+            var moduleDirs = Directory.GetDirectories(scriptFileLocation)
+                .OrderBy(d => d)
+                .ToList();
+
+            foreach (var moduleDir in moduleDirs)
             {
-                _logger.LogTrace($"Importing module: {moduleFile}");
+                var moduleName = Path.GetFileName(moduleDir);
+                var modulePsm1 = Path.Combine(moduleDir, $"{moduleName}.psm1");
+
+                if (!File.Exists(modulePsm1))
+                {
+                    _logger.LogTrace($"No .psm1 found in {moduleName}, skipping");
+                    continue;
+                }
+
+                _logger.LogTrace($"Importing module: {modulePsm1}");
                 PS.AddCommand("Import-Module")
-                    .AddParameter("Name", moduleFile)
+                    .AddParameter("Name", modulePsm1)
                     .AddParameter("Force");
                 PS.Invoke();
 
                 if (PS.HadErrors)
                 {
-                    _logger.LogError("Errors importing Keyfactor.WinCert.Common module:");
+                    _logger.LogError($"Errors importing {moduleName} module:");
                     foreach (var error in PS.Streams.Error)
                         _logger.LogError($"  {error}");
                     PS.Streams.Error.Clear();
                 }
                 else
                 {
-                    _logger.LogInformation("Keyfactor.WinCert.Common module imported successfully.");
+                    _logger.LogInformation($"{moduleName} module imported successfully.");
                 }
                 PS.Commands.Clear();
-            }
-            else
-            {
-                _logger.LogWarning($"Keyfactor.WinCert.Common module not found at: {moduleFile}");
             }
 
             // Load flat legacy .ps1 scripts from the PowerShell root directory

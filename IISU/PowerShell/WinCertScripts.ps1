@@ -338,6 +338,7 @@ function Remove-KFCertificateFromStore {
 }
 
 ##### IIS Functions
+#Migrated
 function Get-KFIISBoundCertificates {
     $certificates = @()
     $totalBoundCertificates = 0
@@ -414,6 +415,8 @@ function Get-KFIISBoundCertificates {
         Write-Information "No valid certificates were found bound to websites."
     }
 }
+
+# Migrated
 function New-KFIISSiteBinding {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -532,6 +535,8 @@ function New-KFIISSiteBinding {
         return New-ResultObject -Status Error -Code 999 -Step UnexpectedError -ErrorMessage $errorMessage
     }
 }
+
+# Migrated
 function Remove-ExistingIISBinding {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -596,6 +601,8 @@ function Remove-ExistingIISBinding {
         return New-ResultObject -Status Error -Code 201 -Step RemoveBinding -ErrorMessage $errorMessage
     }
 }
+
+# Migrated
 function Add-IISBindingWithSSL {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -2009,6 +2016,7 @@ function Parse-DNSubject {
 }
 
 #### Functions to test SSL flags
+# Migrated
 function Get-ValidSslFlagsForSystem {
     <#
     .SYNOPSIS
@@ -2041,6 +2049,8 @@ function Get-ValidSslFlagsForSystem {
         return @(1, 2)
     }
 }
+
+# Migrated
 function Test-ValidSslFlags {
     [CmdletBinding()]
     param(
@@ -2123,6 +2133,8 @@ function Test-ValidSslFlags {
         }
     }
 }
+
+# Not used
 function Get-SslFlagDescription {
     <#
     .SYNOPSIS
@@ -2156,6 +2168,7 @@ function Get-SslFlagDescription {
 
 # Note: Removed Test-IISBindingConflict function - we now mimic IIS behavior
 # IIS replaces exact matches and allows multiple hostnames (SNI) on same IP:Port
+# Migrated
 function Get-IISManagementInfo {
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -2210,6 +2223,8 @@ function Get-IISManagementInfo {
         }
     }
 }
+
+# Migrated
 function Ensure-IISDrive {
     [CmdletBinding()]
     param ()

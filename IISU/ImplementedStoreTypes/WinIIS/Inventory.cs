@@ -144,7 +144,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 //    results = ps.InvokeFunction("Get-KFIISBoundCertificates");
                 //}
 
-                results = ps.ExecutePowerShell("Get-KFIISBoundCertificates");
+                results = ps.ExecutePowerShell("Get-KeyfactorIISBoundCertificates");
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)

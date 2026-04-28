@@ -53,6 +53,9 @@
     <None Update="PowerShell\Keyfactor.WinCert.Common\**\*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="PowerShell\Keyfactor.WinCert.IIS\**\*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="PowerShell\Build\KeyfactorWinCert.pssc">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
