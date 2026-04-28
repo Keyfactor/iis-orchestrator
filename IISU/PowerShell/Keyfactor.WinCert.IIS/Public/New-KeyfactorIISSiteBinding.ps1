@@ -48,7 +48,7 @@ function New-KeyfactorIISSiteBinding {
 
         # Step 3: Determine SslFlags supported by Microsoft.Web.Administration
         if ($SslFlags -gt 3) {
-            Write-Verbose "SslFlags value $SslFlags exceeds managed API range (0–3). Applying reduced flags for creation."
+            Write-Verbose "SslFlags value $SslFlags exceeds managed API range (0-3). Applying reduced flags for creation."
             $SslFlagsApplied = ($SslFlags -band 3)
         } else {
             $SslFlagsApplied = $SslFlags

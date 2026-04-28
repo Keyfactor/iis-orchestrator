@@ -20,8 +20,12 @@
 # Export only public functions for non-JEA use.
 # In JEA sessions, VisibleFunctions in the .psrc is the actual access control mechanism.
 Export-ModuleMember -Function @(
+    # Public functions
     'New-KeyfactorResult',
     'Get-KeyfactorCertificates',
     'Add-KeyfactorCertificate',
-    'Remove-KeyfactorCertificate'
+    'Remove-KeyfactorCertificate',
+    # Shared certificate inspection utilities — exported so other modules (e.g. IIS) can call them
+    'Get-CertificateCSP',
+    'Get-CertificateSAN'
 )
