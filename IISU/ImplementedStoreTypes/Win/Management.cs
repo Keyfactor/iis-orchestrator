@@ -88,10 +88,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
-                bool useJea = jobProperties?.UseJEA ?? false;
-                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "keyfactor.wincert";
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "";
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, useJea: useJea, jeaEndpoint: jeaEndpoint);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
 
                 switch (_operationType)
                 {

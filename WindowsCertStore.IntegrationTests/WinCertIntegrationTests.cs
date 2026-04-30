@@ -1,5 +1,4 @@
-﻿using Castle.Core.Logging;
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Moq;
@@ -9,7 +8,7 @@ using WindowsCertStore.IntegrationTests.Factories;
 namespace WindowsCertStore.IntegrationTests
 {
     [Trait("Category", "Integration")]
-    public class WinIISIntegrationTests
+    public class WinCertIntegrationTests
     {
         private static (string thumbprint, string base64Pfx, string pfxPassword) CreateTestCertificate()
         {
@@ -43,6 +42,7 @@ namespace WindowsCertStore.IntegrationTests
                 ContentsFormat = "PFX"
             };
             job.JobProperties = managementJobProperties;
+            job.Capability = "CertStores.WinCert.Management";
             job.CertificateStoreDetails.ClientMachine = connection.Machine;
             job.CertificateStoreDetails.StorePath = "My";
             job.CertificateStoreDetails.Properties = certStorejobProperties;
@@ -57,40 +57,32 @@ namespace WindowsCertStore.IntegrationTests
             inventoryJob.CertificateStoreDetails.ClientMachine = connection.Machine;
             inventoryJob.CertificateStoreDetails.StorePath = "My";
             inventoryJob.CertificateStoreDetails.Properties = certStorejobProperties;
+            inventoryJob.Capability = "CertStores.WinCert.Inventory";
             return inventoryJob;
         }
 
-        // Make this dynamic in the future
         private static Dictionary<string, object> GetManagementJobProperties() => new()
         {
-            ["Protocol"] = "https",
-            ["IPAddress"] = "*",
-            ["SiteName"] = "Default Web Site",
-            ["Port"] = "443",
-            ["HostName"] = "",
-            ["SniFlag"] = "0",
-            ["ProviderName"] = "",
-            ["SAN"] = ""
+            ["ProviderName"] = ""
         };
 
-        // Make this dynamic in the future
         private static string GetCertStoreJobProperties(ClientConnection connection) =>
-        JsonConvert.SerializeObject(new Dictionary<string, string>
-        {
-            ["spnwithport"] = "false",
-            ["WinRm Protocol"] = "http",
-            ["WinRm Port"] = "5985",
-            ["ServerUsername"] = connection.Username,
-            ["ServerPassword"] = connection.PrivateKey,
-            ["ServerUseSsl"] = "false",
-            ["JEAEndpointName"] = connection.JEAEndpointName ?? ""
-        });
+            JsonConvert.SerializeObject(new Dictionary<string, string>
+            {
+                ["spnwithport"] = "false",
+                ["WinRm Protocol"] = "http",
+                ["WinRm Port"] = "5985",
+                ["ServerUsername"] = connection.Username,
+                ["ServerPassword"] = connection.PrivateKey,
+                ["ServerUseSsl"] = "false",
+                ["JEAEndpointName"] = connection.JEAEndpointName ?? ""
+            });
 
         private static (bool found, string? alias) FindAliasByThumbprint(IEnumerable<CurrentInventoryItem> inventory, string thumbprint)
         {
             var matchedItem = inventory
                 .FirstOrDefault(item => !string.IsNullOrEmpty(item.Alias) &&
-                                       item.Alias.Split(':')[0].Equals(thumbprint, StringComparison.OrdinalIgnoreCase));
+                                       item.Alias.Equals(thumbprint, StringComparison.OrdinalIgnoreCase));
             return (matchedItem != null, matchedItem?.Alias);
         }
 
@@ -112,8 +104,8 @@ namespace WindowsCertStore.IntegrationTests
         }
 
         [Theory]
-        [MemberData(nameof(ConnectionFactory.GetIISConnections), MemberType = typeof(ConnectionFactory))]
-        public void WinIIS_Management_Add_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
+        [MemberData(nameof(ConnectionFactory.GetWinCertConnections), MemberType = typeof(ConnectionFactory))]
+        public void WinCert_Management_Add_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
         {
             var (thumbprint, base64Pfx, pfxPassword) = CreateTestCertificate();
             var secretResolver = new Mock<IPAMSecretResolver>();
@@ -124,7 +116,7 @@ namespace WindowsCertStore.IntegrationTests
 
             // Add certificate
             var addJob = CreateManagementJobConfig(
-                connection, thumbprint, base64Pfx, pfxPassword, "Test Cert",
+                connection, thumbprint, base64Pfx, pfxPassword, thumbprint,
                 managementJobProperties, certStorejobProperties,
                 Keyfactor.Orchestrators.Common.Enums.CertStoreOperationType.Add, true);
 
@@ -149,7 +141,7 @@ namespace WindowsCertStore.IntegrationTests
 
             // Remove certificate
             var removeJob = CreateManagementJobConfig(
-                connection, null, "", "", returnedAlias ?? "",
+                connection, null, "", "", returnedAlias ?? thumbprint,
                 managementJobProperties, certStorejobProperties,
                 Keyfactor.Orchestrators.Common.Enums.CertStoreOperationType.Remove, false);
 
@@ -159,8 +151,8 @@ namespace WindowsCertStore.IntegrationTests
         }
 
         [Theory]
-        [MemberData(nameof(ConnectionFactory.GetIISConnections), MemberType = typeof(ConnectionFactory))]
-        public void WinIIS_Management_Add_Inventory_Renewal_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
+        [MemberData(nameof(ConnectionFactory.GetWinCertConnections), MemberType = typeof(ConnectionFactory))]
+        public void WinCert_Management_Add_Inventory_Renewal_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
         {
             var (thumbprint, base64Pfx, pfxPassword) = CreateTestCertificate();
             var secretResolver = new Mock<IPAMSecretResolver>();
@@ -169,9 +161,9 @@ namespace WindowsCertStore.IntegrationTests
             var managementJobProperties = GetManagementJobProperties();
             var certStorejobProperties = GetCertStoreJobProperties(connection);
 
-            // Add certificate
+            // Add original certificate
             var addJob = CreateManagementJobConfig(
-                connection, "", base64Pfx, pfxPassword, "",
+                connection, thumbprint, base64Pfx, pfxPassword, thumbprint,
                 managementJobProperties, certStorejobProperties,
                 Keyfactor.Orchestrators.Common.Enums.CertStoreOperationType.Add, true);
 
@@ -191,13 +183,13 @@ namespace WindowsCertStore.IntegrationTests
             result = inventory.ProcessJob(inventoryJob, submitInventoryUpdate);
             AssertJobResult(result.Result, result.FailureMessage);
 
-            var (thumbprintFound, returnedAlias) = FindAliasByThumbprint(returnedInventory, thumbprint);
+            var (thumbprintFound, _) = FindAliasByThumbprint(returnedInventory, thumbprint);
             Assert.True(thumbprintFound, $"The inventory did not return the expected certificate with thumbprint: {thumbprint}");
 
-            // Renew certificate
+            // Renew: add new certificate referencing original thumbprint
             var (renewalThumbprint, renewalBase64Pfx, renewalPfxPassword) = CreateTestCertificate();
             var renewalJob = CreateManagementJobConfig(
-                connection, thumbprint, renewalBase64Pfx, renewalPfxPassword, "",
+                connection, thumbprint, renewalBase64Pfx, renewalPfxPassword, renewalThumbprint,
                 managementJobProperties, certStorejobProperties,
                 Keyfactor.Orchestrators.Common.Enums.CertStoreOperationType.Add, true);
 
@@ -216,11 +208,11 @@ namespace WindowsCertStore.IntegrationTests
             AssertJobResult(result.Result, result.FailureMessage);
 
             var (renewalThumbprintFound, renewalReturnedAlias) = FindAliasByThumbprint(returnedInventory, renewalThumbprint);
-            Assert.True(renewalThumbprintFound, $"The inventory returned the expected certificate with thumbprint: {renewalThumbprint}");
+            Assert.True(renewalThumbprintFound, $"The inventory did not return the renewed certificate with thumbprint: {renewalThumbprint}");
 
             // Remove renewed certificate
             var removeJob = CreateManagementJobConfig(
-                connection, null, "", "", renewalReturnedAlias ?? "",
+                connection, null, "", "", renewalReturnedAlias ?? renewalThumbprint,
                 managementJobProperties, certStorejobProperties,
                 Keyfactor.Orchestrators.Common.Enums.CertStoreOperationType.Remove, false);
 

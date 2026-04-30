@@ -1,4 +1,4 @@
-function Test-ValidSslFlags {
+﻿function Test-ValidSslFlags {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -66,7 +66,7 @@ function Test-ValidSslFlags {
     $successMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) is valid for this system (Build: $build)."
     
     if ($ThrowOnError) {
-        Write-Verbose $successMsg
+        Write-Information "[VERBOSE] $successMsg"
         return $true
     }
     else {

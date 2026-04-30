@@ -1,4 +1,4 @@
-function Get-CertificateCSP 
+﻿function Get-CertificateCSP 
 {
     param(
         [System.Security.Cryptography.X509Certificates.X509Certificate2]$cert
@@ -17,7 +17,7 @@ function Get-CertificateCSP
             }
         }
         catch {
-            Write-Verbose "CNG provider lookup failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] CNG provider lookup failed: $($_.Exception.Message)"
         }
         return $null
     }
@@ -45,7 +45,7 @@ function Get-CertificateCSP
             }
         }
         catch {
-            Write-Verbose "RSA CNG detection failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] RSA CNG detection failed: $($_.Exception.Message)"
         }
 
         # ── 3. ECC / ECDsa (ECDsaCng) ─────────────────────────────────────────
@@ -56,12 +56,12 @@ function Get-CertificateCSP
                 $providerName = Get-CngProviderName $ecKey
                 if ($providerName) { return $providerName }
 
-                Write-Verbose "ECC key detected but no resolvable provider name (type: $($ecKey.GetType().Name))"
+                Write-Information "[VERBOSE] ECC key detected but no resolvable provider name (type: $($ecKey.GetType().Name))"
                 return ""
             }
         }
         catch {
-            Write-Verbose "ECDsa CNG detection failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] ECDsa CNG detection failed: $($_.Exception.Message)"
         }
 
         # ── 4. DSA (bonus) ────────────────────────────────────────────────────
@@ -71,15 +71,15 @@ function Get-CertificateCSP
                 $providerName = Get-CngProviderName $dsaKey
                 if ($providerName) { return $providerName }
 
-                Write-Verbose "DSA key detected but no resolvable provider name (type: $($dsaKey.GetType().Name))"
+                Write-Information "[VERBOSE] DSA key detected but no resolvable provider name (type: $($dsaKey.GetType().Name))"
                 return ""
             }
         }
         catch {
-            Write-Verbose "DSA CNG detection failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] DSA CNG detection failed: $($_.Exception.Message)"
         }
 
-        Write-Verbose "No supported key type detected; provider name could not be determined"
+        Write-Information "[VERBOSE] No supported key type detected; provider name could not be determined"
         return ""
     }
     catch {

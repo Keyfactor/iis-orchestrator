@@ -1,7 +1,7 @@
-function Get-CryptoProviders {
+﻿function Get-CryptoProviders {
     # Retrieves the list of available Crypto Service Providers using certutil
     try {
-        Write-Verbose "Retrieving Crypto Service Providers using certutil..."
+        Write-Information "[VERBOSE] Retrieving Crypto Service Providers using certutil..."
         $certUtilOutput = certutil -csplist
         
         # Parse the output to extract CSP names
@@ -17,8 +17,8 @@ function Get-CryptoProviders {
             throw "No Crypto Service Providers were found. Ensure certutil is functioning properly."
         }
 
-        Write-Verbose "Retrieved the following CSPs:"
-        $cspInfoList | ForEach-Object { Write-Verbose $_ }
+        Write-Information "[VERBOSE] Retrieved the following CSPs:"
+        $cspInfoList | ForEach-Object { Write-Information "[VERBOSE] $_" }
 
         return $cspInfoList
     } catch {

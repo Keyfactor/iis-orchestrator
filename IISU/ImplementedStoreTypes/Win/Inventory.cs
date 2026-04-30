@@ -81,7 +81,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     settings.IncludePortInSPN = jobProperties.SpnPortFlag;
                     settings.ServerUserName = serverUserName;
                     settings.ServerPassword = serverPassword;
-                    settings.UseJEA = jobProperties.UseJEA;
                     settings.JEAEndpointName = jobProperties.JEAEndpointName;
 
                     _logger.LogTrace($"Querying Window certificate in store: {storePath}");
@@ -128,7 +127,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, useJea: settings.UseJEA, jeaEndpoint: settings.JEAEndpointName))
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, jeaEndpoint: settings.JEAEndpointName))
             {
                 ps.Initialize();
 

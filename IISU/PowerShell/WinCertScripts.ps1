@@ -171,7 +171,7 @@ function Add-KFCertificateToStore{
 
     try {
         Write-Information "Entering PowerShell Script Add-KFCertificate"
-        Write-Verbose "Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
+        Write-Information "[VERBOSE] Add-KFCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
 
         # Get the thumbprint of the passed in certificate
         # Convert password to secure string if provided, otherwise use $null
@@ -210,13 +210,13 @@ function Add-KFCertificateToStore{
                 $arguments = @('-f')
 
                 if ($PrivateKeyPassword) {
-                    Write-Verbose "Has a private key"
+                    Write-Information "[VERBOSE] Has a private key"
                     $arguments += '-p'
                     $arguments += $PrivateKeyPassword
                 }
 
                 if ($CryptoServiceProvider) {
-                    Write-Verbose "Has a CryptoServiceProvider: $CryptoServiceProvider"
+                    Write-Information "[VERBOSE] Has a CryptoServiceProvider: $CryptoServiceProvider"
                     $arguments += '-csp'
                     $arguments += $CryptoServiceProvider
                 }
@@ -230,7 +230,7 @@ function Add-KFCertificateToStore{
                     if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
                 }) -join ' '
 
-                write-Verbose "Running certutil with arguments: $argLine"
+                Write-Information "[VERBOSE] Running certutil with arguments: $argLine"
 
                 # Setup process execution
                 $processInfo = New-Object System.Diagnostics.ProcessStartInfo
@@ -441,7 +441,7 @@ function New-KFIISSiteBinding {
     )
 
     Write-Information "Entering PowerShell Script: New-KFIISSiteBinding" -InformationAction SilentlyContinue
-    Write-Verbose "Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
+    Write-Information "[VERBOSE] Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
 
     try {
         # Step 1: Perform verifications and get management info
@@ -458,7 +458,7 @@ function New-KFIISSiteBinding {
 
         # Step 2: Remove existing HTTPS bindings for this binding info
         $searchBindings = "${IPAddress}:${Port}:${Hostname}"
-        Write-Verbose "Removing existing HTTPS bindings for: $searchBindings"
+        Write-Information "[VERBOSE] Removing existing HTTPS bindings for: $searchBindings"
     
         $removalResult = Remove-ExistingIISBinding -SiteName $SiteName -BindingInfo $searchBindings -UseIISDrive $managementInfo.UseIISDrive
         if ($removalResult.Status -eq 'Error') {
@@ -467,14 +467,14 @@ function New-KFIISSiteBinding {
 
         # Step 3: Determine SslFlags supported by Microsoft.Web.Administration
         if ($SslFlags -gt 3) {
-            Write-Verbose "SslFlags value $SslFlags exceeds managed API range (0–3). Applying reduced flags for creation."
+            Write-Information "[VERBOSE] SslFlags value $SslFlags exceeds managed API range (0–3). Applying reduced flags for creation."
             $SslFlagsApplied = ($SslFlags -band 3)
         } else {
             $SslFlagsApplied = $SslFlags
         }
 
         # Step 4: Add the new binding with the reduced flag set
-        Write-Verbose "Adding new binding with SSL certificate (SslFlagsApplied=$SslFlagsApplied)"
+        Write-Information "[VERBOSE] Adding new binding with SSL certificate (SslFlagsApplied=$SslFlagsApplied)"
     
         $addParams = @{
             SiteName    = $SiteName
@@ -496,7 +496,7 @@ function New-KFIISSiteBinding {
 
         # Step 5: If extended flags, update via appcmd.exe
         if ($SslFlags -gt 3) {
-            Write-Verbose "Applying full SslFlags=$SslFlags via appcmd"
+            Write-Information "[VERBOSE] Applying full SslFlags=$SslFlags via appcmd"
 
             $appcmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
 
@@ -514,16 +514,16 @@ function New-KFIISSiteBinding {
             # Build binding argument for appcmd
             $bindingArg = "/bindings.[protocol='https',bindingInformation='$bindingInfo'].sslFlags:$SslFlags"
 
-            Write-Verbose "Running appcmd: $appcmd $siteArg $bindingArg"
+            Write-Information "[VERBOSE] Running appcmd: $appcmd $siteArg $bindingArg"
             $appcmdOutput = & $appcmd set site $siteArg $bindingArg 2>&1
-            Write-Verbose "appcmd output: $appcmdOutput"
+            Write-Information "[VERBOSE] appcmd output: $appcmdOutput"
         
             #& $appcmd set site $siteArg $bindingArg | Out-Null
 
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "appcmd failed to set extended SslFlags ($SslFlags) for binding $bindingInfo."
             } else {
-                Write-Verbose "Successfully updated SslFlags to $SslFlags via appcmd."
+                Write-Information "[VERBOSE] Successfully updated SslFlags to $SslFlags via appcmd."
             }
         }
 
@@ -552,11 +552,11 @@ function Remove-ExistingIISBinding {
         [bool]$UseIISDrive
     )
 
-    Write-Verbose "Removing existing bindings for exact match: $BindingInfo on site $SiteName (mimics IIS replace behavior)"
+    Write-Information "[VERBOSE] Removing existing bindings for exact match: $BindingInfo on site $SiteName (mimics IIS replace behavior)"
 
     try {
         if ($UseIISDrive) {
-            Write-Verbose "Using IIS Drive to remove binding"
+            Write-Information "[VERBOSE] Using IIS Drive to remove binding"
             $sitePath = "IIS:\Sites\$SiteName"
             $site = Get-Item $sitePath
             $httpsBindings = $site.Bindings.Collection | Where-Object {
@@ -567,13 +567,13 @@ function Remove-ExistingIISBinding {
                 $bindingInfo = $binding.GetAttributeValue("bindingInformation")
                 $protocol = $binding.protocol
 
-                Write-Verbose "Removing binding: $bindingInfo ($protocol)"
+                Write-Information "[VERBOSE] Removing binding: $bindingInfo ($protocol)"
                 Remove-WebBinding -Name $SiteName -BindingInformation $bindingInfo -Protocol $protocol -Confirm:$false
-                Write-Verbose "Successfully removed binding"
+                Write-Information "[VERBOSE] Successfully removed binding"
             }
         }
         else {
-            Write-Verbose "Using Web Administration assembly to remove binding"
+            Write-Information "[VERBOSE] Using Web Administration assembly to remove binding"
             # ServerManager fallback
             Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
             $iis = New-Object Microsoft.Web.Administration.ServerManager
@@ -584,13 +584,13 @@ function Remove-ExistingIISBinding {
             }
 
             foreach ($binding in $httpsBindings) {
-                Write-Verbose "Removing binding: $($binding.BindingInformation)"
+                Write-Information "[VERBOSE] Removing binding: $($binding.BindingInformation)"
                 $site.Bindings.Remove($binding)
-                Write-Verbose "Successfully removed binding"
+                Write-Information "[VERBOSE] Successfully removed binding"
             }
             
             $iis.CommitChanges()
-            Write-Verbose "Committed changes to IIS"
+            Write-Information "[VERBOSE] Committed changes to IIS"
         }
 
         return New-ResultObject -Status Success -Code 0 -Step RemoveBinding -Message "Successfully removed existing bindings"
@@ -633,7 +633,7 @@ function Add-IISBindingWithSSL {
         [bool]$UseIISDrive
     )
 
-    Write-Verbose "Adding binding: Protocol=$Protocol, IP=$IPAddress, Port=$Port, Host='$Hostname'"
+    Write-Information "[VERBOSE] Adding binding: Protocol=$Protocol, IP=$IPAddress, Port=$Port, Host='$Hostname'"
 
     try {
         if ($UseIISDrive) {
@@ -651,22 +651,22 @@ function Add-IISBindingWithSSL {
                 $bindingParams.HostHeader = $Hostname
             }
             
-            Write-Verbose "Creating new web binding with parameters: $(($bindingParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')"
+            Write-Information "[VERBOSE] Creating new web binding with parameters: $(($bindingParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')"
             New-WebBinding @bindingParams
 
             # Bind SSL certificate if HTTPS
             if ($Protocol -eq "https" -and -not [string]::IsNullOrEmpty($Thumbprint)) {
                 $searchBindings = "${IPAddress}:${Port}:${Hostname}"
-                Write-Verbose "Searching for binding: $searchBindings"
+                Write-Information "[VERBOSE] Searching for binding: $searchBindings"
                 
                 $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol | Where-Object {
                     $_.bindingInformation -eq $searchBindings
                 }
 
                 if ($binding) {
-                    Write-Verbose "Binding SSL certificate with thumbprint: $Thumbprint"
+                    Write-Information "[VERBOSE] Binding SSL certificate with thumbprint: $Thumbprint"
                     $null = $binding.AddSslCertificate($Thumbprint, $StoreName)
-                    Write-Verbose "SSL certificate successfully bound"
+                    Write-Information "[VERBOSE] SSL certificate successfully bound"
                     return New-ResultObject -Status Success -Code 0 -Step BindSSL -Message "Binding and SSL certificate successfully applied"
                 } else {
                     return New-ResultObject -Status Error -Code 202 -Step BindSSL -ErrorMessage "No binding found for: $searchBindings"
@@ -718,7 +718,7 @@ function Remove-KFIISSiteBinding {
         [Parameter(Mandatory = $false)] [string] $Hostname
     )
 
-    Write-Verbose "Entering PowerShell Scrip Remove-KFIISiteBinding with arguments Sitename: '$SiteName', IP Address: '$IPAddress', Port: $Port, Hostname: '$Hostname'"
+    Write-Information "[VERBOSE] Entering PowerShell Scrip Remove-KFIISiteBinding with arguments Sitename: '$SiteName', IP Address: '$IPAddress', Port: $Port, Hostname: '$Hostname'"
 
     try {
         Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
@@ -737,14 +737,14 @@ function Remove-KFIISSiteBinding {
 
         $searchBindingInfo = if ($HostName) { "$IPAddress`:$Port`:$HostName" } else { "$IPAddress`:$Port`:" }
 
-        Write-Verbose "Searching Site for bindings: $searchBindingInfo"
+        Write-Information "[VERBOSE] Searching Site for bindings: $searchBindingInfo"
         $httpsBinding = $site.Bindings | Where-Object { $_.bindingInformation -eq $searchBindingInfo -and $_.protocol -eq 'https' }
 
         if ($httpsBinding)
         {
             $site.Bindings.Remove($httpsBinding)
             $serverManager.CommitChanges()
-            Write-Verbose "Removed binding $httpsBinding from site '$SiteName'."
+            Write-Information "[VERBOSE] Removed binding $httpsBinding from site '$SiteName'."
 
             return $true
         }
@@ -823,6 +823,7 @@ function Remove-KFIISCertificateIfUnused {
 #####
 
 # Function to get certificate information for a SQL Server instance
+# Migrated
 function GET-KFSQLInventory {
     # Retrieve all SQL Server instances
     $sqlInstances = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server").InstalledInstances
@@ -894,6 +895,7 @@ function GET-KFSQLInventory {
     return $myBoundCerts  | ConvertTo-Json
 }
 
+# Migrated to New-KeyfactorSQLCertificate
 function Bind-KFSqlCertificate { 
     param (
         [string]$SQLInstance,
@@ -921,10 +923,10 @@ function Bind-KFSqlCertificate {
                     $bindingSuccess = $false
                     continue
                 }
-                Write-Verbose "Instance: $instance"
-                Write-Verbose "Full Instance: $fullInstance"
-                Write-Verbose "Registry Location: $regLocation"
-                Write-Verbose "Current Thumbprint: $currentThumbprint"
+                Write-Information "[VERBOSE] Instance: $instance"
+                Write-Information "[VERBOSE] Full Instance: $fullInstance"
+                Write-Information "[VERBOSE] Registry Location: $regLocation"
+                Write-Information "[VERBOSE] Current Thumbprint: $currentThumbprint"
 
                 $currentThumbprint = Get-ItemPropertyValue -Path $regLocation -Name "Certificate" -ErrorAction SilentlyContinue
 
@@ -955,6 +957,7 @@ function Bind-KFSqlCertificate {
     return $bindingSuccess
 }
 
+# Migrated
 function Set-KFSQLCertificateBinding {
     <#
     .SYNOPSIS
@@ -1003,8 +1006,8 @@ function Set-KFSQLCertificateBinding {
             $fullInstance = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $InstanceName -ErrorAction Stop
             $RegistryPath = Get-SqlCertRegistryLocation -InstanceName $fullInstance
             
-            Write-Verbose "Full instance name: $fullInstance"
-            Write-Verbose "Registry path: $RegistryPath"
+            Write-Information "[VERBOSE] Full instance name: $fullInstance"
+            Write-Information "[VERBOSE] Registry path: $RegistryPath"
             Write-Information "SQL Server instance registry path located: $RegistryPath"
         }
         catch {
@@ -1022,9 +1025,9 @@ function Set-KFSQLCertificateBinding {
             $currentThumbprint = Get-ItemPropertyValue -Path $RegistryPath -Name "Certificate" -ErrorAction SilentlyContinue
             
             if ($currentThumbprint) {
-                Write-Verbose "Current certificate thumbprint: $currentThumbprint"
+                Write-Information "[VERBOSE] Current certificate thumbprint: $currentThumbprint"
             } else {
-                Write-Verbose "No existing certificate thumbprint found"
+                Write-Information "[VERBOSE] No existing certificate thumbprint found"
             }
             
             # Set new thumbprint
@@ -1061,19 +1064,19 @@ function Set-KFSQLCertificateBinding {
             # Normalize service account name for ACL operations
             if ($SqlServiceUser -eq "LocalSystem") {
                 $SqlServiceUser = "NT AUTHORITY\SYSTEM"
-                Write-Verbose "Normalized LocalSystem to: $SqlServiceUser"
+                Write-Information "[VERBOSE] Normalized LocalSystem to: $SqlServiceUser"
             } 
             elseif ($SqlServiceUser -match "^NT Service\\") {
                 # NT Service accounts are already in correct format
-                Write-Verbose "Using NT Service account: $SqlServiceUser"
+                Write-Information "[VERBOSE] Using NT Service account: $SqlServiceUser"
             }
             elseif ($SqlServiceUser.StartsWith(".\")) {
                 # Local account - convert to machine\user format
                 $SqlServiceUser = "$env:COMPUTERNAME$($SqlServiceUser.Substring(1))"
-                Write-Verbose "Normalized local account to: $SqlServiceUser"
+                Write-Information "[VERBOSE] Normalized local account to: $SqlServiceUser"
             }
             
-            Write-Verbose "Service name: $serviceName"
+            Write-Information "[VERBOSE] Service name: $serviceName"
             Write-Information "SQL Server service account: $SqlServiceUser"
         }
         catch {
@@ -1094,7 +1097,7 @@ function Set-KFSQLCertificateBinding {
                 throw "Certificate with thumbprint $NewThumbprint not found in LocalMachine\My store"
             }
     
-            Write-Verbose "Certificate found: $($Cert.Subject)"
+            Write-Information "[VERBOSE] Certificate found: $($Cert.Subject)"
     
             if (-not $Cert.HasPrivateKey) {
                 throw "Certificate does not have a private key"
@@ -1112,8 +1115,8 @@ function Set-KFSQLCertificateBinding {
                 if ($rsaKey -is [System.Security.Cryptography.RSACng]) {
                     $privKey = $rsaKey.Key.UniqueName
                     $keyStorageType = "CNG"
-                    Write-Verbose "Certificate uses CNG key storage"
-                    Write-Verbose "CNG key unique name: $privKey"
+                    Write-Information "[VERBOSE] Certificate uses CNG key storage"
+                    Write-Information "[VERBOSE] CNG key unique name: $privKey"
             
                     # CNG keys can be in multiple locations - check them all
                     $possiblePaths = @(
@@ -1122,19 +1125,19 @@ function Set-KFSQLCertificateBinding {
                         "$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\$privKey"
                     )
             
-                    Write-Verbose "Searching for CNG private key in known locations..."
+                    Write-Information "[VERBOSE] Searching for CNG private key in known locations..."
                     foreach ($path in $possiblePaths) {
-                        Write-Verbose "Checking: $path"
+                        Write-Information "[VERBOSE] Checking: $path"
                         if (Test-Path $path) {
                             $privKeyPath = Get-Item $path -ErrorAction Stop
-                            Write-Verbose "Found CNG private key at: $path"
+                            Write-Information "[VERBOSE] Found CNG private key at: $path"
                             break
                         }
                     }
             
                     # If not found in standard locations, search more broadly
                     if (-not $privKeyPath) {
-                        Write-Verbose "Key not found in standard locations. Searching all Crypto directories..."
+                        Write-Information "[VERBOSE] Key not found in standard locations. Searching all Crypto directories..."
                 
                         $searchPaths = @(
                             "$($env:ProgramData)\Microsoft\Crypto\Keys",
@@ -1147,7 +1150,7 @@ function Set-KFSQLCertificateBinding {
                                 $found = Get-ChildItem -Path $searchPath -Filter "*$privKey*" -ErrorAction SilentlyContinue | Select-Object -First 1
                                 if ($found) {
                                     $privKeyPath = $found
-                                    Write-Verbose "Found CNG private key at: $($privKeyPath.FullName)"
+                                    Write-Information "[VERBOSE] Found CNG private key at: $($privKeyPath.FullName)"
                                     break
                                 }
                             }
@@ -1160,13 +1163,13 @@ function Set-KFSQLCertificateBinding {
                 }
             }
             catch {
-                Write-Verbose "CNG key detection failed or not applicable: $_"
-                Write-Verbose "Exception type: $($_.Exception.GetType().FullName)"
+                Write-Information "[VERBOSE] CNG key detection failed or not applicable: $_"
+                Write-Information "[VERBOSE] Exception type: $($_.Exception.GetType().FullName)"
             }
     
             # Fallback to CAPI/CSP (legacy certificates)
             if (-not $privKey -or -not $privKeyPath) {
-                Write-Verbose "Attempting CAPI/CSP key detection..."
+                Write-Information "[VERBOSE] Attempting CAPI/CSP key detection..."
         
                 try {
                     if ($Cert.PrivateKey -and $Cert.PrivateKey.CspKeyContainerInfo) {
@@ -1174,15 +1177,15 @@ function Set-KFSQLCertificateBinding {
                         $keyPath = "$($env:ProgramData)\Microsoft\Crypto\RSA\MachineKeys\"
                         $keyStorageType = "CAPI/CSP"
                 
-                        Write-Verbose "CAPI/CSP key unique name: $privKey"
-                        Write-Verbose "Expected path: $keyPath$privKey"
+                        Write-Information "[VERBOSE] CAPI/CSP key unique name: $privKey"
+                        Write-Information "[VERBOSE] Expected path: $keyPath$privKey"
                 
                         $privKeyPath = Get-Item "$keyPath\$privKey" -ErrorAction Stop
                         Write-Information "Certificate uses CAPI/CSP (legacy) key storage"
                     }
                 }
                 catch {
-                    Write-Verbose "CAPI/CSP key detection failed: $_"
+                    Write-Information "[VERBOSE] CAPI/CSP key detection failed: $_"
                 }
             }
     
@@ -1202,7 +1205,7 @@ function Set-KFSQLCertificateBinding {
         
                 foreach ($searchPath in $allCryptoPaths) {
                     if (Test-Path $searchPath) {
-                        Write-Verbose "Searching in: $searchPath"
+                        Write-Information "[VERBOSE] Searching in: $searchPath"
                         $found = Get-ChildItem -Path $searchPath -File -ErrorAction SilentlyContinue | 
                             Where-Object { $_.Name -like "*$privKey*" -or $_.Name -eq $privKey } |
                             Select-Object -First 1
@@ -1221,13 +1224,13 @@ function Set-KFSQLCertificateBinding {
             }
     
             Write-Information "Private key located at: $($privKeyPath.FullName)"
-            Write-Verbose "Key storage type: $keyStorageType"
-            Write-Verbose "Key file size: $($privKeyPath.Length) bytes"
+            Write-Information "[VERBOSE] Key storage type: $keyStorageType"
+            Write-Information "[VERBOSE] Key file size: $($privKeyPath.Length) bytes"
     
             # Verify we can read the key file
             try {
                 $acl = Get-Acl -Path $privKeyPath.FullName -ErrorAction Stop
-                Write-Verbose "Successfully accessed private key file ACL"
+                Write-Information "[VERBOSE] Successfully accessed private key file ACL"
             }
             catch {
                 Write-Warning "Could not read ACL from private key file: $_"
@@ -1249,7 +1252,7 @@ function Set-KFSQLCertificateBinding {
             
             # Attempt 1: Try Set-Acl (works in most local scenarios and some SSH sessions)
             try {
-                Write-Verbose "Attempting ACL update using Set-Acl method..."
+                Write-Information "[VERBOSE] Attempting ACL update using Set-Acl method..."
                 
                 $Acl = Get-Acl -Path $privKeyPath -ErrorAction Stop
                 $Ar = New-Object System.Security.AccessControl.FileSystemAccessRule(
@@ -1278,19 +1281,19 @@ function Set-KFSQLCertificateBinding {
             }
             catch {
                 Write-Warning "Set-Acl method failed: $_"
-                Write-Verbose "Error details: $($_.Exception.Message)"
+                Write-Information "[VERBOSE] Error details: $($_.Exception.Message)"
             }
             
             # Attempt 2: Use icacls (more reliable in SSH sessions)
             if (-not $aclSet) {
-                Write-Verbose "Attempting ACL update using icacls method..."
+                Write-Information "[VERBOSE] Attempting ACL update using icacls method..."
                 
                 try {
                     # Execute icacls to grant Read permissions
                     $icaclsResult = & icacls.exe $privKeyPath.FullName /grant "${SqlServiceUser}:(R)" 2>&1
                     
                     if ($LASTEXITCODE -eq 0) {
-                        Write-Verbose "icacls command executed successfully"
+                        Write-Information "[VERBOSE] icacls command executed successfully"
                         
                         # Verify with icacls
                         $verifyResult = & icacls.exe $privKeyPath.FullName 2>&1
@@ -1304,7 +1307,7 @@ function Set-KFSQLCertificateBinding {
                         }
                     } else {
                         Write-Warning "icacls failed with exit code $LASTEXITCODE"
-                        Write-Verbose "icacls output: $icaclsResult"
+                        Write-Information "[VERBOSE] icacls output: $icaclsResult"
                     }
                 }
                 catch {
@@ -1348,7 +1351,7 @@ try {
 "@
                     
                     Set-Content -Path $tempScriptPath -Value $scriptContent
-                    Write-Verbose "Created temporary script: $tempScriptPath"
+                    Write-Information "[VERBOSE] Created temporary script: $tempScriptPath"
                     
                     # Create and register the scheduled task
                     $taskName = "SetCertACL_$((Get-Date).Ticks)"
@@ -1358,10 +1361,10 @@ try {
                     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
                     
                     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -ErrorAction Stop | Out-Null
-                    Write-Verbose "Scheduled task registered: $taskName"
+                    Write-Information "[VERBOSE] Scheduled task registered: $taskName"
                     
                     # Wait for task to complete
-                    Write-Verbose "Waiting for scheduled task to complete..."
+                    Write-Information "[VERBOSE] Waiting for scheduled task to complete..."
                     Start-Sleep -Seconds 5
                     
                     # Check results
@@ -1415,7 +1418,7 @@ try {
                 $service = Get-Service -Name $serviceName -ErrorAction Stop
                 $originalStatus = $service.Status
                 
-                Write-Verbose "Current service status: $originalStatus"
+                Write-Information "[VERBOSE] Current service status: $originalStatus"
                 
                 # Stop the service if running
                 if ($originalStatus -eq 'Running') {
@@ -1429,7 +1432,7 @@ try {
                     while ((Get-Service -Name $serviceName).Status -ne 'Stopped' -and $elapsed -lt $stopTimeout) {
                         Start-Sleep -Seconds 2
                         $elapsed += 2
-                        Write-Verbose "Waiting for service to stop... ($elapsed seconds)"
+                        Write-Information "[VERBOSE] Waiting for service to stop... ($elapsed seconds)"
                     }
                     
                     if ((Get-Service -Name $serviceName).Status -ne 'Stopped') {
@@ -1450,7 +1453,7 @@ try {
                 while ((Get-Service -Name $serviceName).Status -ne 'Running' -and $elapsed -lt $startTimeout) {
                     Start-Sleep -Seconds 2
                     $elapsed += 2
-                    Write-Verbose "Waiting for service to start... ($elapsed seconds)"
+                    Write-Information "[VERBOSE] Waiting for service to start... ($elapsed seconds)"
                 }
                 
                 $finalStatus = (Get-Service -Name $serviceName).Status
@@ -1498,11 +1501,12 @@ try {
     catch {
         Write-Error "Certificate binding failed for instance $InstanceName"
         Write-Error "Error: $_"
-        Write-Verbose "Stack trace: $($_.ScriptStackTrace)"
+        Write-Information "[VERBOSE] Stack trace: $($_.ScriptStackTrace)"
         return $false
     }
 }
 
+# Migrated
 function Unbind-KFSqlCertificate {
     param (
         [string]$SQLInstanceNames,   # Comma-separated list of SQL instances
@@ -1560,6 +1564,7 @@ function Unbind-KFSqlCertificate {
 # Bind-CertificateToSqlInstance -Thumbprint "123ABC456DEF" -SqlInstanceName "MSSQLSERVER"
 }
 
+# Migrated
 function Get-SqlServiceName {
     param (
         [string]$InstanceName
@@ -1571,6 +1576,7 @@ function Get-SqlServiceName {
     }
 }
 
+# Migrated
 function Get-SQLServiceUser {
     param (
         [Parameter(Mandatory = $true)]
@@ -1593,6 +1599,7 @@ function Get-SQLServiceUser {
 #####
 
 ##### ReEnrollment (ODKG) functions
+# Migrated
 function New-CSREnrollment {
     param (
         [string]$SubjectText,
@@ -1641,7 +1648,7 @@ KeySpec = 0
 $sanContent
 "@
 
-    Write-Verbose "INF Contents: $infContent"
+    Write-Information "[VERBOSE] INF Contents: $infContent"
 
     # Path to temporary INF file
     $infFile = [System.IO.Path]::GetTempFileName() + ".inf"
@@ -1702,11 +1709,11 @@ function Import-SignedCertificate {
 
     try {
         # Step 1: Convert raw certificate data to Base64 string with line breaks
-        Write-Verbose "Converting raw certificate data to Base64 string."
+        Write-Information "[VERBOSE] Converting raw certificate data to Base64 string."
         $csrData = [System.Convert]::ToBase64String($RawData, [System.Base64FormattingOptions]::InsertLineBreaks)
 
         # Step 2: Create PEM-formatted certificate content
-        Write-Verbose "Creating PEM-formatted certificate content."
+        Write-Information "[VERBOSE] Creating PEM-formatted certificate content."
         $certContent = @(
             "-----BEGIN CERTIFICATE-----"
             $csrData
@@ -1714,18 +1721,18 @@ function Import-SignedCertificate {
         ) -join "`n"
 
         # Step 3: Create a temporary file for the certificate
-        Write-Verbose "Creating a temporary file for the certificate."
+        Write-Information "[VERBOSE] Creating a temporary file for the certificate."
         $cerFilename = [System.IO.Path]::GetTempFileName()
         Set-Content -Path $cerFilename -Value $certContent -Force
-        Write-Verbose "Temporary certificate file created at: $cerFilename"
+        Write-Information "[VERBOSE] Temporary certificate file created at: $cerFilename"
 
         # Step 4: Import the certificate into the specified store
-        Write-Verbose "Importing the certificate to the store: Cert:\LocalMachine\$StoreName"
+        Write-Information "[VERBOSE] Importing the certificate to the store: Cert:\LocalMachine\$StoreName"
         Set-Location -Path "Cert:\LocalMachine\$StoreName"
 
         $importResult = Import-Certificate -FilePath $cerFilename
         if ($importResult) {
-            Write-Verbose "Certificate successfully imported to Cert:\LocalMachine\$StoreName."
+            Write-Information "[VERBOSE] Certificate successfully imported to Cert:\LocalMachine\$StoreName."
         } else {
             throw "Certificate import failed."
         }
@@ -1733,7 +1740,7 @@ function Import-SignedCertificate {
         # Step 5: Cleanup temporary file
         if (Test-Path $cerFilename) {
             Remove-Item -Path $cerFilename -Force
-            Write-Verbose "Temporary file deleted: $cerFilename"
+            Write-Information "[VERBOSE] Temporary file deleted: $cerFilename"
         }
 
         # Step 6: Return the imported certificate's thumbprint
@@ -1793,7 +1800,7 @@ function Get-CertificateCSP {
             }
         }
         catch {
-            Write-Verbose "CNG provider lookup failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] CNG provider lookup failed: $($_.Exception.Message)"
         }
         return $null
     }
@@ -1821,7 +1828,7 @@ function Get-CertificateCSP {
             }
         }
         catch {
-            Write-Verbose "RSA CNG detection failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] RSA CNG detection failed: $($_.Exception.Message)"
         }
 
         # ── 3. ECC / ECDsa (ECDsaCng) ─────────────────────────────────────────
@@ -1832,12 +1839,12 @@ function Get-CertificateCSP {
                 $providerName = Get-CngProviderName $ecKey
                 if ($providerName) { return $providerName }
 
-                Write-Verbose "ECC key detected but no resolvable provider name (type: $($ecKey.GetType().Name))"
+                Write-Information "[VERBOSE] ECC key detected but no resolvable provider name (type: $($ecKey.GetType().Name))"
                 return ""
             }
         }
         catch {
-            Write-Verbose "ECDsa CNG detection failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] ECDsa CNG detection failed: $($_.Exception.Message)"
         }
 
         # ── 4. DSA (bonus) ────────────────────────────────────────────────────
@@ -1847,15 +1854,15 @@ function Get-CertificateCSP {
                 $providerName = Get-CngProviderName $dsaKey
                 if ($providerName) { return $providerName }
 
-                Write-Verbose "DSA key detected but no resolvable provider name (type: $($dsaKey.GetType().Name))"
+                Write-Information "[VERBOSE] DSA key detected but no resolvable provider name (type: $($dsaKey.GetType().Name))"
                 return ""
             }
         }
         catch {
-            Write-Verbose "DSA CNG detection failed: $($_.Exception.Message)"
+            Write-Information "[VERBOSE] DSA CNG detection failed: $($_.Exception.Message)"
         }
 
-        Write-Verbose "No supported key type detected; provider name could not be determined"
+        Write-Information "[VERBOSE] No supported key type detected; provider name could not be determined"
         return ""
     }
     catch {
@@ -1868,7 +1875,7 @@ function Get-CertificateCSP {
 function Get-CryptoProviders {
     # Retrieves the list of available Crypto Service Providers using certutil
     try {
-        Write-Verbose "Retrieving Crypto Service Providers using certutil..."
+        Write-Information "[VERBOSE] Retrieving Crypto Service Providers using certutil..."
         $certUtilOutput = certutil -csplist
         
         # Parse the output to extract CSP names
@@ -1884,8 +1891,8 @@ function Get-CryptoProviders {
             throw "No Crypto Service Providers were found. Ensure certutil is functioning properly."
         }
 
-        Write-Verbose "Retrieved the following CSPs:"
-        $cspInfoList | ForEach-Object { Write-Verbose $_ }
+        Write-Information "[VERBOSE] Retrieved the following CSPs:"
+        $cspInfoList | ForEach-Object { Write-Information "[VERBOSE] $_" }
 
         return $cspInfoList
     } catch {
@@ -1899,7 +1906,7 @@ function Validate-CryptoProvider {
         [Parameter(Mandatory)]
         [string]$ProviderName
     )
-    Write-Verbose "Validating CSP: $ProviderName"
+    Write-Information "[VERBOSE] Validating CSP: $ProviderName"
 
     $availableProviders = Get-CryptoProviders
 
@@ -1908,10 +1915,11 @@ function Validate-CryptoProvider {
         throw "Crypto Service Provider '$ProviderName' is either invalid or not found on this system."
     }
 
-    Write-Verbose "Crypto Service Provider '$ProviderName' is valid."
+    Write-Information "[VERBOSE] Crypto Service Provider '$ProviderName' is valid."
 }
 
-function Parse-DNSubject {
+# Migrated
+function Convert-DNSubject {
     <#
     .SYNOPSIS
         Parses a Distinguished Name (DN) subject string and properly quotes RDN values containing escaped commas.
@@ -2030,22 +2038,22 @@ function Get-ValidSslFlagsForSystem {
     # Return array of valid flag values based on Windows Server version
     if ($build -ge 20348) {
         # Windows Server 2022+ (IIS 10.0.20348+)
-        Write-Verbose "Detected Windows Server 2022 or later (Build: $build)"
+        Write-Information "[VERBOSE] Detected Windows Server 2022 or later (Build: $build)"
         return @(1, 4, 8, 16, 32, 64)  # Include unknowns for testing
     }
     elseif ($build -ge 17763) {
         # Windows Server 2019 (IIS 10.0.17763)
-        Write-Verbose "Detected Windows Server 2019 (Build: $build)"
+        Write-Information "[VERBOSE] Detected Windows Server 2019 (Build: $build)"
         return @(1, 4, 8)
     }
     elseif ($build -ge 14393) {
         # Windows Server 2016 (IIS 10.0)
-        Write-Verbose "Detected Windows Server 2016 (Build: $build)"
+        Write-Information "[VERBOSE] Detected Windows Server 2016 (Build: $build)"
         return @(1, 4)
     }
     else {
         # Windows Server 2012 R2 and earlier (IIS 8.5)
-        Write-Verbose "Detected Windows Server 2012 R2 or earlier (Build: $build)"
+        Write-Information "[VERBOSE] Detected Windows Server 2012 R2 or earlier (Build: $build)"
         return @(1, 2)
     }
 }
@@ -2119,7 +2127,7 @@ function Test-ValidSslFlags {
     $successMsg = "SslFlags value $Flags (0x$($Flags.ToString('X'))) is valid for this system (Build: $build)."
     
     if ($ThrowOnError) {
-        Write-Verbose $successMsg
+        Write-Information "[VERBOSE] $successMsg"
         return $true
     }
     else {
@@ -2178,7 +2186,7 @@ function Get-IISManagementInfo {
     )
 
     $hasIISDrive = Ensure-IISDrive
-    Write-Verbose "IIS Drive available: $hasIISDrive"
+    Write-Information "[VERBOSE] IIS Drive available: $hasIISDrive"
 
     if ($hasIISDrive) {
         $null = Import-Module WebAdministration

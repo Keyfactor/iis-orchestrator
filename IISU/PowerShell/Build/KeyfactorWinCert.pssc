@@ -11,6 +11,7 @@
 #      $base = 'C:\Program Files\WindowsPowerShell\Modules'
 #      Copy-Item -Path '.\Keyfactor.WinCert.Common' -Destination "$base\Keyfactor.WinCert.Common" -Recurse -Force
 #      Copy-Item -Path '.\Keyfactor.WinCert.IIS'    -Destination "$base\Keyfactor.WinCert.IIS"    -Recurse -Force
+#      Copy-Item -Path '.\Keyfactor.WinCert.SQL'    -Destination "$base\Keyfactor.WinCert.SQL"    -Recurse -Force
 #
 #    (Only install the modules needed for the store types you use on this endpoint.)
 #
@@ -91,9 +92,11 @@
     # Multiple capabilities are merged — the session exposes all their VisibleFunctions.
     #
     # Examples:
-    #   WinCert + IIS:  @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS' }
-    #   WinCert only:   @{ RoleCapabilities = 'Keyfactor.WinCert.Common' }
+    #   WinCert + IIS:       @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS' }
+    #   WinCert + SQL:       @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL' }
+    #   WinCert + IIS + SQL: @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
+    #   WinCert only:        @{ RoleCapabilities = 'Keyfactor.WinCert.Common' }
     RoleDefinitions = @{
-        'BUILTIN\Administrators' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS' }
+        'BUILTIN\Administrators' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
     }
 }

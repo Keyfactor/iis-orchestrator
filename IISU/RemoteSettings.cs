@@ -26,8 +26,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         public string ServerUserName { get; set; }
         public string ServerPassword { get; set; }
 
-        public bool UseJEA { get; set; }
-        public string JEAEndpointName { get; set; } = "keyfactor.wincert";
+        public string JEAEndpointName { get; set; } = "";
     }
 
 }

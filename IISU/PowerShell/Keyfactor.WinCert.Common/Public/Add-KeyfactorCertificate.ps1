@@ -1,4 +1,4 @@
-function Add-KeyfactorCertificate {
+﻿function Add-KeyfactorCertificate {
     param (
         [Parameter(Mandatory = $true)]
         [string]$Base64Cert,
@@ -15,7 +15,7 @@ function Add-KeyfactorCertificate {
 
     try {
         Write-Information "Entering PowerShell Script Add-KeyfactorCertificateToStore"
-        Write-Verbose "Add-KeyfactorCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
+        Write-Information "[VERBOSE] Add-KeyfactorCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
 
         # Get the thumbprint of the passed in certificate
         # Convert password to secure string if provided, otherwise use $null
@@ -54,13 +54,13 @@ function Add-KeyfactorCertificate {
                 $arguments = @('-f')
 
                 if ($PrivateKeyPassword) {
-                    Write-Verbose "Has a private key"
+                    Write-Information "[VERBOSE] Has a private key"
                     $arguments += '-p'
                     $arguments += $PrivateKeyPassword
                 }
 
                 if ($CryptoServiceProvider) {
-                    Write-Verbose "Has a CryptoServiceProvider: $CryptoServiceProvider"
+                    Write-Information "[VERBOSE] Has a CryptoServiceProvider: $CryptoServiceProvider"
                     $arguments += '-csp'
                     $arguments += $CryptoServiceProvider
                 }
@@ -74,7 +74,7 @@ function Add-KeyfactorCertificate {
                     if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
                 }) -join ' '
 
-                write-Verbose "Running certutil with arguments: $argLine"
+                Write-Information "[VERBOSE] Running certutil with arguments: $argLine"
 
                 # Setup process execution
                 $processInfo = New-Object System.Diagnostics.ProcessStartInfo

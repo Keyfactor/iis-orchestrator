@@ -83,7 +83,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     settings.IncludePortInSPN = jobProperties.SpnPortFlag;
                     settings.ServerUserName = serverUserName;
                     settings.ServerPassword = serverPassword;
-                    settings.UseJEA = jobProperties.UseJEA;
                     settings.JEAEndpointName = jobProperties.JEAEndpointName;
 
                     _logger.LogTrace("Querying IIS Inventory..");
@@ -129,7 +128,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, useJea: settings.UseJEA, jeaEndpoint: settings.JEAEndpointName))
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, jeaEndpoint: settings.JEAEndpointName))
             {
                 ps.Initialize();
 

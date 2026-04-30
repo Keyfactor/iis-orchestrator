@@ -1,4 +1,4 @@
-function Get-IISManagementInfo {
+﻿function Get-IISManagementInfo {
     [CmdletBinding()]
     [OutputType([hashtable])]
     param (
@@ -7,7 +7,7 @@ function Get-IISManagementInfo {
     )
 
     $hasIISDrive = Test-IISDrive
-    Write-Verbose "IIS Drive available: $hasIISDrive"
+    Write-Information "[VERBOSE] IIS Drive available: $hasIISDrive"
 
     if ($hasIISDrive) {
         $null = Import-Module WebAdministration

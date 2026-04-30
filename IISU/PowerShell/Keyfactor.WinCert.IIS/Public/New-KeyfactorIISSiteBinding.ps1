@@ -1,4 +1,4 @@
-function New-KeyfactorIISSiteBinding {
+﻿function New-KeyfactorIISSiteBinding {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
@@ -22,7 +22,7 @@ function New-KeyfactorIISSiteBinding {
     )
 
     Write-Information "Entering PowerShell Script: New-KFIISSiteBinding" -InformationAction SilentlyContinue
-    Write-Verbose "Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
+    Write-Information "[VERBOSE] Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
 
     try {
         # Step 1: Perform verifications and get management info
@@ -39,7 +39,7 @@ function New-KeyfactorIISSiteBinding {
 
         # Step 2: Remove existing HTTPS bindings for this binding info
         $searchBindings = "${IPAddress}:${Port}:${Hostname}"
-        Write-Verbose "Removing existing HTTPS bindings for: $searchBindings"
+        Write-Information "[VERBOSE] Removing existing HTTPS bindings for: $searchBindings"
     
         $removalResult = Remove-KeyfactorIISSiteBinding -SiteName $SiteName -BindingInfo $searchBindings -UseIISDrive $managementInfo.UseIISDrive
         if ($removalResult.Status -eq 'Error') {
@@ -48,14 +48,14 @@ function New-KeyfactorIISSiteBinding {
 
         # Step 3: Determine SslFlags supported by Microsoft.Web.Administration
         if ($SslFlags -gt 3) {
-            Write-Verbose "SslFlags value $SslFlags exceeds managed API range (0-3). Applying reduced flags for creation."
+            Write-Information "[VERBOSE] SslFlags value $SslFlags exceeds managed API range (0-3). Applying reduced flags for creation."
             $SslFlagsApplied = ($SslFlags -band 3)
         } else {
             $SslFlagsApplied = $SslFlags
         }
 
         # Step 4: Add the new binding with the reduced flag set
-        Write-Verbose "Adding new binding with SSL certificate (SslFlagsApplied=$SslFlagsApplied)"
+        Write-Information "[VERBOSE] Adding new binding with SSL certificate (SslFlagsApplied=$SslFlagsApplied)"
     
         $addParams = @{
             SiteName    = $SiteName
@@ -77,7 +77,7 @@ function New-KeyfactorIISSiteBinding {
 
         # Step 5: If extended flags, update via appcmd.exe
         if ($SslFlags -gt 3) {
-            Write-Verbose "Applying full SslFlags=$SslFlags via appcmd"
+            Write-Information "[VERBOSE] Applying full SslFlags=$SslFlags via appcmd"
 
             $appcmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
 
@@ -95,16 +95,16 @@ function New-KeyfactorIISSiteBinding {
             # Build binding argument for appcmd
             $bindingArg = "/bindings.[protocol='https',bindingInformation='$bindingInfo'].sslFlags:$SslFlags"
 
-            Write-Verbose "Running appcmd: $appcmd $siteArg $bindingArg"
+            Write-Information "[VERBOSE] Running appcmd: $appcmd $siteArg $bindingArg"
             $appcmdOutput = & $appcmd set site $siteArg $bindingArg 2>&1
-            Write-Verbose "appcmd output: $appcmdOutput"
+            Write-Information "[VERBOSE] appcmd output: $appcmdOutput"
         
             #& $appcmd set site $siteArg $bindingArg | Out-Null
 
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "appcmd failed to set extended SslFlags ($SslFlags) for binding $bindingInfo."
             } else {
-                Write-Verbose "Successfully updated SslFlags to $SslFlags via appcmd."
+                Write-Information "[VERBOSE] Successfully updated SslFlags to $SslFlags via appcmd."
             }
         }
 

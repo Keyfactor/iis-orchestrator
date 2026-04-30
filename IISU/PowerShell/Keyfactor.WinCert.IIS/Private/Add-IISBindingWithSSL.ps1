@@ -1,4 +1,4 @@
-function Add-IISBindingWithSSL {
+﻿function Add-IISBindingWithSSL {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
@@ -28,7 +28,7 @@ function Add-IISBindingWithSSL {
         [bool]$UseIISDrive
     )
 
-    Write-Verbose "Adding binding: Protocol=$Protocol, IP=$IPAddress, Port=$Port, Host='$Hostname'"
+    Write-Information "[VERBOSE] Adding binding: Protocol=$Protocol, IP=$IPAddress, Port=$Port, Host='$Hostname'"
 
     try {
         if ($UseIISDrive) {
@@ -46,22 +46,22 @@ function Add-IISBindingWithSSL {
                 $bindingParams.HostHeader = $Hostname
             }
             
-            Write-Verbose "Creating new web binding with parameters: $(($bindingParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')"
+            Write-Information "[VERBOSE] Creating new web binding with parameters: $(($bindingParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')"
             New-WebBinding @bindingParams
 
             # Bind SSL certificate if HTTPS
             if ($Protocol -eq "https" -and -not [string]::IsNullOrEmpty($Thumbprint)) {
                 $searchBindings = "${IPAddress}:${Port}:${Hostname}"
-                Write-Verbose "Searching for binding: $searchBindings"
+                Write-Information "[VERBOSE] Searching for binding: $searchBindings"
                 
                 $binding = Get-WebBinding -Name $SiteName -Protocol $Protocol | Where-Object {
                     $_.bindingInformation -eq $searchBindings
                 }
 
                 if ($binding) {
-                    Write-Verbose "Binding SSL certificate with thumbprint: $Thumbprint"
+                    Write-Information "[VERBOSE] Binding SSL certificate with thumbprint: $Thumbprint"
                     $null = $binding.AddSslCertificate($Thumbprint, $StoreName)
-                    Write-Verbose "SSL certificate successfully bound"
+                    Write-Information "[VERBOSE] SSL certificate successfully bound"
                     return New-KeyfactorResult -Status Success -Code 0 -Step BindSSL -Message "Binding and SSL certificate successfully applied"
                 } else {
                     return New-KeyfactorResult -Status Error -Code 202 -Step BindSSL -ErrorMessage "No binding found for: $searchBindings"

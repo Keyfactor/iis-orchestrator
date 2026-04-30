@@ -36,6 +36,7 @@
         'Add-KeyfactorCertificate',
         'Remove-KeyfactorCertificate',
         'New-KeyfactorResult',
+        'New-KeyfactorODKGEnrollment',
         'Get-CertificateCSP',
         'Get-CertificateSAN'
     )
@@ -53,10 +54,12 @@
     )
 
     # certutil.exe is called directly via the PowerShell pipeline by Get-CryptoProviders.
-    # Full path is required. Add-KeyfactorCertificate uses certutil via .NET ProcessStartInfo
+    # certreq.exe is called directly via the PowerShell pipeline by New-KeyfactorODKGEnrollment.
+    # Full path is required for both. Add-KeyfactorCertificate uses certutil via .NET ProcessStartInfo
     # and does NOT need it listed here.
     VisibleExternalCommands = @(
-        'C:\Windows\System32\certutil.exe'
+        'C:\Windows\System32\certutil.exe',
+        'C:\Windows\System32\certreq.exe'
     )
 
     # No variables need to be pre-defined for the orchestrator.

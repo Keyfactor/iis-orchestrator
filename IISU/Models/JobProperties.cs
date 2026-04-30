@@ -52,12 +52,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         [DefaultValue(true)]
         public bool RestartService { get; set; }
 
-        [JsonProperty("UseJEA")]
-        [DefaultValue(false)]
-        public bool UseJEA { get; set; }
-
         [JsonProperty("JEAEndpointName")]
-        [DefaultValue("keyfactor.wincert")]
-        public string JEAEndpointName { get; set; } = "keyfactor.wincert";
+        [DefaultValue("")]
+        public string JEAEndpointName { get; set; } = "";
     }
 }

@@ -1,9 +1,9 @@
-function Validate-CryptoProvider {
+﻿function Validate-CryptoProvider {
     param (
         [Parameter(Mandatory)]
         [string]$ProviderName
     )
-    Write-Verbose "Validating CSP: $ProviderName"
+    Write-Information "[VERBOSE] Validating CSP: $ProviderName"
 
     $availableProviders = Get-CryptoProviders
 
@@ -12,5 +12,5 @@ function Validate-CryptoProvider {
         throw "Crypto Service Provider '$ProviderName' is either invalid or not found on this system."
     }
 
-    Write-Verbose "Crypto Service Provider '$ProviderName' is valid."
+    Write-Information "[VERBOSE] Crypto Service Provider '$ProviderName' is valid."
 }

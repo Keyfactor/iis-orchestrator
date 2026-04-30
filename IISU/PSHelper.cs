@@ -60,8 +60,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private bool isLocalMachine;
         private bool isADFSStore = false;
-        private bool useJea = false;
-        private string jeaEndpoint = "keyfactor.wincert";
+        private string jeaEndpoint = "";
+        private bool useJea => !string.IsNullOrEmpty(jeaEndpoint);
 
         public bool IsLocalMachine
         {
@@ -97,7 +97,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = LogHandler.GetClassLogger<PSHelper>();
         }
 
-        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false, bool useJea = false, string jeaEndpoint = "keyfactor.wincert")
+        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false, string jeaEndpoint = "")
         {
             this.protocol = protocol.ToLower();
             this.port = port;
@@ -106,7 +106,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             this.serverUserName = serverUserName;
             this.serverPassword = serverPassword;
             this.isADFSStore = isADFSStore;
-            this.useJea = useJea;
             this.jeaEndpoint = jeaEndpoint;
 
             _logger = LogHandler.GetClassLogger<PSHelper>();
@@ -115,7 +114,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace($"Port: {this.port}");
             _logger.LogTrace($"UseSPN: {this.useSPN}");
             _logger.LogTrace($"ClientMachineName: {ClientMachineName}");
-            _logger.LogTrace($"UseJEA: {this.useJea}");
+            _logger.LogTrace($"JEA Active: {this.useJea}");
             _logger.LogTrace($"JEAEndpoint: {this.jeaEndpoint}");
             _logger.LogTrace("Constructor Completed");
         }
@@ -280,6 +279,29 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 else
                 {
                     _logger.LogDebug($"JEA session active on endpoint '{jeaEndpoint}' - skipping script injection, functions are pre-registered.");
+
+                    // Pre-flight: verify Keyfactor modules are installed on the JEA endpoint.
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("Session", _PSSession)
+                        .AddParameter("ScriptBlock", ScriptBlock.Create("[bool](Get-Command 'New-KeyfactorResult' -ErrorAction SilentlyContinue)"));
+                    var preFlightResults = PS.Invoke();
+                    PS.Commands.Clear();
+
+                    bool modulesInstalled = preFlightResults != null &&
+                        preFlightResults.Count > 0 &&
+                        preFlightResults[0]?.BaseObject is bool preFlightBool &&
+                        preFlightBool;
+
+                    if (!modulesInstalled)
+                    {
+                        throw new Exception(
+                            $"JEA endpoint '{jeaEndpoint}' is reachable but Keyfactor modules are not installed. " +
+                            "Install Keyfactor.WinCert.Common (and any required store-type modules) under " +
+                            "'C:\\Program Files\\WindowsPowerShell\\Modules\\' on the target machine, " +
+                            "re-register the JEA session configuration, and restart WinRM.");
+                    }
+
+                    _logger.LogDebug("JEA pre-flight passed: Keyfactor modules are installed on the endpoint.");
                 }
 
                 // Set $InformationPreference globally so Write-Information output is forwarded
@@ -918,8 +940,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             var infoMessages = sender as PSDataCollection<InformationRecord>;
                             if (infoMessages != null)
                             {
-                                var infoMessage = infoMessages[e.Index];
-                                _logger.LogInformation($"INFO: {infoMessage.MessageData}");
+                                var msg = infoMessages[e.Index].MessageData?.ToString() ?? string.Empty;
+                                if (msg.StartsWith("[VERBOSE] ", StringComparison.Ordinal))
+                                    _logger.LogTrace("{Message}", msg[10..]);
+                                else
+                                    _logger.LogInformation("INFO: {Message}", msg);
                             }
                             break;
 
