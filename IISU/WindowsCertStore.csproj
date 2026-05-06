@@ -65,9 +65,6 @@
     <None Update="PowerShell\WinADFSScripts.ps1">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="PowerShell\WinCertScripts.ps1">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
   <ItemGroup>

@@ -22,6 +22,7 @@ if (-not (Get-Command 'New-KeyfactorResult' -ErrorAction SilentlyContinue)) {
 . "$PSScriptRoot\Private\Test-ValidSslFlags.ps1"
 . "$PSScriptRoot\Private\Add-IISBindingWithSSL.ps1"
 . "$PSScriptRoot\Private\Get-IISManagementInfo.ps1"
+. "$PSScriptRoot\Private\Remove-KeyfactorIISCertificateIfUnused.ps1"
 
 # Public functions
 . "$PSScriptRoot\Public\Get-KeyfactorIISBoundCertificates.ps1"

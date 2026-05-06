@@ -331,7 +331,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                         { "StoreName", _storePath }
                     };
 
-            _psHelper.ExecutePowerShell("Remove-KFIISCertificateIfUnused", parameters);
+            _psHelper.ExecutePowerShell("Remove-KeyfactorIISCertificateIfUnused", parameters);
 
         }
 
