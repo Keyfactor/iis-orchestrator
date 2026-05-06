@@ -1,3 +1,6 @@
+3.0.2
+* Fixed a null object reference bug when resolving SANs via the Entry Parameter. 
+
 3.0.1
 * Fixed an issues when renewing ECC Certificates 
 
