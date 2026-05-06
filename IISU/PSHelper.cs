@@ -142,6 +142,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             _logger.LogTrace($"Script file located here: {scriptFileLocation}");
 
+            if (isLocalMachine && useJea)
+            {
+                throw new Exception(
+                    $"Ambiguous configuration: the store target is set to the local machine but JEA endpoint '{jeaEndpoint}' is also configured. " +
+                    "JEA requires a remote WinRM connection and cannot be used with a local machine store. " +
+                    "To resolve: either clear the JEA Endpoint Name to use a direct local connection, " +
+                    "or replace 'LocalMachine'/'localhost' with the server's hostname or IP address to connect via JEA over WinRM.");
+            }
+
             if (!isLocalMachine)
             {
                 InitializeRemoteSession();
