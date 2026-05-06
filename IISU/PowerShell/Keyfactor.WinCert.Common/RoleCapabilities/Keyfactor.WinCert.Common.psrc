@@ -37,6 +37,7 @@
         'Remove-KeyfactorCertificate',
         'New-KeyfactorResult',
         'New-KeyfactorODKGEnrollment',
+        'Import-KeyfactorSignedCertificate',
         'Get-CertificateCSP',
         'Get-CertificateSAN'
     )

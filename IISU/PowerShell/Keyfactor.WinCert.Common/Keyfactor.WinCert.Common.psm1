@@ -18,6 +18,7 @@
 . "$PSScriptRoot\Public\Add-KeyfactorCertificate.ps1"
 . "$PSScriptRoot\Public\Remove-KeyfactorCertificate.ps1"
 . "$PSScriptRoot\Public\New-KeyfactorODKGEnrollment.ps1"
+. "$PSScriptRoot\Public\Import-KeyfactorSignedCertificate.ps1"
 
 # Export only public functions for non-JEA use.
 # In JEA sessions, VisibleFunctions in the .psrc is the actual access control mechanism.
@@ -28,6 +29,7 @@ Export-ModuleMember -Function @(
     'Add-KeyfactorCertificate',
     'Remove-KeyfactorCertificate',
     'New-KeyfactorODKGEnrollment',
+    'Import-KeyfactorSignedCertificate',
     # Shared certificate inspection utilities — exported so other modules (e.g. IIS) can call them
     'Get-CertificateCSP',
     'Get-CertificateSAN'

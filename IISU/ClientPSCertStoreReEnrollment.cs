@@ -90,12 +90,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string protocol = jobProperties.WinRmProtocol;
                 string port = jobProperties.WinRmPort;
                 bool includePortInSPN = jobProperties.SpnPortFlag;
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "";
                 string clientMachineName = config.CertificateStoreDetails.ClientMachine;
                 string storePath = config.CertificateStoreDetails.StorePath;
 
-                //_psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword);
-
-                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
                 _psHelper.Initialize();
 
                 using (_psHelper)
@@ -160,25 +159,25 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                             {
                                                 case "Success":
                                                     psResult = OrchestratorJobStatusJobResult.Success;
-                                                    _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned successfully with Code: {code}, on Step: {step}");
+                                                    _logger.LogDebug($"PowerShell function New-KeyfactorIISSiteBinding returned successfully with Code: {code}, on Step: {step}");
                                                     break;
                                                 case "Skipped":
                                                     psResult = OrchestratorJobStatusJobResult.Failure;
-                                                    failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} - message:\n {errorMessage}");
+                                                    failureMessage = ($"PowerShell function New-KeyfactorIISSiteBinding failed on step: {step} - message:\n {errorMessage}");
                                                     _logger.LogDebug(failureMessage);
                                                     break;
                                                 case "Warning":
                                                     psResult = OrchestratorJobStatusJobResult.Warning;
-                                                    _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned with a Warning on step: {step} with code: {code} - message: {message}");
+                                                    _logger.LogDebug($"PowerShell function New-KeyfactorIISSiteBinding returned with a Warning on step: {step} with code: {code} - message: {message}");
                                                     break;
                                                 case "Error":
                                                     psResult = OrchestratorJobStatusJobResult.Failure;
-                                                    failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} with code: {code} - message: {errorMessage}");
+                                                    failureMessage = ($"PowerShell function New-KeyfactorIISSiteBinding failed on step: {step} with code: {code} - message: {errorMessage}");
                                                     _logger.LogDebug(failureMessage);
                                                     break;
                                                 default:
                                                     psResult = OrchestratorJobStatusJobResult.Unknown;
-                                                    _logger.LogWarning("Unknown status returned from New-KFIISSiteBinding: " + status);
+                                                    _logger.LogWarning("Unknown status returned from New-KeyfactorIISSiteBinding: " + status);
                                                     break;
                                             }
                                         }
@@ -294,9 +293,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     { "keyLength", keySize },
                     { "SAN", SAN }
                 };
-                _logger.LogInformation("Attempting to execute PS function (New-CsrEnrollment)");
-                _results = _psHelper.ExecutePowerShell("New-CsrEnrollment", parameters);
-                _logger.LogInformation("Returned from executing PS function (New-CsrEnrollment)");
+                _logger.LogInformation("Attempting to execute PS function (New-KeyfactorODKGEnrollment)");
+                _results = _psHelper.ExecutePowerShell("New-KeyfactorODKGEnrollment", parameters);
+                _logger.LogInformation("Returned from executing PS function (New-KeyfactorODKGEnrollment)");
 
                 // This should return the CSR that was generated
                 if (_results == null || _results.Count == 0)
@@ -356,9 +355,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     { "storeName", storeName }
                 };
 
-                _logger.LogTrace("Attempting to execute PS function (Import-SignedCertificate)");
-                _results = _psHelper.ExecutePowerShell("Import-SignedCertificate", parameters);
-                _logger.LogTrace("Returned from executing PS function (Import-SignedCertificate)");
+                _logger.LogTrace("Attempting to execute PS function (Import-KeyfactorSignedCertificate)");
+                _results = _psHelper.ExecutePowerShell("Import-KeyfactorSignedCertificate", parameters);
+                _logger.LogTrace("Returned from executing PS function (Import-KeyfactorSignedCertificate)");
 
                 // This should return the CSR that was generated
                 if (_results != null && _results.Count > 0)
