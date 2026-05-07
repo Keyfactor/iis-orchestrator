@@ -1,59 +1,52 @@
 function Import-KeyfactorSignedCertificate {
     param (
         [Parameter(Mandatory = $true)]
-        [byte[]]$RawData,
+        [byte[]]$RawData,               # RawData from the certificate
 
         [Parameter(Mandatory = $true)]
-        [string]$StoreName
+        [string]$StoreName              # Store to which the certificate should be imported
     )
 
-    $tempCertFile = $null
     try {
-        Write-Information "Entering Import-KeyfactorSignedCertificate"
+        # Step 1: Convert raw certificate data to Base64 string with line breaks
+        Write-Verbose "Converting raw certificate data to Base64 string."
+        $csrData = [System.Convert]::ToBase64String($RawData, [System.Base64FormattingOptions]::InsertLineBreaks)
 
-        # Extract thumbprint from the raw certificate bytes
-        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($RawData)
-        $thumbprint = $cert.Thumbprint
-        if (-not $thumbprint) {
-            throw "Failed to get thumbprint from the signed certificate."
-        }
-        Write-Information "Certificate thumbprint: $thumbprint"
+        # Step 2: Create PEM-formatted certificate content
+        Write-Verbose "Creating PEM-formatted certificate content."
+        $certContent = @(
+            "-----BEGIN CERTIFICATE-----"
+            $csrData
+            "-----END CERTIFICATE-----"
+        ) -join "`n"
 
-        # Write to temp .cer file so certreq can process it
-        $tempCertFile = [System.IO.Path]::GetTempFileName() + ".cer"
-        [System.IO.File]::WriteAllBytes($tempCertFile, $RawData)
+        # Step 3: Create a temporary file for the certificate
+        Write-Verbose "Creating a temporary file for the certificate."
+        $cerFilename = [System.IO.Path]::GetTempFileName()
+        Set-Content -Path $cerFilename -Value $certContent -Force
+        Write-Verbose "Temporary certificate file created at: $cerFilename"
 
-        # certreq -accept links the signed certificate to the matching pending private key
-        # that was created when New-KeyfactorODKGEnrollment ran certreq -new.
-        Write-Information "Running certreq -accept to complete enrollment"
-        $output = & certreq -accept $tempCertFile 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "certreq -accept failed (exit code $LASTEXITCODE). Output: $output"
-        }
-        Write-Information "certreq -accept completed successfully."
+        # Step 4: Import the certificate into the specified store
+        Write-Verbose "Importing the certificate to the store: Cert:\LocalMachine\$StoreName"
+        Set-Location -Path "Cert:\LocalMachine\$StoreName"
 
-        # certreq -accept installs into the 'My' (Personal) store.
-        # If the target store is different, also register the cert there.
-        $normalizedStore = $StoreName.Trim()
-        if ($normalizedStore -ine 'My' -and $normalizedStore -ine 'Personal') {
-            Write-Information "Adding certificate to store '$normalizedStore'"
-            $addOutput = & certutil -f -addstore $normalizedStore $tempCertFile 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                Write-Warning "certutil -addstore for store '$normalizedStore' returned exit code $LASTEXITCODE. Output: $addOutput"
-            } else {
-                Write-Information "Certificate added to store '$normalizedStore'."
-            }
+        $importResult = Import-Certificate -FilePath $cerFilename
+        if ($importResult) {
+            Write-Verbose "Certificate successfully imported to Cert:\LocalMachine\$StoreName."
+        } else {
+            throw "Certificate import failed."
         }
 
-        return $thumbprint
-    }
-    catch {
-        Write-Error "An error occurred in Import-KeyfactorSignedCertificate: $_"
-        return $null
-    }
-    finally {
-        if ($tempCertFile -and (Test-Path $tempCertFile)) {
-            Remove-Item $tempCertFile -Force
+        # Step 5: Cleanup temporary file
+        if (Test-Path $cerFilename) {
+            Remove-Item -Path $cerFilename -Force
+            Write-Verbose "Temporary file deleted: $cerFilename"
         }
+
+        # Step 6: Return the imported certificate's thumbprint
+        return $importResult.Thumbprint
+
+    } catch {
+        Write-Error "An error occurred during the certificate export and import process: $_"
     }
 }
