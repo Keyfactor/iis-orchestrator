@@ -49,7 +49,7 @@ function Remove-KeyfactorIISCertificateIfUnused {
             return
         }
 
-        Remove-Item -Path $cert.PSPath -Force
+        Remove-Item -Path "Cert:\LocalMachine\$StoreName\$normalizedThumbprint" -Force
         Write-Information "[VERBOSE] Certificate $normalizedThumbprint removed from Cert:\LocalMachine\$StoreName"
     }
     catch {
