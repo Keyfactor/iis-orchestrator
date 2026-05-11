@@ -27,7 +27,8 @@
     VisibleFunctions = @(
         'Get-KeyfactorIISBoundCertificates',
         'New-KeyfactorIISSiteBinding',
-        'Remove-KeyfactorIISSiteBinding'
+        'Remove-KeyfactorIISSiteBinding',
+        'Remove-KeyfactorIISCertificateIfUnused'
     )
 
     VisibleCmdlets = @(

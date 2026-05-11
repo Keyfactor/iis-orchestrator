@@ -22,17 +22,17 @@ if (-not (Get-Command 'New-KeyfactorResult' -ErrorAction SilentlyContinue)) {
 . "$PSScriptRoot\Private\Test-ValidSslFlags.ps1"
 . "$PSScriptRoot\Private\Add-IISBindingWithSSL.ps1"
 . "$PSScriptRoot\Private\Get-IISManagementInfo.ps1"
-. "$PSScriptRoot\Private\Remove-KeyfactorIISCertificateIfUnused.ps1"
-
 # Public functions
 . "$PSScriptRoot\Public\Get-KeyfactorIISBoundCertificates.ps1"
 . "$PSScriptRoot\Public\Remove-KeyfactorIISSiteBinding.ps1"
 . "$PSScriptRoot\Public\New-KeyfactorIISSiteBinding.ps1"
+. "$PSScriptRoot\Public\Remove-KeyfactorIISCertificateIfUnused.ps1"
 
 # Export only public functions for non-JEA use.
 # In JEA sessions, VisibleFunctions in the .psrc is the actual access control mechanism.
 Export-ModuleMember -Function @(
     'Get-KeyfactorIISBoundCertificates',
     'New-KeyfactorIISSiteBinding',
-    'Remove-KeyfactorIISSiteBinding'
+    'Remove-KeyfactorIISSiteBinding',
+    'Remove-KeyfactorIISCertificateIfUnused'
 )
