@@ -205,6 +205,329 @@ Copy this entire `PowerShell` folder to the target server (or to a network share
 On the **target server**, open an elevated PowerShell prompt (Run as Administrator) and run the following commands. Adjust the source path (`$sourcePath`) to wherever you placed the `PowerShell` folder in Step 1.
 
 ```powershell
+# Set the source path to where you copied the PowerShell folder
+$sourcePath = 'C:\Temp\PowerShell'
+
+# System module path — modules installed here are treated as fully trusted by PowerShell
+$moduleBase = 'C:\Program Files\WindowsPowerShell\Modules'
+
+# Always install the Common module — required for all store types
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.Common" `
+          -Destination "$moduleBase\Keyfactor.WinCert.Common" `
+          -Recurse -Force
+
+# Install the IIS module if this server hosts IIS certificate stores (WinIIS)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.IIS" `
+          -Destination "$moduleBase\Keyfactor.WinCert.IIS" `
+          -Recurse -Force
+
+# Install the SQL module if this server hosts SQL Server certificate stores (WinSQL)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.SQL" `
+          -Destination "$moduleBase\Keyfactor.WinCert.SQL" `
+          -Recurse -Force
+```
+
+> **Important:** Modules **must** be installed under `C:\Program Files\WindowsPowerShell\Modules\` (or another path listed in the system `$env:PSModulePath`). Modules installed outside of a trusted path will not run as fully trusted code inside a `ConstrainedLanguage` JEA session, and calls to .NET APIs will fail.
+
+Verify that the modules installed correctly by running:
+
+```powershell
+Get-Module -ListAvailable | Where-Object { $_.Name -like 'Keyfactor.*' }
+```
+
+You should see entries for each module you installed.
+
+---
+
+#### Step 3: Create the Audit Transcript Directory
+
+JEA records a full transcript of every session for audit purposes. The transcript directory must exist before you register the session configuration.
+
+```powershell
+New-Item -ItemType Directory -Path 'C:\ProgramData\Keyfactor\JEA\Transcripts' -Force
+```
+
+Transcripts are written here automatically for every connection made through the JEA endpoint. Review these files periodically to audit orchestrator activity. Each transcript file is named with the date, time, and a unique identifier so that sessions are never overwritten.
+
+---
+
+#### Step 4: Review and Customize the Session Configuration File
+
+Copy the `KeyfactorWinCert.pssc` file from `PowerShell\Build\` to a working location on the target server (e.g., `C:\Temp\KeyfactorWinCert.pssc`) and open it in a text editor. The key settings to review and customize are:
+
+**Run-As Account (choose one):**
+
+The JEA session executes the Keyfactor functions under a run-as account that is separate from the connecting account. There are two options:
+
+- **Virtual Account (default, recommended for testing):** A temporary local administrator account is automatically created for each JEA session and discarded when the session ends. This is the simplest option and requires no additional Active Directory configuration.
+
+  ```powershell
+  RunAsVirtualAccount = $true
+  ```
+
+- **Group Managed Service Account (recommended for production):** A gMSA runs the session under a domain account whose password is automatically managed by Active Directory. This is the preferred production option because it provides a stable, auditable identity without requiring manual password rotation. The gMSA must be created in Active Directory and granted the necessary permissions to manage certificates on the target server before use.
+
+  ```powershell
+  # Comment out RunAsVirtualAccount and uncomment this line:
+  GroupManagedServiceAccount = 'DOMAIN\KeyfactorJEA$'
+  ```
+
+  To create a gMSA (run on a domain controller or with AD PowerShell module):
+  ```powershell
+  # Create the gMSA in Active Directory
+  New-ADServiceAccount -Name 'KeyfactorJEA' `
+                       -DNSHostName 'keyfactorjea.yourdomain.com' `
+                       -PrincipalsAllowedToRetrieveManagedPassword 'KeyfactorServers$'
+
+  # On the target server, install the gMSA
+  Install-ADServiceAccount -Identity 'KeyfactorJEA$'
+
+  # Verify the gMSA can log on
+  Test-ADServiceAccount -Identity 'KeyfactorJEA$'
+  ```
+
+**Role Definitions (who is allowed to connect):**
+
+The `RoleDefinitions` section maps connecting users or groups to JEA role capabilities. Replace `BUILTIN\Administrators` with the specific AD group or local group whose members should be allowed to connect via JEA. Using a dedicated AD group is strongly recommended for production environments.
+
+```powershell
+RoleDefinitions = @{
+    # Replace with the AD group that contains your Keyfactor orchestrator service accounts:
+    'DOMAIN\KeyfactorOrchestrators' = @{
+        RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS'
+    }
+}
+```
+
+Only list the `RoleCapabilities` whose corresponding modules are installed on this server. The available combinations are:
+
+| Store Types on This Server | RoleCapabilities to List |
+|---|---|
+| WinCert only | `'Keyfactor.WinCert.Common'` |
+| WinIIS only or WinCert + WinIIS | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS'` |
+| WinSQL only or WinCert + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL'` |
+| WinCert + WinIIS + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL'` |
+
+---
+
+#### Step 5: Register the JEA Session Configuration
+
+On the **target server**, in an elevated PowerShell prompt, register the session configuration. This creates the named WinRM endpoint that the Keyfactor orchestrator will connect to.
+
+```powershell
+Register-PSSessionConfiguration `
+    -Name 'keyfactor.wincert' `
+    -Path 'C:\Temp\KeyfactorWinCert.pssc' `
+    -Force
+
+# WinRM must be restarted for the new endpoint to become active
+Restart-Service WinRM
+```
+
+> **Note:** `Restart-Service WinRM` will briefly interrupt all active WinRM connections on the server. Schedule this during a maintenance window if other services depend on WinRM.
+
+The name `keyfactor.wincert` is the endpoint name you will enter into the **JEA Endpoint Name** field in Keyfactor Command. You may use a different name if desired — just ensure it matches exactly when configuring the certificate store.
+
+---
+
+#### Step 6: Verify the Registration
+
+Confirm the endpoint is registered and its configuration is correct:
+
+```powershell
+# List all registered session configurations
+Get-PSSessionConfiguration | Where-Object { $_.Name -eq 'keyfactor.wincert' }
+```
+
+You should see output showing the configuration name, PSVersion, and the path to the `.pssc` file.
+
+For a more thorough validation, connect to the JEA endpoint from a remote machine and verify that the Keyfactor functions are available:
+
+```powershell
+# Connect to the JEA endpoint (run this from the Keyfactor orchestrator server or any machine with network access)
+$cred = Get-Credential   # Enter the orchestrator service account credentials
+$s = New-PSSession -ComputerName '<target-server>' `
+                   -Port 5985 `
+                   -ConfigurationName 'keyfactor.wincert' `
+                   -Credential $cred
+
+# List all commands available in the JEA session (should be limited to Keyfactor functions only)
+Invoke-Command -Session $s -ScriptBlock { Get-Command }
+
+# Test a certificate inventory call (WinCert)
+Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorCertificates -StoreName 'My' }
+
+# Test IIS inventory (if Keyfactor.WinCert.IIS is installed on the target)
+Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorIISBoundCertificates }
+
+# Clean up the test session
+Remove-PSSession $s
+```
+
+The `Get-Command` output should show only a small set of Keyfactor functions plus the basic infrastructure cmdlets allowed by the session (e.g., `Write-Output`, `ConvertTo-Json`). If you see hundreds of commands, the session is not properly restricted and the session configuration should be reviewed.
+
+---
+
+#### Step 7: Configure the Certificate Store in Keyfactor Command
+
+Once the JEA endpoint is registered and verified on the target server, configure the certificate store in Keyfactor Command:
+
+1. Navigate to the certificate store you wish to manage via JEA (or create a new one).
+2. In the store's **Custom Parameters** (also called **Store Properties**), locate the **JEA Endpoint Name** field.
+3. Enter the name of the JEA session configuration you registered — for example, `keyfactor.wincert`.
+4. Ensure the **Client Machine** is set to the target server's hostname or IP address. **Do not** use `localhost`, `LocalMachine`, or the `|LocalMachine` suffix — JEA requires a real WinRM network connection.
+5. The **Server Username** and **Server Password** fields should contain the credentials of the account that is permitted to connect to the JEA endpoint (i.e., a member of the group specified in `RoleDefinitions` in the `.pssc` file).
+6. Save the certificate store.
+
+When a job runs against this store, the orchestrator will automatically use the JEA endpoint instead of a standard WinRM administrative session.
+
+---
+
+### Updating the JEA Configuration
+
+If you need to change the session configuration — for example, to add a new module or change the run-as account — update the `.pssc` file and re-register it:
+
+```powershell
+# Re-register with the -Force flag to overwrite the existing registration
+Register-PSSessionConfiguration `
+    -Name 'keyfactor.wincert' `
+    -Path 'C:\Temp\KeyfactorWinCert.pssc' `
+    -Force
+
+Restart-Service WinRM
+```
+
+If you update one of the Keyfactor modules (e.g., after upgrading the WinCert extension), repeat Step 2 to copy the new module files to the target server. No re-registration of the session configuration is necessary for module-only updates — the next JEA session will load the updated module automatically.
+
+---
+
+### Removing the JEA Configuration
+
+To remove the JEA endpoint from a server:
+
+```powershell
+Unregister-PSSessionConfiguration -Name 'keyfactor.wincert'
+Restart-Service WinRM
+```
+
+After removing the endpoint, any certificate stores in Keyfactor Command that reference the JEA endpoint name will fail. Update those stores to either clear the **JEA Endpoint Name** field (to revert to standard WinRM) or point to a different JEA endpoint.
+
+---
+
+### Troubleshooting
+
+**"JEA endpoint is reachable but Keyfactor modules are not installed"**
+
+The orchestrator connected to the JEA session but the pre-flight check for `New-KeyfactorResult` failed. This means the Keyfactor modules are not installed in a location that PowerShell recognizes as trusted. Verify that the modules are installed under `C:\Program Files\WindowsPowerShell\Modules\` (not under the user profile or any other path) and that the module folder name exactly matches the module name (e.g., `Keyfactor.WinCert.Common`).
+
+**"The term 'Get-KeyfactorCertificates' is not recognized..."**
+
+The function is not visible in the JEA session. Verify that:
+- The module containing that function is installed on the target server (Step 2).
+- The corresponding role capability is listed in `RoleDefinitions` in the `.pssc` (Step 4).
+- The module name in `RoleCapabilities` matches the module folder name exactly (case-sensitive on some systems).
+- The session configuration was re-registered and WinRM was restarted after any changes.
+
+**"Connecting user is not authorized to connect to this configuration"**
+
+The account used in the certificate store credentials is not a member of any group listed in `RoleDefinitions`. Add the account (or a group containing it) to the `RoleDefinitions` section in the `.pssc`, re-register the configuration, and restart WinRM.
+
+**"Access is denied" or "WinRM cannot complete the operation"**
+
+This typically indicates a WinRM connectivity issue rather than a JEA-specific problem. Verify that:
+- WinRM is enabled on the target server (`Enable-PSRemoting -Force`).
+- The WinRM firewall rule allows connections from the orchestrator server's IP.
+- The port (5985 for HTTP, 5986 for HTTPS) specified in the certificate store matches the WinRM listener configuration.
+
+**"Ambiguous configuration: the store target is set to the local machine but JEA endpoint is also configured"**
+
+A **JEA Endpoint Name** was entered in the certificate store but the **Client Machine** is set to `localhost`, `LocalMachine`, or uses the `|LocalMachine` suffix. JEA is not compatible with local-machine (agent) mode. Either remove the JEA endpoint name to use direct local access, or change the Client Machine to the server's actual hostname or IP address to use JEA over WinRM.
+
+**Reviewing JEA Transcripts**
+
+All JEA sessions are transcribed to `C:\ProgramData\Keyfactor\JEA\Transcripts\` on the target server. Each transcript file records the session start time, the connecting user, all commands executed (including parameter values), and the session end time. These files are invaluable for diagnosing job failures and for security audits.
+
+```powershell
+# List recent transcript files
+Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' | Sort-Object LastWriteTime -Descending | Select-Object -First 10
+
+# View the most recent transcript
+Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1 |
+    Get-Content
+```
+
+---
+
+### Important Notes and Limitations
+
+- **JEA is not supported over SSH.** JEA requires a WinRM connection. The SSH protocol does not support named session configurations and cannot be used to target a JEA endpoint.
+- **JEA is not compatible with local machine (agent) mode.** If the Client Machine is set to `localhost`, `LocalMachine`, or uses `|LocalMachine`, the JEA endpoint name must be left empty. See the troubleshooting entry above.
+- **One JEA endpoint can serve multiple store types.** A single `keyfactor.wincert` endpoint can expose Common, IIS, and SQL capabilities simultaneously. You do not need separate endpoints per store type — configure the role capabilities in the `.pssc` to include all modules installed on that server.
+- **Module updates require re-copying files, not re-registration.** When the WinCert extension is upgraded, copy the updated module folders to the target server's `C:\Program Files\WindowsPowerShell\Modules\` directory. WinRM does not need to be restarted for module-only updates.
+- **The JEA run-as account needs certificate store permissions.** Whether using a virtual account or a gMSA, the run-as account must have permission to read and write to the Windows certificate stores, access private keys, and (for IIS) manage IIS bindings. Virtual accounts are local administrators by default, so this is typically not a concern in development. For production gMSA accounts, explicitly grant the necessary permissions.
+- **ADFS stores (WinADFS) do not support JEA.** The WinADFS store type requires specific ADFS module cmdlets that cannot be constrained within a JEA session. WinADFS stores must use a standard WinRM connection.
+
+</details>
+
+Please consult with your company's system administrator for more information on configuring SSH or WinRM in your environment.
+
+### PowerShell Requirements
+PowerShell is extensively used to inventory and manage certificates across each Certificate Store Type.  Windows Desktop and Server includes PowerShell 5.1 that is capable of running all or most PowerShell functions.  If the Orchestrator is to run in a Linux environment using SSH as their communication protocol, PowerShell 6.1 or greater is required (7.4 or greater is recommended).  
+In addition to PowerShell, IISU requires additional PowerShell modules to be installed and available.  These modules include:  WebAdministration and IISAdministration, versions 1.1.
+
+**JEA Module Requirements:** When using JEA (Just Enough Administration) to connect to a target server, the Keyfactor PowerShell modules must be pre-installed on each target server under `C:\Program Files\WindowsPowerShell\Modules\`. These modules are included in the WinCert extension deployment package inside the `PowerShell` folder. The modules that must be installed depend on which store types are managed on that server:
+
+| Module | Required For |
+|---|---|
+| `Keyfactor.WinCert.Common` | All store types — must always be installed |
+| `Keyfactor.WinCert.IIS` | WinIIS stores |
+| `Keyfactor.WinCert.SQL` | WinSQL stores |
+
+In standard (non-JEA) WinRM and local-machine modes, the orchestrator automatically loads these modules from its own deployment at runtime — no pre-installation on the target server is required. JEA mode is the only mode that requires the modules to be pre-installed on the target server. See the **Just Enough Administration (JEA) Setup and Configuration** section for complete installation and setup instructions.
+
+### Security and Permission Considerations
+
+From an official support point of view, Local Administrator permissions are required on the target server. Some customers have been successful with using other accounts and granting rights to the underlying certificate and private key stores. Due to complexities with the interactions between Group Policy, WinRM, User Account Control, and other unpredictable customer environmental factors, Keyfactor cannot provide assistance with using accounts other than the local administrator account.
+ 
+For customers wishing to use something other than the local administrator account, the following information may be helpful:
+ 
+*	The WinCert extensions (WinCert, IISU, WinSQL) create a WinRM (remote PowerShell) session to the target server in order to manipulate the Windows Certificate Stores, perform binding (in the case of the IISU extension), or to access the registry (in the case of the WinSQL extension). 
+ 
+*	When the WinRM session is created, the certificate store credentials are used if they have been specified, otherwise the WinRM session is created in the context of the Universal Orchestrator (UO) Service account (which potentially could be the network service account, a regular account, or a GMSA account)
+ 
+*	WinRM needs to be properly set up between the server hosting the UO and the target server. This means that a WinRM client running on the UO server when running in the context of the UO service account needs to be able to create a session on the target server using the configured credentials of the target server and any PowerShell commands running on the remote session need to have appropriate permissions. 
+ 
+*	Even though a given account may be in the administrators group or have administrative privileges on the target system and may be able to execute certificate and binding operations when running locally, the same account may not work when being used via WinRM. User Account Control (UAC) can get in the way and filter out administrative privledges. UAC / WinRM configuration has a LocalAccountTokenFilterPolicy setting that can be adjusted to not filter out administrative privledges for remote users, but enabling this may have other security ramifications. 
+ 
+*	The following list may not be exhaustive, but in general the account (when running under a remote WinRM session) needs permissions to:
+    -	Instantiate and open a .NET X509Certificates.X509Store object for the target certificate store and be able to read and write both the certificates and related private keys. Note that ACL permissions on the stores and private keys are separate.
+    -	Use the Import-Certificate, Get-WebSite, Get-WebBinding, and New-WebBinding PowerShell CmdLets.
+    -	Create and delete temporary files.
+    -	Execute certreq commands.
+    -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
+    -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
+
+### Using Crypto Service Providers (CSP)
+When adding or reenrolling certificates, you may specify an optional CSP to be used when generating and storing the private keys.  This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed. 
+
+The list of installed cryptographic providers can be obtained by running the PowerShell command on the target server:
+
+     certutil -csplist
+
+When performing a ReEnrollment or On Device Key Generation (ODKG) job, if no CSP is specified, a default value of 'Microsoft Strong Cryptographic Provider' will be used.  
+
+When performing an Add job, if no CSP is specified, the machine's default CSP will be used, in most cases this could be the 'Microsoft Enhanced Cryptographic Provider v1.0' provider.
+
+Each CSP only supports certain key types and algorithms.
+
+Below is a brief summary of the CSPs and their support for RSA and ECC algorithms:
+|CSP Name|Supports RSA?|Supports ECC?|
+|---|---|---|
+|Microsoft RSA SChannel Cryptographic Provider	|✅|❌|
+|Microsoft Software Key Storage Provider	    |✅|✅|
+|Microsoft Enhanced Cryptographic Provider	    |✅|❌|
 
 ## Certificate Store Types
 
