@@ -1,3 +1,7 @@
+4.0.0
+* As of this version of the extension, SANs will be handled through the ODKG Enrollment page in Command and will no longer use the SAN Entry Parameter. This version, we are removing all support for the SAN Entry Parameter. If you are still using the SAN Entry Parameter, you will need to remove it from your store types and re-run inventory to remove it from your database.
+* Adding JEA Support for local PowerShell execution.  This will allow for more secure execution of the extension when running in a local PowerShell Runspace.  To utilize this feature, you will need to create a JEA endpoint on the target server and specify the endpoint name as a new parameter in the specific Cert Store definition.  Refer to the README for more details.
+ 
 3.0.1
 * Fixed an issues when renewing ECC Certificates 
 

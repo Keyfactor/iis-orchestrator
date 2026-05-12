@@ -70,21 +70,17 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 **Note: If Looking to use GMSA Accounts to run the Service Keyfactor Command 10.2 or greater is required for No Value checkbox to work**
 
 The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
-
 - [Windows Certificate](#WinCert)
-
 - [IIS Bound Certificate](#IISU)
-
 - [WinSql](#WinSql)
-
 - [ADFS Rotation Manager](#WinAdfs)
-
 
 ## Compatibility
 
 This integration is compatible with Keyfactor Universal Orchestrator version 10.1 and later.
 
 ## Support
+
 The Windows Certificate Universal Orchestrator extension is supported by Keyfactor. If you require support for any issues or have feature request, please open a support ticket by either contacting your Keyfactor representative or via the Keyfactor Support Portal at https://support.keyfactor.com.
 
 > If you want to contribute bug fixes or additional enhancements, use the **[Pull requests](../../pulls)** tab.
@@ -92,7 +88,6 @@ The Windows Certificate Universal Orchestrator extension is supported by Keyfact
 ## Requirements & Prerequisites
 
 Before installing the Windows Certificate Universal Orchestrator extension, we recommend that you install [kfutil](https://github.com/Keyfactor/kfutil). Kfutil is a command-line tool that simplifies the process of creating store types, installing extensions, and instantiating certificate stores in Keyfactor Command.
-
 
 <details>
 <summary><b>Using the WinCert Extension on Linux servers and/or with Docker Containers:</b></summary>
@@ -113,7 +108,366 @@ dnf install openssh-clients openssl
 <details>
 <summary><b>Using the WinCert Extension on Windows servers:</b></summary>
 
-1. When orchestrating management of external (and potentially local) certificate stores, the WinCert Orchestrator Extension makes use of WinRM to connect to external certificate store servers.  The security context used is the user id entered in the Keyfactor Command certificate store.  Make sure that WinRM is set up on the orchestrated server and that the WinRM port (by convention, 5585 for HTTP and 5586 for HTTPS) is part of the certificate store path when setting up your certificate stores jobs.  If running as an agent, managing local certificate stores, local commands are run under the security context of the user account running the Keyfactor Universal Orchestrator Service.
+1. When orchestrating management of external (and potentially local) certificate stores, the WinCert Orchestrator Extension makes use of WinRM to connect to external certificate store servers.  The security context used is the user id entered in the Keyfactor Command certificate store.  Make sure that WinRM is set up on the orchestrated server and that the WinRM port (by convention, 5985 for HTTP and 5986 for HTTPS) is part of the certificate store path when setting up your certificate stores jobs.  If running as an agent, managing local certificate stores, local commands are run under the security context of the user account running the Keyfactor Universal Orchestrator Service.
+
+2. **JEA (Just Enough Administration) Support** — As a more secure alternative to granting the orchestrator service account full local administrator rights, the WinCert extension supports connecting via a JEA-enabled WinRM session endpoint. When JEA is configured, the orchestrator connects to a named PowerShell session configuration on the target server. Within that session, only the specific Keyfactor certificate management functions are exposed — no general PowerShell commands, no file system access, and no administrative cmdlets are available to the connecting account. This dramatically reduces the attack surface on managed servers and allows you to follow the principle of least privilege. JEA is configured on a per-certificate-store basis by entering the JEA endpoint name in the **JEA Endpoint Name** parameter when creating or editing a certificate store in Keyfactor Command. Refer to the **Just Enough Administration (JEA) Setup and Configuration** section below for complete step-by-step setup instructions.
+
+3. **Important:** JEA cannot be used when the certificate store is configured to access the local machine directly (i.e., when the Client Machine value contains `|LocalMachine` or is set to `localhost`/`LocalMachine`). JEA requires an actual WinRM network connection to the target server. If a JEA Endpoint Name is configured and the store is also set to LocalMachine, the job will fail immediately with an ambiguous configuration error. To manage a local machine's certificates using JEA, set the Client Machine to the server's actual hostname or IP address and configure the JEA endpoint normally.
+
+</details>
+
+<details>
+<summary><b>Just Enough Administration (JEA) Setup and Configuration:</b></summary>
+
+### What is JEA?
+
+Just Enough Administration (JEA) is a PowerShell security technology built into Windows that allows administrators to create constrained, audited remote PowerShell sessions. Instead of granting a service account full administrative access to a server, JEA lets you define exactly which PowerShell functions, cmdlets, and external commands are permitted within a remote session. The connecting account runs commands in that restricted environment — it cannot browse the file system, run arbitrary scripts, or invoke any command that has not been explicitly permitted.
+
+JEA operates through two types of configuration files:
+
+- **Session Configuration file (`.pssc`)** — Defines the overall session: the language mode, who is allowed to connect, which role capabilities to apply, whether to use a virtual run-as account or a Group Managed Service Account, and where to write audit transcripts. This file is registered with WinRM using `Register-PSSessionConfiguration` and becomes a named WinRM endpoint on the target server.
+
+- **Role Capability files (`.psrc`)** — Defines the functions, cmdlets, and external commands that are visible within the session to users assigned that role. Each Keyfactor module ships with its own `.psrc` file that whitelists only the functions required for certificate management.
+
+When the Keyfactor orchestrator connects to a JEA endpoint, it runs inside a `ConstrainedLanguage` PowerShell session backed by pre-installed, fully-trusted module code. The orchestrator can invoke Keyfactor certificate management functions, but nothing else. Every command executed in the session is recorded to a transcript file for audit purposes.
+
+---
+
+### Why Use JEA with the WinCert Extension?
+
+The default WinRM connection model requires the orchestrator service account to have local administrator rights on every managed server. While functional, this violates the principle of least privilege and creates a broad attack surface — if the service account credentials were ever compromised, an attacker would have administrative access to every managed server. JEA addresses this by:
+
+- **Limiting command exposure** — The remote session only exposes the specific Keyfactor functions needed. An attacker with the service account credentials cannot run arbitrary commands or explore the target server.
+- **Running as a privileged virtual or managed service account** — The connecting account itself does not need administrative rights. The JEA session can run the actual commands under a local virtual account or a Group Managed Service Account (gMSA) that has only the rights needed to manage certificates.
+- **Full audit trail** — Every JEA session is automatically transcribed to a log file on the target server. You have a complete record of every function called, with what parameters, and at what time.
+- **Simplified permission management** — Rather than managing complex local administrator group membership across dozens of servers, you create a single AD group of orchestrator service accounts that are permitted to connect to the JEA endpoint.
+
+---
+
+### How JEA Works with the WinCert Extension
+
+When the **JEA Endpoint Name** field is populated on a certificate store, the orchestrator changes its connection behavior:
+
+1. It connects to the target server via WinRM using the configured credentials, but specifies the named JEA session configuration (`-ConfigurationName keyfactor.wincert`) instead of opening a standard administrative session.
+2. The JEA session loads the pre-installed Keyfactor PowerShell modules from the target server's system module path (`C:\Program Files\WindowsPowerShell\Modules\`). Because these modules are installed in a trusted location, they run as fully trusted code and can use .NET APIs freely.
+3. The orchestrator does **not** inject script content into the session. Instead, it calls the pre-loaded module functions by name, passing parameters. This is different from the standard WinRM mode, which loads scripts at session start.
+4. A pre-flight check verifies that the Keyfactor modules are installed and accessible before any job runs. If the modules are not found, the job fails immediately with an actionable error message.
+5. All commands executed during the session are written to a transcript in `C:\ProgramData\Keyfactor\JEA\Transcripts\` on the target server.
+
+---
+
+### Prerequisites
+
+Before configuring JEA on a target server, ensure the following:
+
+- **Windows PowerShell 5.1** is installed on the target server (included with Windows Server 2016 and later; available via Windows Management Framework 5.1 for Windows Server 2012 R2).
+- **WinRM is enabled and configured** on the target server. Verify with: `Test-WSMan -ComputerName <target>`.
+- **The Keyfactor orchestrator deployment package** has been extracted. The `PowerShell` folder within the extension contains the module directories and JEA configuration files.
+- **Local Administrator access** on the target server is required to perform the one-time JEA setup (registering the session configuration and installing modules). This is a setup-time requirement only — once configured, the orchestrator service account does not need administrator rights.
+
+---
+
+### Keyfactor PowerShell Module Overview
+
+The WinCert extension ships three PowerShell modules. Each module contains a `RoleCapabilities` subfolder with a `.psrc` file that defines which functions are visible in a JEA session.
+
+| Module | Store Types Supported | Purpose |
+|---|---|---|
+| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
+| `Keyfactor.WinCert.IIS` | WinIIS | IIS site binding management (get, create, remove bindings). |
+| `Keyfactor.WinCert.SQL` | WinSQL | SQL Server certificate binding management (get, bind, unbind). |
+
+Install only the modules needed for the store types you manage on that server. For example, a server that only hosts IIS certificates needs `Keyfactor.WinCert.Common` and `Keyfactor.WinCert.IIS`.
+
+---
+
+### Step-by-Step Setup Guide
+
+#### Step 1: Locate the JEA Configuration Files
+
+After deploying the Keyfactor Universal Orchestrator with the WinCert extension, navigate to the extension's output directory. You will find a `PowerShell` folder containing:
+
+```
+PowerShell\
+  Keyfactor.WinCert.Common\       ← Module: common certificate operations
+  Keyfactor.WinCert.IIS\          ← Module: IIS binding management
+  Keyfactor.WinCert.SQL\          ← Module: SQL Server binding management
+  Build\
+    KeyfactorWinCert.pssc          ← JEA Session Configuration file
+```
+
+Copy this entire `PowerShell` folder to the target server (or to a network share accessible from the target server) to perform the setup steps below.
+
+---
+
+#### Step 2: Install the Keyfactor PowerShell Modules on the Target Server
+
+On the **target server**, open an elevated PowerShell prompt (Run as Administrator) and run the following commands. Adjust the source path (`$sourcePath`) to wherever you placed the `PowerShell` folder in Step 1.
+
+```powershell
+# Set the source path to where you copied the PowerShell folder
+$sourcePath = 'C:\Temp\PowerShell'
+
+# System module path — modules installed here are treated as fully trusted by PowerShell
+$moduleBase = 'C:\Program Files\WindowsPowerShell\Modules'
+
+# Always install the Common module — required for all store types
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.Common" `
+          -Destination "$moduleBase\Keyfactor.WinCert.Common" `
+          -Recurse -Force
+
+# Install the IIS module if this server hosts IIS certificate stores (WinIIS)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.IIS" `
+          -Destination "$moduleBase\Keyfactor.WinCert.IIS" `
+          -Recurse -Force
+
+# Install the SQL module if this server hosts SQL Server certificate stores (WinSQL)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.SQL" `
+          -Destination "$moduleBase\Keyfactor.WinCert.SQL" `
+          -Recurse -Force
+```
+
+> **Important:** Modules **must** be installed under `C:\Program Files\WindowsPowerShell\Modules\` (or another path listed in the system `$env:PSModulePath`). Modules installed outside of a trusted path will not run as fully trusted code inside a `ConstrainedLanguage` JEA session, and calls to .NET APIs will fail.
+
+Verify that the modules installed correctly by running:
+
+```powershell
+Get-Module -ListAvailable | Where-Object { $_.Name -like 'Keyfactor.*' }
+```
+
+You should see entries for each module you installed.
+
+---
+
+#### Step 3: Create the Audit Transcript Directory
+
+JEA records a full transcript of every session for audit purposes. The transcript directory must exist before you register the session configuration.
+
+```powershell
+New-Item -ItemType Directory -Path 'C:\ProgramData\Keyfactor\JEA\Transcripts' -Force
+```
+
+Transcripts are written here automatically for every connection made through the JEA endpoint. Review these files periodically to audit orchestrator activity. Each transcript file is named with the date, time, and a unique identifier so that sessions are never overwritten.
+
+---
+
+#### Step 4: Review and Customize the Session Configuration File
+
+Copy the `KeyfactorWinCert.pssc` file from `PowerShell\Build\` to a working location on the target server (e.g., `C:\Temp\KeyfactorWinCert.pssc`) and open it in a text editor. The key settings to review and customize are:
+
+**Run-As Account (choose one):**
+
+The JEA session executes the Keyfactor functions under a run-as account that is separate from the connecting account. There are two options:
+
+- **Virtual Account (default, recommended for testing):** A temporary local administrator account is automatically created for each JEA session and discarded when the session ends. This is the simplest option and requires no additional Active Directory configuration.
+
+  ```powershell
+  RunAsVirtualAccount = $true
+  ```
+
+- **Group Managed Service Account (recommended for production):** A gMSA runs the session under a domain account whose password is automatically managed by Active Directory. This is the preferred production option because it provides a stable, auditable identity without requiring manual password rotation. The gMSA must be created in Active Directory and granted the necessary permissions to manage certificates on the target server before use.
+
+  ```powershell
+  # Comment out RunAsVirtualAccount and uncomment this line:
+  GroupManagedServiceAccount = 'DOMAIN\KeyfactorJEA$'
+  ```
+
+  To create a gMSA (run on a domain controller or with AD PowerShell module):
+  ```powershell
+  # Create the gMSA in Active Directory
+  New-ADServiceAccount -Name 'KeyfactorJEA' `
+                       -DNSHostName 'keyfactorjea.yourdomain.com' `
+                       -PrincipalsAllowedToRetrieveManagedPassword 'KeyfactorServers$'
+
+  # On the target server, install the gMSA
+  Install-ADServiceAccount -Identity 'KeyfactorJEA$'
+
+  # Verify the gMSA can log on
+  Test-ADServiceAccount -Identity 'KeyfactorJEA$'
+  ```
+
+**Role Definitions (who is allowed to connect):**
+
+The `RoleDefinitions` section maps connecting users or groups to JEA role capabilities. Replace `BUILTIN\Administrators` with the specific AD group or local group whose members should be allowed to connect via JEA. Using a dedicated AD group is strongly recommended for production environments.
+
+```powershell
+RoleDefinitions = @{
+    # Replace with the AD group that contains your Keyfactor orchestrator service accounts:
+    'DOMAIN\KeyfactorOrchestrators' = @{
+        RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS'
+    }
+}
+```
+
+Only list the `RoleCapabilities` whose corresponding modules are installed on this server. The available combinations are:
+
+| Store Types on This Server | RoleCapabilities to List |
+|---|---|
+| WinCert only | `'Keyfactor.WinCert.Common'` |
+| WinIIS only or WinCert + WinIIS | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS'` |
+| WinSQL only or WinCert + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL'` |
+| WinCert + WinIIS + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL'` |
+
+---
+
+#### Step 5: Register the JEA Session Configuration
+
+On the **target server**, in an elevated PowerShell prompt, register the session configuration. This creates the named WinRM endpoint that the Keyfactor orchestrator will connect to.
+
+```powershell
+Register-PSSessionConfiguration `
+    -Name 'keyfactor.wincert' `
+    -Path 'C:\Temp\KeyfactorWinCert.pssc' `
+    -Force
+
+# WinRM must be restarted for the new endpoint to become active
+Restart-Service WinRM
+```
+
+> **Note:** `Restart-Service WinRM` will briefly interrupt all active WinRM connections on the server. Schedule this during a maintenance window if other services depend on WinRM.
+
+The name `keyfactor.wincert` is the endpoint name you will enter into the **JEA Endpoint Name** field in Keyfactor Command. You may use a different name if desired — just ensure it matches exactly when configuring the certificate store.
+
+---
+
+#### Step 6: Verify the Registration
+
+Confirm the endpoint is registered and its configuration is correct:
+
+```powershell
+# List all registered session configurations
+Get-PSSessionConfiguration | Where-Object { $_.Name -eq 'keyfactor.wincert' }
+```
+
+You should see output showing the configuration name, PSVersion, and the path to the `.pssc` file.
+
+For a more thorough validation, connect to the JEA endpoint from a remote machine and verify that the Keyfactor functions are available:
+
+```powershell
+# Connect to the JEA endpoint (run this from the Keyfactor orchestrator server or any machine with network access)
+$cred = Get-Credential   # Enter the orchestrator service account credentials
+$s = New-PSSession -ComputerName '<target-server>' `
+                   -Port 5985 `
+                   -ConfigurationName 'keyfactor.wincert' `
+                   -Credential $cred
+
+# List all commands available in the JEA session (should be limited to Keyfactor functions only)
+Invoke-Command -Session $s -ScriptBlock { Get-Command }
+
+# Test a certificate inventory call (WinCert)
+Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorCertificates -StoreName 'My' }
+
+# Test IIS inventory (if Keyfactor.WinCert.IIS is installed on the target)
+Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorIISBoundCertificates }
+
+# Clean up the test session
+Remove-PSSession $s
+```
+
+The `Get-Command` output should show only a small set of Keyfactor functions plus the basic infrastructure cmdlets allowed by the session (e.g., `Write-Output`, `ConvertTo-Json`). If you see hundreds of commands, the session is not properly restricted and the session configuration should be reviewed.
+
+---
+
+#### Step 7: Configure the Certificate Store in Keyfactor Command
+
+Once the JEA endpoint is registered and verified on the target server, configure the certificate store in Keyfactor Command:
+
+1. Navigate to the certificate store you wish to manage via JEA (or create a new one).
+2. In the store's **Custom Parameters** (also called **Store Properties**), locate the **JEA Endpoint Name** field.
+3. Enter the name of the JEA session configuration you registered — for example, `keyfactor.wincert`.
+4. Ensure the **Client Machine** is set to the target server's hostname or IP address. **Do not** use `localhost`, `LocalMachine`, or the `|LocalMachine` suffix — JEA requires a real WinRM network connection.
+5. The **Server Username** and **Server Password** fields should contain the credentials of the account that is permitted to connect to the JEA endpoint (i.e., a member of the group specified in `RoleDefinitions` in the `.pssc` file).
+6. Save the certificate store.
+
+When a job runs against this store, the orchestrator will automatically use the JEA endpoint instead of a standard WinRM administrative session.
+
+---
+
+### Updating the JEA Configuration
+
+If you need to change the session configuration — for example, to add a new module or change the run-as account — update the `.pssc` file and re-register it:
+
+```powershell
+# Re-register with the -Force flag to overwrite the existing registration
+Register-PSSessionConfiguration `
+    -Name 'keyfactor.wincert' `
+    -Path 'C:\Temp\KeyfactorWinCert.pssc' `
+    -Force
+
+Restart-Service WinRM
+```
+
+If you update one of the Keyfactor modules (e.g., after upgrading the WinCert extension), repeat Step 2 to copy the new module files to the target server. No re-registration of the session configuration is necessary for module-only updates — the next JEA session will load the updated module automatically.
+
+---
+
+### Removing the JEA Configuration
+
+To remove the JEA endpoint from a server:
+
+```powershell
+Unregister-PSSessionConfiguration -Name 'keyfactor.wincert'
+Restart-Service WinRM
+```
+
+After removing the endpoint, any certificate stores in Keyfactor Command that reference the JEA endpoint name will fail. Update those stores to either clear the **JEA Endpoint Name** field (to revert to standard WinRM) or point to a different JEA endpoint.
+
+---
+
+### Troubleshooting
+
+**"JEA endpoint is reachable but Keyfactor modules are not installed"**
+
+The orchestrator connected to the JEA session but the pre-flight check for `New-KeyfactorResult` failed. This means the Keyfactor modules are not installed in a location that PowerShell recognizes as trusted. Verify that the modules are installed under `C:\Program Files\WindowsPowerShell\Modules\` (not under the user profile or any other path) and that the module folder name exactly matches the module name (e.g., `Keyfactor.WinCert.Common`).
+
+**"The term 'Get-KeyfactorCertificates' is not recognized..."**
+
+The function is not visible in the JEA session. Verify that:
+- The module containing that function is installed on the target server (Step 2).
+- The corresponding role capability is listed in `RoleDefinitions` in the `.pssc` (Step 4).
+- The module name in `RoleCapabilities` matches the module folder name exactly (case-sensitive on some systems).
+- The session configuration was re-registered and WinRM was restarted after any changes.
+
+**"Connecting user is not authorized to connect to this configuration"**
+
+The account used in the certificate store credentials is not a member of any group listed in `RoleDefinitions`. Add the account (or a group containing it) to the `RoleDefinitions` section in the `.pssc`, re-register the configuration, and restart WinRM.
+
+**"Access is denied" or "WinRM cannot complete the operation"**
+
+This typically indicates a WinRM connectivity issue rather than a JEA-specific problem. Verify that:
+- WinRM is enabled on the target server (`Enable-PSRemoting -Force`).
+- The WinRM firewall rule allows connections from the orchestrator server's IP.
+- The port (5985 for HTTP, 5986 for HTTPS) specified in the certificate store matches the WinRM listener configuration.
+
+**"Ambiguous configuration: the store target is set to the local machine but JEA endpoint is also configured"**
+
+A **JEA Endpoint Name** was entered in the certificate store but the **Client Machine** is set to `localhost`, `LocalMachine`, or uses the `|LocalMachine` suffix. JEA is not compatible with local-machine (agent) mode. Either remove the JEA endpoint name to use direct local access, or change the Client Machine to the server's actual hostname or IP address to use JEA over WinRM.
+
+**Reviewing JEA Transcripts**
+
+All JEA sessions are transcribed to `C:\ProgramData\Keyfactor\JEA\Transcripts\` on the target server. Each transcript file records the session start time, the connecting user, all commands executed (including parameter values), and the session end time. These files are invaluable for diagnosing job failures and for security audits.
+
+```powershell
+# List recent transcript files
+Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' | Sort-Object LastWriteTime -Descending | Select-Object -First 10
+
+# View the most recent transcript
+Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1 |
+    Get-Content
+```
+
+---
+
+### Important Notes and Limitations
+
+- **JEA is not supported over SSH.** JEA requires a WinRM connection. The SSH protocol does not support named session configurations and cannot be used to target a JEA endpoint.
+- **JEA is not compatible with local machine (agent) mode.** If the Client Machine is set to `localhost`, `LocalMachine`, or uses `|LocalMachine`, the JEA endpoint name must be left empty. See the troubleshooting entry above.
+- **One JEA endpoint can serve multiple store types.** A single `keyfactor.wincert` endpoint can expose Common, IIS, and SQL capabilities simultaneously. You do not need separate endpoints per store type — configure the role capabilities in the `.pssc` to include all modules installed on that server.
+- **Module updates require re-copying files, not re-registration.** When the WinCert extension is upgraded, copy the updated module folders to the target server's `C:\Program Files\WindowsPowerShell\Modules\` directory. WinRM does not need to be restarted for module-only updates.
+- **The JEA run-as account needs certificate store permissions.** Whether using a virtual account or a gMSA, the run-as account must have permission to read and write to the Windows certificate stores, access private keys, and (for IIS) manage IIS bindings. Virtual accounts are local administrators by default, so this is typically not a concern in development. For production gMSA accounts, explicitly grant the necessary permissions.
+- **ADFS stores (WinADFS) do not support JEA.** The WinADFS store type requires specific ADFS module cmdlets that cannot be constrained within a JEA session. WinADFS stores must use a standard WinRM connection.
 
 </details>
 
@@ -122,6 +476,16 @@ Please consult with your company's system administrator for more information on 
 ### PowerShell Requirements
 PowerShell is extensively used to inventory and manage certificates across each Certificate Store Type.  Windows Desktop and Server includes PowerShell 5.1 that is capable of running all or most PowerShell functions.  If the Orchestrator is to run in a Linux environment using SSH as their communication protocol, PowerShell 6.1 or greater is required (7.4 or greater is recommended).  
 In addition to PowerShell, IISU requires additional PowerShell modules to be installed and available.  These modules include:  WebAdministration and IISAdministration, versions 1.1.
+
+**JEA Module Requirements:** When using JEA (Just Enough Administration) to connect to a target server, the Keyfactor PowerShell modules must be pre-installed on each target server under `C:\Program Files\WindowsPowerShell\Modules\`. These modules are included in the WinCert extension deployment package inside the `PowerShell` folder. The modules that must be installed depend on which store types are managed on that server:
+
+| Module | Required For |
+|---|---|
+| `Keyfactor.WinCert.Common` | All store types — must always be installed |
+| `Keyfactor.WinCert.IIS` | WinIIS stores |
+| `Keyfactor.WinCert.SQL` | WinSQL stores |
+
+In standard (non-JEA) WinRM and local-machine modes, the orchestrator automatically loads these modules from its own deployment at runtime — no pre-installation on the target server is required. JEA mode is the only mode that requires the modules to be pre-installed on the target server. See the **Just Enough Administration (JEA) Setup and Configuration** section for complete installation and setup instructions.
 
 ### Security and Permission Considerations
 
@@ -165,7 +529,6 @@ Below is a brief summary of the CSPs and their support for RSA and ECC algorithm
 |Microsoft Software Key Storage Provider	    |✅|✅|
 |Microsoft Enhanced Cryptographic Provider	    |✅|❌|
 
-
 ## Certificate Store Types
 
 To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your use-case. This only needs to happen _once_ per Keyfactor Command instance.
@@ -175,7 +538,6 @@ The Windows Certificate Universal Orchestrator extension implements 4 Certificat
 ### WinCert
 
 <details><summary>Click to expand details</summary>
-
 
 The Windows Certificate Certificate Store Type, known by its short name 'WinCert,' enables the management of certificates within the Windows local machine certificate stores. This store type is a versatile option for general Windows certificate management and supports functionalities including inventory, add, remove, and reenrollment of certificates.
 
@@ -189,24 +551,22 @@ The store type represents the various certificate stores present on a Windows Se
 
 - **Limitations:** Users should be aware that for this store type to function correctly, certain permissions are necessary. While some advanced users successfully use non-administrator accounts with specific permissions, it is officially supported only with Local Administrator permissions. Complexities with interactions between Group Policy, WinRM, User Account Control, and other environmental factors may impede operations if not properly configured.
 
-
-
-
 #### Supported Operations
 
-| Operation    | Is Supported                                                                                                           |
-|--------------|------------------------------------------------------------------------------------------------------------------------|
-| Add          | ✅ Checked        |
-| Remove       | ✅ Checked     |
-| Discovery    | 🔲 Unchecked  |
+| Operation    | Is Supported |
+|--------------|--------------|
+| Add          | ✅ Checked |
+| Remove       | ✅ Checked |
+| Discovery    | 🔲 Unchecked |
 | Reenrollment | ✅ Checked |
-| Create       | 🔲 Unchecked     |
+| Create       | 🔲 Unchecked |
 
 #### Store Type Creation
 
 ##### Using kfutil:
 `kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+
    <details><summary>Click to expand WinCert kfutil details</summary>
 
    ##### Using online definition from GitHub:
@@ -225,10 +585,10 @@ For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out 
    ```
    </details>
 
-
 #### Manual Creation
 Below are instructions on how to create the WinCert store type manually in
 the Keyfactor Command Portal
+
    <details><summary>Click to expand manual WinCert details</summary>
 
    Create a store type called `WinCert` with the attributes in the tables below:
@@ -239,11 +599,11 @@ the Keyfactor Command Portal
    | Name | Windows Certificate | Display name for the store type (may be customized) |
    | Short Name | WinCert | Short display name for the store type |
    | Capability | WinCert | Store type name orchestrator will register with. Check the box to allow entry of value |
-   | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
-   | Supports Remove | ✅ Checked | Check the box. Indicates that the Store Type supports Management Remove |
-   | Supports Discovery | 🔲 Unchecked |  Indicates that the Store Type supports Discovery |
-   | Supports Reenrollment | ✅ Checked |  Indicates that the Store Type supports Reenrollment |
-   | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
+   | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
+   | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | ✅ Checked | Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
    | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |
    | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
@@ -252,18 +612,18 @@ the Keyfactor Command Portal
 
    The Basic tab should look like this:
 
-   ![WinCert Basic Tab](docsource/images/WinCert-basic-store-type-dialog.png)
+   ![WinCert Basic Tab](docsource/images/WinCert-basic-store-type-dialog.svg)
 
    ##### Advanced Tab
    | Attribute | Value | Description |
    | --------- | ----- | ----- |
    | Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias. |
-   | Private Key Handling | Optional | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
+   | Private Key Handling | Optional | This determines if Keyfactor can send the private key associated with a certificate to the store. |
    | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
 
    The Advanced tab should look like this:
 
-   ![WinCert Advanced Tab](docsource/images/WinCert-advanced-store-type-dialog.png)
+   ![WinCert Advanced Tab](docsource/images/WinCert-advanced-store-type-dialog.svg)
 
    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
 
@@ -281,31 +641,27 @@ the Keyfactor Command Portal
 
    The Custom Fields tab should look like this:
 
-   ![WinCert Custom Fields Tab](docsource/images/WinCert-custom-fields-store-type-dialog.png)
-
+   ![WinCert Custom Fields Tab](docsource/images/WinCert-custom-fields-store-type-dialog.svg)
 
    ###### SPN With Port
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
-   ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-dialog.png)
-   ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-validation-options-dialog.png)
-
+   ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-dialog.svg)
+   ![WinCert Custom Field - spnwithport](docsource/images/WinCert-custom-field-spnwithport-validation-options-dialog.svg)
 
 
    ###### WinRM Protocol
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
-   ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-dialog.png)
-   ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-validation-options-dialog.png)
-
+   ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-dialog.svg)
+   ![WinCert Custom Field - WinRM Protocol](docsource/images/WinCert-custom-field-WinRM Protocol-validation-options-dialog.svg)
 
 
    ###### WinRM Port
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
-   ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-dialog.png)
-   ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-validation-options-dialog.png)
-
+   ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-dialog.svg)
+   ![WinCert Custom Field - WinRM Port](docsource/images/WinCert-custom-field-WinRM Port-validation-options-dialog.svg)
 
 
    ###### Server Username
@@ -316,8 +672,6 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Server Password
    Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)
 
@@ -326,16 +680,11 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Use SSL
    Determine whether the server uses SSL or not (This field is automatically created)
 
-   ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-dialog.png)
-   ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-validation-options-dialog.png)
-
-
-
+   ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-dialog.svg)
+   ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-validation-options-dialog.svg)
 
 
    ##### Entry Parameters Tab
@@ -346,15 +695,12 @@ the Keyfactor Command Portal
 
    The Entry Parameters tab should look like this:
 
-   ![WinCert Entry Parameters Tab](docsource/images/WinCert-entry-parameters-store-type-dialog.png)
-
-
+   ![WinCert Entry Parameters Tab](docsource/images/WinCert-entry-parameters-store-type-dialog.svg)
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
-   ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName.png)
-   ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
-
+   ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName.svg)
+   ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
 
    </details>
@@ -364,8 +710,9 @@ the Keyfactor Command Portal
 
 <details><summary>Click to expand details</summary>
 
+#### Key Features and Representation
 
-The IIS Bound Certificate Store Type, identified by its short name 'IISU,' is designed for the management of certificates bound to IIS (Internet Information Services) servers. This store type allows users to automate and streamline the process of adding, removing, and reenrolling certificates for IIS sites, making it significantly easier to manage web server certificates.
+The IISU store type represents the IIS servers and their certificate bindings. It specifically caters to managing SSL/TLS certificates tied to IIS websites, allowing bind operations such as specifying site names, IP addresses, ports, and enabling Server Name Indication (SNI). By default, it supports job types like Inventory, Add, Remove, and Reenrollment, thereby offering comprehensive management capabilities for IIS certificates.
 
 #### Understanding SSL Flags
 
@@ -462,24 +809,32 @@ For authoritative guidance on SSL bindings and the `sslFlags` property, refer to
 **SSL Flag 2 (Centralized Certificate Store)** is currently **not supported** by this implementation.  
 Using this flag will result in an error and the job will not complete successfully.
 
+#### Limitations and Areas of Confusion
 
+- **Caveats:** It's important to ensure that the Windows Remote Management (WinRM) is properly configured on the target server. The orchestrator relies on WinRM to perform its tasks, such as manipulating the Windows Certificate Stores. Misconfiguration of WinRM may lead to connection and permission issues.
+<br><br>When performing <b>Inventory</b>, all bound certificates <i>regardless</i> to their store location will be returned.
+<br><br>When executing an Add or Renew Management job, the Store Location will be considered and place the certificate in that location.
 
+- **Limitations:** Users should be aware that for this store type to function correctly, certain permissions are necessary. While some advanced users successfully use non-administrator accounts with specific permissions, it is officially supported only with Local Administrator permissions. Complexities with interactions between Group Policy, WinRM, User Account Control, and other environmental factors may impede operations if not properly configured.
+
+- **Custom Alias and Private Keys:** The store type does not support custom aliases for individual entries and requires private keys because IIS certificates without private keys would be invalid.
 
 #### Supported Operations
 
-| Operation    | Is Supported                                                                                                           |
-|--------------|------------------------------------------------------------------------------------------------------------------------|
-| Add          | ✅ Checked        |
-| Remove       | ✅ Checked     |
-| Discovery    | 🔲 Unchecked  |
+| Operation    | Is Supported |
+|--------------|--------------|
+| Add          | ✅ Checked |
+| Remove       | ✅ Checked |
+| Discovery    | 🔲 Unchecked |
 | Reenrollment | ✅ Checked |
-| Create       | 🔲 Unchecked     |
+| Create       | 🔲 Unchecked |
 
 #### Store Type Creation
 
 ##### Using kfutil:
 `kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+
    <details><summary>Click to expand IISU kfutil details</summary>
 
    ##### Using online definition from GitHub:
@@ -498,10 +853,10 @@ For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out 
    ```
    </details>
 
-
 #### Manual Creation
 Below are instructions on how to create the IISU store type manually in
 the Keyfactor Command Portal
+
    <details><summary>Click to expand manual IISU details</summary>
 
    Create a store type called `IISU` with the attributes in the tables below:
@@ -512,11 +867,11 @@ the Keyfactor Command Portal
    | Name | IIS Bound Certificate | Display name for the store type (may be customized) |
    | Short Name | IISU | Short display name for the store type |
    | Capability | IISU | Store type name orchestrator will register with. Check the box to allow entry of value |
-   | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
-   | Supports Remove | ✅ Checked | Check the box. Indicates that the Store Type supports Management Remove |
-   | Supports Discovery | 🔲 Unchecked |  Indicates that the Store Type supports Discovery |
-   | Supports Reenrollment | ✅ Checked |  Indicates that the Store Type supports Reenrollment |
-   | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
+   | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
+   | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | ✅ Checked | Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
    | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |
    | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
@@ -525,18 +880,18 @@ the Keyfactor Command Portal
 
    The Basic tab should look like this:
 
-   ![IISU Basic Tab](docsource/images/IISU-basic-store-type-dialog.png)
+   ![IISU Basic Tab](docsource/images/IISU-basic-store-type-dialog.svg)
 
    ##### Advanced Tab
    | Attribute | Value | Description |
    | --------- | ----- | ----- |
    | Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias. |
-   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
+   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. |
    | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
 
    The Advanced tab should look like this:
 
-   ![IISU Advanced Tab](docsource/images/IISU-advanced-store-type-dialog.png)
+   ![IISU Advanced Tab](docsource/images/IISU-advanced-store-type-dialog.svg)
 
    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
 
@@ -554,31 +909,27 @@ the Keyfactor Command Portal
 
    The Custom Fields tab should look like this:
 
-   ![IISU Custom Fields Tab](docsource/images/IISU-custom-fields-store-type-dialog.png)
-
+   ![IISU Custom Fields Tab](docsource/images/IISU-custom-fields-store-type-dialog.svg)
 
    ###### SPN With Port
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
-   ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-dialog.png)
-   ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-validation-options-dialog.png)
-
+   ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-dialog.svg)
+   ![IISU Custom Field - spnwithport](docsource/images/IISU-custom-field-spnwithport-validation-options-dialog.svg)
 
 
    ###### WinRM Protocol
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
-   ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-dialog.png)
-   ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-validation-options-dialog.png)
-
+   ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-dialog.svg)
+   ![IISU Custom Field - WinRM Protocol](docsource/images/IISU-custom-field-WinRM Protocol-validation-options-dialog.svg)
 
 
    ###### WinRM Port
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
-   ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-dialog.png)
-   ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-validation-options-dialog.png)
-
+   ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-dialog.svg)
+   ![IISU Custom Field - WinRM Port](docsource/images/IISU-custom-field-WinRM Port-validation-options-dialog.svg)
 
 
    ###### Server Username
@@ -589,8 +940,6 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Server Password
    Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)
 
@@ -599,16 +948,11 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Use SSL
    Determine whether the server uses SSL or not (This field is automatically created)
 
-   ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-dialog.png)
-   ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-validation-options-dialog.png)
-
-
-
+   ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-dialog.svg)
+   ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-validation-options-dialog.svg)
 
 
    ##### Entry Parameters Tab
@@ -625,57 +969,54 @@ the Keyfactor Command Portal
 
    The Entry Parameters tab should look like this:
 
-   ![IISU Entry Parameters Tab](docsource/images/IISU-entry-parameters-store-type-dialog.png)
-
-
+   ![IISU Entry Parameters Tab](docsource/images/IISU-entry-parameters-store-type-dialog.svg)
    ##### Port
    String value specifying the IP port to bind the certificate to for the IIS site. Example: '443' for HTTPS.
 
-   ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port.png)
-   ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port-validation-options.png)
+   ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port.svg)
+   ![IISU Entry Parameter - Port](docsource/images/IISU-entry-parameters-store-type-dialog-Port-validation-options.svg)
 
 
    ##### IP Address
    String value specifying the IP address to bind the certificate to for the IIS site. Example: '*' for all IP addresses or '192.168.1.1' for a specific IP address.
 
-   ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress.png)
-   ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress-validation-options.png)
+   ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress.svg)
+   ![IISU Entry Parameter - IPAddress](docsource/images/IISU-entry-parameters-store-type-dialog-IPAddress-validation-options.svg)
 
 
    ##### Host Name
    String value specifying the host name (host header) to bind the certificate to for the IIS site. Leave blank for all host names or enter a specific hostname such as 'www.example.com'.
 
-   ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName.png)
-   ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName-validation-options.png)
+   ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName.svg)
+   ![IISU Entry Parameter - HostName](docsource/images/IISU-entry-parameters-store-type-dialog-HostName-validation-options.svg)
 
 
    ##### IIS Site Name
    String value specifying the name of the IIS web site to bind the certificate to. Example: 'Default Web Site' or any custom site name such as 'MyWebsite'.
 
-   ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName.png)
-   ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName-validation-options.png)
+   ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName.svg)
+   ![IISU Entry Parameter - SiteName](docsource/images/IISU-entry-parameters-store-type-dialog-SiteName-validation-options.svg)
 
 
    ##### SSL Flags
    A 128-Bit Flag that determines what type of SSL settings you wish to use.  The default is 0, meaning No SNI.  For more information, check IIS documentation for the appropriate bit setting.)
 
-   ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag.png)
-   ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag-validation-options.png)
+   ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag.svg)
+   ![IISU Entry Parameter - SniFlag](docsource/images/IISU-entry-parameters-store-type-dialog-SniFlag-validation-options.svg)
 
 
    ##### Protocol
    Multiple choice value specifying the protocol to bind to. Example: 'https' for secure communication.
 
-   ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol.png)
-   ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol-validation-options.png)
+   ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol.svg)
+   ![IISU Entry Parameter - Protocol](docsource/images/IISU-entry-parameters-store-type-dialog-Protocol-validation-options.svg)
 
 
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
-   ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName.png)
-   ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
-
+   ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName.svg)
+   ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
 
    </details>
@@ -685,7 +1026,6 @@ the Keyfactor Command Portal
 
 <details><summary>Click to expand details</summary>
 
-
 The WinSql Certificate Store Type, referred to by its short name 'WinSql,' is designed for the management of certificates used by SQL Server instances. This store type allows users to automate the process of adding, removing, reenrolling, and inventorying certificates associated with SQL Server, thereby simplifying the management of SSL/TLS certificates for database servers.
 
 #### Caveats and Limitations
@@ -694,24 +1034,22 @@ The WinSql Certificate Store Type, referred to by its short name 'WinSql,' is de
 
 - **Limitations:** Users should be aware that for this store type to function correctly, certain permissions are necessary. While some advanced users successfully use non-administrator accounts with specific permissions, it is officially supported only with Local Administrator permissions. Complexities with interactions between Group Policy, WinRM, User Account Control, and other environmental factors may impede operations if not properly configured.
 
-
-
-
 #### Supported Operations
 
-| Operation    | Is Supported                                                                                                           |
-|--------------|------------------------------------------------------------------------------------------------------------------------|
-| Add          | ✅ Checked        |
-| Remove       | ✅ Checked     |
-| Discovery    | 🔲 Unchecked  |
+| Operation    | Is Supported |
+|--------------|--------------|
+| Add          | ✅ Checked |
+| Remove       | ✅ Checked |
+| Discovery    | 🔲 Unchecked |
 | Reenrollment | 🔲 Unchecked |
-| Create       | 🔲 Unchecked     |
+| Create       | 🔲 Unchecked |
 
 #### Store Type Creation
 
 ##### Using kfutil:
 `kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+
    <details><summary>Click to expand WinSql kfutil details</summary>
 
    ##### Using online definition from GitHub:
@@ -730,10 +1068,10 @@ For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out 
    ```
    </details>
 
-
 #### Manual Creation
 Below are instructions on how to create the WinSql store type manually in
 the Keyfactor Command Portal
+
    <details><summary>Click to expand manual WinSql details</summary>
 
    Create a store type called `WinSql` with the attributes in the tables below:
@@ -744,11 +1082,11 @@ the Keyfactor Command Portal
    | Name | WinSql | Display name for the store type (may be customized) |
    | Short Name | WinSql | Short display name for the store type |
    | Capability | WinSql | Store type name orchestrator will register with. Check the box to allow entry of value |
-   | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
-   | Supports Remove | ✅ Checked | Check the box. Indicates that the Store Type supports Management Remove |
-   | Supports Discovery | 🔲 Unchecked |  Indicates that the Store Type supports Discovery |
-   | Supports Reenrollment | 🔲 Unchecked |  Indicates that the Store Type supports Reenrollment |
-   | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
+   | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
+   | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | 🔲 Unchecked | Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
    | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | ✅ Checked | Determines if store type may be included in an Orchestrator blueprint |
    | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
@@ -757,18 +1095,18 @@ the Keyfactor Command Portal
 
    The Basic tab should look like this:
 
-   ![WinSql Basic Tab](docsource/images/WinSql-basic-store-type-dialog.png)
+   ![WinSql Basic Tab](docsource/images/WinSql-basic-store-type-dialog.svg)
 
    ##### Advanced Tab
    | Attribute | Value | Description |
    | --------- | ----- | ----- |
    | Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias. |
-   | Private Key Handling | Optional | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
+   | Private Key Handling | Optional | This determines if Keyfactor can send the private key associated with a certificate to the store. |
    | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
 
    The Advanced tab should look like this:
 
-   ![WinSql Advanced Tab](docsource/images/WinSql-advanced-store-type-dialog.png)
+   ![WinSql Advanced Tab](docsource/images/WinSql-advanced-store-type-dialog.svg)
 
    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
 
@@ -787,31 +1125,27 @@ the Keyfactor Command Portal
 
    The Custom Fields tab should look like this:
 
-   ![WinSql Custom Fields Tab](docsource/images/WinSql-custom-fields-store-type-dialog.png)
-
+   ![WinSql Custom Fields Tab](docsource/images/WinSql-custom-fields-store-type-dialog.svg)
 
    ###### SPN With Port
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
-   ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-dialog.png)
-   ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-validation-options-dialog.png)
-
+   ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-dialog.svg)
+   ![WinSql Custom Field - spnwithport](docsource/images/WinSql-custom-field-spnwithport-validation-options-dialog.svg)
 
 
    ###### WinRM Protocol
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
-   ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-dialog.png)
-   ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-validation-options-dialog.png)
-
+   ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-dialog.svg)
+   ![WinSql Custom Field - WinRM Protocol](docsource/images/WinSql-custom-field-WinRM Protocol-validation-options-dialog.svg)
 
 
    ###### WinRM Port
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
-   ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-dialog.png)
-   ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-validation-options-dialog.png)
-
+   ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-dialog.svg)
+   ![WinSql Custom Field - WinRM Port](docsource/images/WinSql-custom-field-WinRM Port-validation-options-dialog.svg)
 
 
    ###### Server Username
@@ -822,8 +1156,6 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Server Password
    Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)
 
@@ -832,24 +1164,18 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Use SSL
    Determine whether the server uses SSL or not (This field is automatically created)
 
-   ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-dialog.png)
-   ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-validation-options-dialog.png)
-
+   ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-dialog.svg)
+   ![WinSql Custom Field - ServerUseSsl](docsource/images/WinSql-custom-field-ServerUseSsl-validation-options-dialog.svg)
 
 
    ###### Restart SQL Service After Cert Installed
    Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation.
 
-   ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-dialog.png)
-   ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-validation-options-dialog.png)
-
-
-
+   ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-dialog.svg)
+   ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-validation-options-dialog.svg)
 
 
    ##### Entry Parameters Tab
@@ -861,22 +1187,19 @@ the Keyfactor Command Portal
 
    The Entry Parameters tab should look like this:
 
-   ![WinSql Entry Parameters Tab](docsource/images/WinSql-entry-parameters-store-type-dialog.png)
-
-
+   ![WinSql Entry Parameters Tab](docsource/images/WinSql-entry-parameters-store-type-dialog.svg)
    ##### Instance Name
    String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance.
 
-   ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName.png)
-   ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName-validation-options.png)
+   ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName.svg)
+   ![WinSql Entry Parameter - InstanceName](docsource/images/WinSql-entry-parameters-store-type-dialog-InstanceName-validation-options.svg)
 
 
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
-   ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName.png)
-   ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
-
+   ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName.svg)
+   ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
 
    </details>
@@ -886,35 +1209,30 @@ the Keyfactor Command Portal
 
 <details><summary>Click to expand details</summary>
 
-
 WinADFS is a store type designed for managing certificates within Microsoft Active Directory Federation Services (ADFS) environments. This store type enables users to automate the management of certificates used for securing ADFS communications, including tasks such as adding, removing, and renewing certificates associated with ADFS services.
 * NOTE: Only the Service-Communications certificate is currently supported.  Follow your ADFS best practices for token encrypt and decrypt certificate management.
 * NOTE: This extension also supports the auto-removal of expired certificates from the ADFS stores on the Primary and Secondary nodes during the certificate rotation process, along with restarting the ADFS service to apply changes.
-
-
-
 
 #### ADFS Rotation Manager Requirements
 
 When using WinADFS, the Universal Orchestrator must act as an agent and be installed on the Primary ADFS server within the ADFS farm. This is necessary because ADFS configurations and certificate management operations must be performed directly on the ADFS server itself to ensure proper functionality and security.
 
-
-
 #### Supported Operations
 
-| Operation    | Is Supported                                                                                                           |
-|--------------|------------------------------------------------------------------------------------------------------------------------|
-| Add          | ✅ Checked        |
-| Remove       | 🔲 Unchecked     |
-| Discovery    | 🔲 Unchecked  |
+| Operation    | Is Supported |
+|--------------|--------------|
+| Add          | ✅ Checked |
+| Remove       | 🔲 Unchecked |
+| Discovery    | 🔲 Unchecked |
 | Reenrollment | 🔲 Unchecked |
-| Create       | 🔲 Unchecked     |
+| Create       | 🔲 Unchecked |
 
 #### Store Type Creation
 
 ##### Using kfutil:
 `kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
 For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+
    <details><summary>Click to expand WinAdfs kfutil details</summary>
 
    ##### Using online definition from GitHub:
@@ -933,10 +1251,10 @@ For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out 
    ```
    </details>
 
-
 #### Manual Creation
 Below are instructions on how to create the WinAdfs store type manually in
 the Keyfactor Command Portal
+
    <details><summary>Click to expand manual WinAdfs details</summary>
 
    Create a store type called `WinAdfs` with the attributes in the tables below:
@@ -947,11 +1265,11 @@ the Keyfactor Command Portal
    | Name | ADFS Rotation Manager | Display name for the store type (may be customized) |
    | Short Name | WinAdfs | Short display name for the store type |
    | Capability | WinAdfs | Store type name orchestrator will register with. Check the box to allow entry of value |
-   | Supports Add | ✅ Checked | Check the box. Indicates that the Store Type supports Management Add |
-   | Supports Remove | 🔲 Unchecked |  Indicates that the Store Type supports Management Remove |
-   | Supports Discovery | 🔲 Unchecked |  Indicates that the Store Type supports Discovery |
-   | Supports Reenrollment | 🔲 Unchecked |  Indicates that the Store Type supports Reenrollment |
-   | Supports Create | 🔲 Unchecked |  Indicates that the Store Type supports store creation |
+   | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
+   | Supports Remove | 🔲 Unchecked | Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | 🔲 Unchecked | Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
    | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | ✅ Checked | Determines if store type may be included in an Orchestrator blueprint |
    | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
@@ -960,18 +1278,18 @@ the Keyfactor Command Portal
 
    The Basic tab should look like this:
 
-   ![WinAdfs Basic Tab](docsource/images/WinAdfs-basic-store-type-dialog.png)
+   ![WinAdfs Basic Tab](docsource/images/WinAdfs-basic-store-type-dialog.svg)
 
    ##### Advanced Tab
    | Attribute | Value | Description |
    | --------- | ----- | ----- |
    | Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias. |
-   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. Required because IIS certificates without private keys would be invalid. |
+   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. |
    | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
 
    The Advanced tab should look like this:
 
-   ![WinAdfs Advanced Tab](docsource/images/WinAdfs-advanced-store-type-dialog.png)
+   ![WinAdfs Advanced Tab](docsource/images/WinAdfs-advanced-store-type-dialog.svg)
 
    > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
 
@@ -989,31 +1307,27 @@ the Keyfactor Command Portal
 
    The Custom Fields tab should look like this:
 
-   ![WinAdfs Custom Fields Tab](docsource/images/WinAdfs-custom-fields-store-type-dialog.png)
-
+   ![WinAdfs Custom Fields Tab](docsource/images/WinAdfs-custom-fields-store-type-dialog.svg)
 
    ###### SPN With Port
    Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
 
-   ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-dialog.png)
-   ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-validation-options-dialog.png)
-
+   ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-dialog.svg)
+   ![WinAdfs Custom Field - spnwithport](docsource/images/WinAdfs-custom-field-spnwithport-validation-options-dialog.svg)
 
 
    ###### WinRM Protocol
    Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
 
-   ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-dialog.png)
-   ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-validation-options-dialog.png)
-
+   ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-dialog.svg)
+   ![WinAdfs Custom Field - WinRM Protocol](docsource/images/WinAdfs-custom-field-WinRM Protocol-validation-options-dialog.svg)
 
 
    ###### WinRM Port
    String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
 
-   ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-dialog.png)
-   ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-validation-options-dialog.png)
-
+   ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-dialog.svg)
+   ![WinAdfs Custom Field - WinRM Port](docsource/images/WinAdfs-custom-field-WinRM Port-validation-options-dialog.svg)
 
 
    ###### Server Username
@@ -1024,8 +1338,6 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Server Password
    Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)
 
@@ -1034,16 +1346,11 @@ the Keyfactor Command Portal
    > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
 
 
-
-
    ###### Use SSL
    Determine whether the server uses SSL or not (This field is automatically created)
 
-   ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-dialog.png)
-   ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-validation-options-dialog.png)
-
-
-
+   ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-dialog.svg)
+   ![WinAdfs Custom Field - ServerUseSsl](docsource/images/WinAdfs-custom-field-ServerUseSsl-validation-options-dialog.svg)
 
 
    ##### Entry Parameters Tab
@@ -1054,15 +1361,12 @@ the Keyfactor Command Portal
 
    The Entry Parameters tab should look like this:
 
-   ![WinAdfs Entry Parameters Tab](docsource/images/WinAdfs-entry-parameters-store-type-dialog.png)
-
-
+   ![WinAdfs Entry Parameters Tab](docsource/images/WinAdfs-entry-parameters-store-type-dialog.svg)
    ##### Crypto Provider Name
    Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
 
-   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName.png)
-   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName-validation-options.png)
-
+   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName.svg)
+   ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
 
    </details>
@@ -1073,14 +1377,15 @@ the Keyfactor Command Portal
 
 1. **Download the latest Windows Certificate Universal Orchestrator extension from GitHub.**
 
-    Navigate to the [Windows Certificate Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/iis-orchestrator/releases/latest). Refer to the compatibility matrix below to determine the asset should be downloaded. Then, click the corresponding asset to download the zip archive.
+    Navigate to the [Windows Certificate Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/iis-orchestrator/releases/latest). Refer to the compatibility matrix below to determine which asset should be downloaded. Then, click the corresponding asset to download the zip archive.
 
    | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `iis-orchestrator` .NET version to download |
    | --------- | ----------- | ----------- | ----------- |
    | Older than `11.0.0` | | | `net6.0` |
    | Between `11.0.0` and `11.5.1` (inclusive) | `net6.0` | | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` || Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
-   | `11.6` _and_ newer | `net8.0` | | `net8.0` | 
+   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` |
+   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
+   | `11.6` _and_ newer | `net8.0` | | `net8.0` |
 
     Unzip the archive containing extension assemblies to a known location.
 
@@ -1102,24 +1407,19 @@ the Keyfactor Command Portal
 
     Refer to [Starting/Restarting the Universal Orchestrator service](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/StarttheService.htm).
 
-
 6. **(optional) PAM Integration**
 
     The Windows Certificate Universal Orchestrator extension is compatible with all supported Keyfactor PAM extensions to resolve PAM-eligible secrets. PAM extensions running on Universal Orchestrators enable secure retrieval of secrets from a connected PAM provider.
 
     To configure a PAM provider, [reference the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam) to select an extension and follow the associated instructions to install it on the Universal Orchestrator (remote).
 
-
 > The above installation steps can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/InstallingAgents/NetCoreOrchestrator/CustomExtensions.htm?Highlight=extensions).
-
-
 
 ## Defining Certificate Stores
 
 The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types, each of which implements different functionality. Refer to the individual instructions below for each Certificate Store Type that you deemed necessary for your use case from the installation section.
 
 <details><summary>Windows Certificate (WinCert)</summary>
-
 
 ### Store Creation
 
@@ -1135,8 +1435,8 @@ The Windows Certificate Universal Orchestrator extension implements 4 Certificat
 
     Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
 
-   | Attribute | Description                                             |
-   | --------- |---------------------------------------------------------|
+   | Attribute | Description |
+   | --------- | ----------- |
    | Category | Select "Windows Certificate" or the customized certificate store name from the previous step. |
    | Container | Optional container to associate certificate store with. |
    | Client Machine | Hostname of the Windows Server containing the certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine). |
@@ -1150,8 +1450,6 @@ The Windows Certificate Universal Orchestrator extension implements 4 Certificat
    | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
 
 </details>
-
-
 
 #### Using kfutil CLI
 
@@ -1188,7 +1486,6 @@ The Windows Certificate Universal Orchestrator extension implements 4 Certificat
 
 </details>
 
-
 #### PAM Provider Eligible Fields
 <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
 
@@ -1204,14 +1501,11 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 </details>
 
-
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
-
 
 </details>
 
 <details><summary>IIS Bound Certificate (IISU)</summary>
-
 
 ### Store Creation
 
@@ -1227,8 +1521,8 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
     Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
 
-   | Attribute | Description                                             |
-   | --------- |---------------------------------------------------------|
+   | Attribute | Description |
+   | --------- | ----------- |
    | Category | Select "IIS Bound Certificate" or the customized certificate store name from the previous step. |
    | Container | Optional container to associate certificate store with. |
    | Client Machine | Hostname of the Windows Server containing the IIS certificate store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields.  For more information, see [Client Machine](#note-regarding-client-machine). |
@@ -1242,8 +1536,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
    | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
 
 </details>
-
-
 
 #### Using kfutil CLI
 
@@ -1280,7 +1572,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 </details>
 
-
 #### PAM Provider Eligible Fields
 <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
 
@@ -1296,14 +1587,11 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 </details>
 
-
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
-
 
 </details>
 
 <details><summary>WinSql (WinSql)</summary>
-
 
 ### Store Creation
 
@@ -1319,8 +1607,8 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
     Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
 
-   | Attribute | Description                                             |
-   | --------- |---------------------------------------------------------|
+   | Attribute | Description |
+   | --------- | ----------- |
    | Category | Select "WinSql" or the customized certificate store name from the previous step. |
    | Container | Optional container to associate certificate store with. |
    | Client Machine | Hostname of the Windows Server containing the SQL Server Certificate Store to be managed. If this value is a hostname, a WinRM session will be established using the credentials specified in the Server Username and Server Password fields. For more information, see [Client Machine](#note-regarding-client-machine). |
@@ -1335,8 +1623,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
    | RestartService | Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation. |
 
 </details>
-
-
 
 #### Using kfutil CLI
 
@@ -1374,7 +1660,6 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 </details>
 
-
 #### PAM Provider Eligible Fields
 <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
 
@@ -1390,16 +1675,13 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 </details>
 
-
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
-
 
 </details>
 
 <details><summary>ADFS Rotation Manager (WinAdfs)</summary>
 
 When creating a Certificate Store for WinADFS, the Client Machine name must be set as an agent and use the LocalMachine moniker, for example: myADFSPrimary|LocalMachine.
-
 
 ### Store Creation
 
@@ -1415,8 +1697,8 @@ When creating a Certificate Store for WinADFS, the Client Machine name must be s
 
     Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
 
-   | Attribute | Description                                             |
-   | --------- |---------------------------------------------------------|
+   | Attribute | Description |
+   | --------- | ----------- |
    | Category | Select "ADFS Rotation Manager" or the customized certificate store name from the previous step. |
    | Container | Optional container to associate certificate store with. |
    | Client Machine | Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server. |
@@ -1430,8 +1712,6 @@ When creating a Certificate Store for WinADFS, the Client Machine name must be s
    | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
 
 </details>
-
-
 
 #### Using kfutil CLI
 
@@ -1468,7 +1748,6 @@ When creating a Certificate Store for WinADFS, the Client Machine name must be s
 
 </details>
 
-
 #### PAM Provider Eligible Fields
 <details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
 
@@ -1484,19 +1763,15 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 </details>
 
-
 > The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
 
-
 </details>
-
 
 
 ## Client Machine Instructions
 Prior to version 2.6, this extension would only run in the Windows environment.  Version 2.6 and greater is capable of running on Linux, however, only the SSH protocol is supported.
 
 If running as an agent (accessing stores on the server where the Universal Orchestrator Services is installed ONLY), the Client Machine can be entered, OR you can bypass a WinRM connection and access the local file system directly by adding "|LocalMachine" to the end of your value for Client Machine, for example "1.1.1.1|LocalMachine".  In this instance the value to the left of the pipe (|) is ignored.  It is important to make sure the values for Client Machine and Store Path together are unique for each certificate store created, as Keyfactor Command requires the Store Type you select, along with Client Machine, and Store Path together must be unique.  To ensure this, it is good practice to put the full DNS or IP Address to the left of the | character when setting up a certificate store that will be accessed without a WinRM connection.
-
 
 ## License
 
