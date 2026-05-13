@@ -192,6 +192,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             if (this.isADFSStore) throw new Exception("Remote ADFS stores are not supported.");
             if (this.useJea && protocol == "ssh") throw new Exception("JEA is not supported over SSH. Use WinRM (http/https) for JEA.");
 
+            double timeoutSeconds = 30.0;
+
             if (protocol == "ssh")
             {
                 _logger.LogTrace("Initializing SSH connection");
@@ -228,7 +230,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     // Create the PSSessionOption object
                     var sessionOption = new PSSessionOption
                     {
-                        IncludePortInSPN = useSPN
+                        IncludePortInSPN = useSPN,
+                        OpenTimeout = TimeSpan.FromSeconds(timeoutSeconds)
                     };
 
                     PS.AddCommand("New-PSSession")
@@ -264,10 +267,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
             _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
-            _PSSession = PS.Invoke();
+
+            var asyncResult = PS.BeginInvoke();
+            if (!asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds)))
+            {
+                PS.Stop();
+                throw new TimeoutException(
+                    $"Could not establish a remote PowerShell session to '{machineName}:{port}' within {timeoutSeconds} seconds. " +
+                    "Verify WinRM is reachable and the firewall allows the connection.");
+            }
+            _PSSession = new Collection<PSObject>(PS.EndInvoke(asyncResult));
 
             if (_PSSession.Count > 0)
             {
