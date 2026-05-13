@@ -51,5 +51,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         [JsonProperty("RestartService")]
         [DefaultValue(true)]
         public bool RestartService { get; set; }
+
+        [JsonProperty("JEAEndpointName")]
+        [DefaultValue("")]
+        public string JEAEndpointName { get; set; } = "";
     }
 }
