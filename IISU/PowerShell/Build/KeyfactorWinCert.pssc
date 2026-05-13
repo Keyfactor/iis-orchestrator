@@ -15,7 +15,8 @@
 #
 #    (Only install the modules needed for the store types you use on this endpoint.)
 #
-# 2. Create the transcript directory for audit logging:
+# 2. (Optional) Create the transcript directory for audit logging.
+#    Only required if TranscriptDirectory is uncommented in the session configuration below.
 #
 #      New-Item -ItemType Directory -Path 'C:\ProgramData\Keyfactor\JEA\Transcripts' -Force
 #
@@ -79,9 +80,14 @@
     #
     RunAsVirtualAccount = $true
 
-    # Transcript every session to this directory for audit purposes.
-    # Directory must exist before registering -- see Prerequisites step 2 above.
-    TranscriptDirectory = 'C:\ProgramData\Keyfactor\JEA\Transcripts'
+    # --- Transcript Logging (Optional) ---
+    # Uncomment TranscriptDirectory to record a full transcript of every JEA session.
+    # Useful during initial testing and for ongoing security audits.
+    # The directory must exist before registering the configuration -- create it with:
+    #   New-Item -ItemType Directory -Path 'C:\ProgramData\Keyfactor\JEA\Transcripts' -Force
+    # When commented out, no transcripts are written.
+    #
+    # TranscriptDirectory = 'C:\ProgramData\Keyfactor\JEA\Transcripts'
 
     # --- Role Definitions ---
     # Map the connecting user/group to one or more Keyfactor role capabilities.
