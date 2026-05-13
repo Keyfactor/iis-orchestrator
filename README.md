@@ -239,15 +239,32 @@ You should see entries for each module you installed.
 
 ---
 
-#### Step 3: Create the Audit Transcript Directory
+#### Step 3: (Optional) Create the Audit Transcript Directory
 
-JEA records a full transcript of every session for audit purposes. The transcript directory must exist before you register the session configuration.
+Transcript logging is **disabled by default** in the session configuration file. When enabled, JEA records a full transcript of every session — every function called, with its parameters and output — to a directory on the target server. This is highly recommended while you are first testing the JEA setup, and may be required by your organization's security policy in production.
+
+To enable transcription, you must do two things: create the directory (this step), and uncomment the `TranscriptDirectory` line in the `.pssc` file (covered in Step 4).
 
 ```powershell
 New-Item -ItemType Directory -Path 'C:\ProgramData\Keyfactor\JEA\Transcripts' -Force
 ```
 
-Transcripts are written here automatically for every connection made through the JEA endpoint. Review these files periodically to audit orchestrator activity. Each transcript file is named with the date, time, and a unique identifier so that sessions are never overwritten.
+Each transcript file is named with the date, time, and a unique identifier so sessions are never overwritten. To review recent transcripts:
+
+```powershell
+# List the 10 most recent transcript files
+Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 10
+
+# View the most recent transcript
+Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1 |
+    Get-Content
+```
+
+If you choose not to enable transcript logging, skip this step entirely — no directory is needed when `TranscriptDirectory` remains commented out in the `.pssc`.
 
 ---
 
@@ -307,6 +324,24 @@ Only list the `RoleCapabilities` whose corresponding modules are installed on th
 | WinIIS only or WinCert + WinIIS | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS'` |
 | WinSQL only or WinCert + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL'` |
 | WinCert + WinIIS + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL'` |
+
+**Transcript Logging (Optional):**
+
+The `TranscriptDirectory` setting in the `.pssc` file is **commented out by default**. When commented out, no transcript files are written and the directory created in Step 3 is not needed. This is a reasonable choice for production environments where the volume of orchestrator activity would generate a large number of transcript files, or where audit logging is handled by another mechanism (e.g., WinRM event logs or a SIEM).
+
+To enable transcript logging, locate the `TranscriptDirectory` line in the `.pssc` file and remove the `#` comment character:
+
+```powershell
+# Before (transcription disabled — default):
+# TranscriptDirectory = 'C:\ProgramData\Keyfactor\JEA\Transcripts'
+
+# After (transcription enabled):
+TranscriptDirectory = 'C:\ProgramData\Keyfactor\JEA\Transcripts'
+```
+
+> **Recommendation:** Enable transcript logging during initial setup and testing. It makes it easy to confirm that the orchestrator is calling the correct functions with the correct parameters, and to diagnose any unexpected failures. Once you are confident the configuration is working correctly in production, you may choose to disable it to reduce disk usage — or keep it enabled to satisfy your organization's audit requirements.
+
+> **Important:** If you enable `TranscriptDirectory`, you must also create the directory before registering the session configuration (Step 3). If the directory does not exist at registration time, `Register-PSSessionConfiguration` will fail.
 
 ---
 
@@ -443,9 +478,9 @@ This typically indicates a WinRM connectivity issue rather than a JEA-specific p
 
 A **JEA Endpoint Name** was entered in the certificate store but the **Client Machine** is set to `localhost`, `LocalMachine`, or uses the `|LocalMachine` suffix. JEA is not compatible with local-machine (agent) mode. Either remove the JEA endpoint name to use direct local access, or change the Client Machine to the server's actual hostname or IP address to use JEA over WinRM.
 
-**Reviewing JEA Transcripts**
+**Reviewing JEA Transcripts (if transcript logging is enabled)**
 
-All JEA sessions are transcribed to `C:\ProgramData\Keyfactor\JEA\Transcripts\` on the target server. Each transcript file records the session start time, the connecting user, all commands executed (including parameter values), and the session end time. These files are invaluable for diagnosing job failures and for security audits.
+If `TranscriptDirectory` is uncommented in the `.pssc` file, JEA writes a full transcript of every session to that directory on the target server. Each transcript file records the session start time, the connecting user, all commands executed (including parameter values), and the session end time. These files are invaluable for diagnosing job failures and for security audits. See Steps 3 and 4 for instructions on enabling this feature.
 
 ```powershell
 # List recent transcript files
