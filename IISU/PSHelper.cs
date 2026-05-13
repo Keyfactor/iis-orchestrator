@@ -227,17 +227,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 _logger.LogTrace("Initializing WinRM connection");
                 try
                 {
-                    // Create the PSSessionOption object
-                    var sessionOption = new PSSessionOption
-                    {
-                        IncludePortInSPN = useSPN,
-                        OpenTimeout = TimeSpan.FromSeconds(timeoutSeconds)
-                    };
-
                     PS.AddCommand("New-PSSession")
-                    .AddParameter("ComputerName", ClientMachineName)
-                    .AddParameter("Port", port)
-                    .AddParameter("SessionOption", sessionOption);
+                        .AddParameter("ComputerName", ClientMachineName)
+                        .AddParameter("Port", port);
+
+                    if (useSPN)
+                    {
+                        var sessionOption = new PSSessionOption { IncludePortInSPN = true };
+                        PS.AddParameter("SessionOption", sessionOption);
+                    }
 
                     if (useJea)
                     {
@@ -260,8 +258,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     }
 
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    _logger.LogError($"An error occurred while attempting to establish a remote connection.\n {ex.Message}");
                     throw new Exception("Problems establishing network credentials.  Please check the User name and Password for the Certificate Store");
                 }
 
