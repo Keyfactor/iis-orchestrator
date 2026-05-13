@@ -24,6 +24,7 @@ using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
+    [Obsolete("This class is no longer used and will be removed in a future release.")]
     internal class WinInventory : ClientPSCertStoreInventory
     {
         private ILogger _logger;

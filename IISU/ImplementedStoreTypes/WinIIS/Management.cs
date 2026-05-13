@@ -92,12 +92,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "";
                 string alias = config.JobCertificate?.Alias?.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
 
                 // Assign the binding information
                 IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
 
                 _psHelper.Initialize();
 
@@ -295,7 +296,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                 if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
 
-                _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
+                _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
                 _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
 
                 // This should return the thumbprint of the certificate
@@ -330,7 +331,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                         { "StoreName", _storePath }
                     };
 
-            _psHelper.ExecutePowerShell("Remove-KFIISCertificateIfUnused", parameters);
+            _psHelper.ExecutePowerShell("Remove-KeyfactorIISCertificateIfUnused", parameters);
 
         }
 

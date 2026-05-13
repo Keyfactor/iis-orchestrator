@@ -91,7 +91,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
-                
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "";
+
                 RestartSQLService = jobProperties.RestartService;
 
                 if (config.JobProperties.ContainsKey("InstanceName"))
@@ -104,7 +105,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     RenewalThumbprint = config.JobProperties["RenewalThumbprint"]?.ToString();
                 }
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
 
                 _psHelper.Initialize();
 
@@ -234,8 +235,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                         { "StorePath", _storePath }
                     };
 
-                    _psHelper.ExecutePowerShell("Remove-KFCertificateFromStore", parameters);
-                    _logger.LogTrace("Returned from executing PS function (Remove-KFCertificateFromStore)");
+                    _psHelper.ExecutePowerShell("Remove-KeyfactorCertificate", parameters);
+                    _logger.LogTrace("Returned from executing PS function (Remove-KeyfactorCertificate)");
 
                     _psHelper.Terminate();
                 }
@@ -280,8 +281,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                 if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                 if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
 
-                _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
-                _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+                _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
+                _logger.LogTrace("Returned from executing PS function (Add-KeyfactorCertificate)");
 
                 // This should return the thumbprint of the certificate
                 if (_results != null && _results.Count > 0)
