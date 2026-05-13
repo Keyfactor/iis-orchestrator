@@ -57,23 +57,23 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     parameters["RestartService"] = restartSQLService;
                 }
 
-                _results = psHelper.ExecutePowerShell("Bind-KFSqlCertificate", parameters);
+                _results = psHelper.ExecutePowerShell("New-KeyfactorSQLBinding", parameters);
                 if (_results != null && _results.Count > 0)
                 {
                     // Extract value from PSObject and convert to bool
                     if (bool.TryParse(_results[0]?.BaseObject?.ToString(), out bool result))
                     {
-                        _logger.LogTrace($"PowerShell function Bind-KFSqlCertificate returned: {result}");
+                        _logger.LogTrace($"PowerShell function New-KeyfactorSQLBinding returned: {result}");
                         return result;
                     }
                 }
 
-                _logger.LogWarning("PowerShell function Bind-KFSqlCertificate did not return a valid boolean result.");
+                _logger.LogWarning("PowerShell function New-KeyfactorSQLBinding did not return a valid boolean result.");
                 return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error executing PowerShell function: Bind-KFSqlCertificate");
+                _logger.LogError(ex, "Error executing PowerShell function: New-KeyfactorSQLBinding");
                 return false;
             }
         }
@@ -96,22 +96,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     parameters["RestartService"] = restartSQLService;
                 }
 
-                _results = psHelper.ExecutePowerShell("Unbind-KFSqlCertificate", parameters);
+                _results = psHelper.ExecutePowerShell("Remove-KeyfactorSQLCertificate", parameters);
                 if (_results != null && _results.Count > 0)
                 {
                     if (bool.TryParse(_results[0]?.BaseObject?.ToString(), out bool result))
                     {
-                        _logger.LogTrace($"PowerShell function Unbind-KFSqlCertificate returned: {result}");
+                        _logger.LogTrace($"PowerShell function Remove-KeyfactorSQLCertificate returned: {result}");
                         return result;
                     }
                 }
 
-                _logger.LogWarning("PowerShell function Unbind-KFSqlCertificate did not return a valid boolean result.");
+                _logger.LogWarning("PowerShell function Remove-KeyfactorSQLCertificate did not return a valid boolean result.");
                 return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while unbinding certificate(s) from SQL instance(s)");
+                _logger.LogError(ex, "Error executing PowerShell function: Remove-KeyfactorSQLCertificate");
                 return false;
             }
         }

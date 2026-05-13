@@ -180,8 +180,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs
                     {
                         var siteSettingsDict = new Dictionary<string, object>
                                 {
-                                    { "ProviderName", cert.ProviderName},
-                                    { "SAN", cert.SAN }
+                                    { "ProviderName", cert.ProviderName}
                                 };
 
                         Inventory.Add(
