@@ -398,7 +398,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             else if (config.JobProperties != null &&
                 config.JobProperties.TryGetValue("SAN", out object legacySanValue) &&
-                !string.IsNullOrWhiteSpace(legacySanValue.ToString()))
+                    (legacySanValue is not null && !string.IsNullOrWhiteSpace(legacySanValue.ToString())))
             {
                 sanValue = legacySanValue.ToString().Trim();
                 sourceUsed = "config.JobProperties[\"SAN\"] (legacy)";

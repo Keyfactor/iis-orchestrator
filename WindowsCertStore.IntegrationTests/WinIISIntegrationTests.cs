@@ -20,7 +20,7 @@ namespace WindowsCertStore.IntegrationTests
 
         private static ManagementJobConfiguration CreateManagementJobConfig(
             ClientConnection connection,
-            string thumbprint,
+            string? thumbprint,
             string base64Pfx,
             string pfxPassword,
             string alias,
