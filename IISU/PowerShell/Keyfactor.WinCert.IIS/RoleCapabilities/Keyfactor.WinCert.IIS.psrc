@@ -1,0 +1,50 @@
+#
+# Keyfactor.WinCert.IIS.psrc
+# JEA Role Capability file for Keyfactor IIS certificate management operations
+#
+# Place this file under the module's RoleCapabilities directory so JEA can discover it:
+#   C:\Program Files\WindowsPowerShell\Modules\Keyfactor.WinCert.IIS\RoleCapabilities\Keyfactor.WinCert.IIS.psrc
+#
+# Reference this capability in KeyfactorWinCert.pssc:
+#   RoleDefinitions = @{
+#       'BUILTIN\Administrators' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS' }
+#   }
+#
+@{
+    GUID        = '3527aec5-b87f-4bb4-98df-34f5b2ac49cb'
+    Author      = 'Keyfactor'
+    Description = 'Role capability for Keyfactor IIS certificate management operations'
+    CompanyName = 'Keyfactor'
+    Copyright   = '2025 Keyfactor'
+
+    # Both modules must be installed under C:\Program Files\WindowsPowerShell\Modules\
+    # so they are treated as fully trusted code regardless of the session LanguageMode.
+    ModulesToImport = @('Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS')
+
+    # Only the three public IIS functions need to be visible to the caller.
+    # Internal helpers (New-KeyfactorResult, Get-CertificateCSP, Add-IISBindingWithSSL, etc.)
+    # are called from within trusted module code and do not require explicit exposure.
+    VisibleFunctions = @(
+        'Get-KeyfactorIISBoundCertificates',
+        'New-KeyfactorIISSiteBinding',
+        'Remove-KeyfactorIISSiteBinding',
+        'Remove-KeyfactorIISCertificateIfUnused'
+    )
+
+    VisibleCmdlets = @(
+        'ConvertTo-Json',
+        'ConvertFrom-Json',
+        'Write-Output',
+        'Write-Verbose',
+        'Write-Warning',
+        'Write-Error',
+        'Write-Information'
+    )
+
+    # appcmd.exe is invoked inside New-KeyfactorIISSiteBinding for extended SSL flag support.
+    # Trusted module code can call external commands unrestricted, but listing it here
+    # makes the allowed command surface explicit.
+    VisibleExternalCommands = @(
+        'C:\Windows\System32\inetsrv\appcmd.exe'
+    )
+}

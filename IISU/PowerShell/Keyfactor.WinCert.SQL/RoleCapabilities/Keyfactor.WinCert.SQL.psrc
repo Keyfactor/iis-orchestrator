@@ -1,0 +1,61 @@
+#
+# Keyfactor.WinCert.SQL.psrc
+# JEA Role Capability file for Keyfactor Windows Certificate Store (SQL Server operations)
+#
+# INSTALL LOCATION:
+#   This file must live inside the module folder that PowerShell can discover:
+#     C:\Program Files\WindowsPowerShell\Modules\
+#       Keyfactor.WinCert.SQL\
+#         RoleCapabilities\
+#           Keyfactor.WinCert.SQL.psrc   <-- this file
+#
+#   PowerShell finds the role capability by name ('Keyfactor.WinCert.SQL') by searching
+#   all modules in $env:PSModulePath for a RoleCapabilities subfolder with a matching .psrc.
+#
+# LANGUAGE MODE NOTE:
+#   The session configuration (KeyfactorWinCert.pssc) sets LanguageMode = 'ConstrainedLanguage'.
+#   Module code loaded from a trusted path ($env:PSModulePath) runs as FULLY TRUSTED and can
+#   use .NET APIs freely. The ConstrainedLanguage restriction only applies to caller scriptblocks
+#   sent by the orchestrator (e.g., param() blocks for parameter passing).
+#
+@{
+    GUID        = 'a7b93d2f-5e4c-4b1a-8f6e-2c9d0e3f7a1b'
+    Author      = 'Keyfactor'
+    Description = 'Role capabilities for Keyfactor Windows Certificate Store SQL Server operations (inventory, bind, unbind)'
+
+    # Import both modules so their functions are pre-loaded and run as trusted code.
+    # Both modules MUST be installed under C:\Program Files\WindowsPowerShell\Modules\ so that
+    # PowerShell treats them as trusted (required for .NET API usage in ConstrainedLanguage sessions).
+    ModulesToImport = @('Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL')
+
+    # Functions the orchestrator is allowed to invoke in this JEA session.
+    VisibleFunctions = @(
+        'Get-KeyfactorSQLInventory',
+        'New-KeyfactorSQLBinding',
+        'Remove-KeyfactorSQLCertificate'
+    )
+
+    # Cmdlets available to caller scriptblocks (param() wrappers sent by PSHelper).
+    # Module functions are trusted and can use any cmdlet internally regardless of this list.
+    VisibleCmdlets = @(
+        'ConvertTo-Json',
+        'ConvertFrom-Json',
+        'Write-Output',
+        'Write-Verbose',
+        'Write-Warning',
+        'Write-Error',
+        'Write-Information'
+    )
+
+    # icacls.exe is called via the PowerShell pipeline by Set-KeyfactorSQLCertificateBinding.
+    # Full path is required.
+    VisibleExternalCommands = @(
+        'C:\Windows\System32\icacls.exe'
+    )
+
+    # No variables need to be pre-defined for the orchestrator.
+    VisibleVariables = @()
+
+    # No aliases beyond what the module exports.
+    VisibleAliases = @()
+}
