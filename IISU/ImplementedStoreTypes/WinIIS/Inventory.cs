@@ -83,6 +83,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     settings.IncludePortInSPN = jobProperties.SpnPortFlag;
                     settings.ServerUserName = serverUserName;
                     settings.ServerPassword = serverPassword;
+                    settings.JEAEndpointName = jobProperties.JEAEndpointName;
 
                     _logger.LogTrace("Querying IIS Inventory..");
                     inventoryItems = QueryIISCertificates(settings);
@@ -127,7 +128,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, jeaEndpoint: settings.JEAEndpointName))
             {
                 ps.Initialize();
 
@@ -142,7 +143,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 //    results = ps.InvokeFunction("Get-KFIISBoundCertificates");
                 //}
 
-                results = ps.ExecutePowerShell("Get-KFIISBoundCertificates");
+                results = ps.ExecutePowerShell("Get-KeyfactorIISBoundCertificates");
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)
