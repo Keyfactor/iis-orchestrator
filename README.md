@@ -673,6 +673,7 @@ the Keyfactor Command Portal
    | ServerUsername | Server Username | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'.  (This field is automatically created) | Secret |  | 🔲 Unchecked |
    | ServerPassword | Server Password | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) | Secret |  | 🔲 Unchecked |
    | ServerUseSsl | Use SSL | Determine whether the server uses SSL or not (This field is automatically created) | Bool | true | ✅ Checked |
+   | JEAEndpointName | JEA End Point Name | Name of the JEA endpoint to use for the session (This field is automatically created) | String |  | 🔲 Unchecked |
 
    The Custom Fields tab should look like this:
 
@@ -720,6 +721,13 @@ the Keyfactor Command Portal
 
    ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-dialog.svg)
    ![WinCert Custom Field - ServerUseSsl](docsource/images/WinCert-custom-field-ServerUseSsl-validation-options-dialog.svg)
+
+
+   ###### JEA End Point Name
+   Name of the JEA endpoint to use for the session (This field is automatically created)
+
+   ![WinCert Custom Field - JEAEndpointName](docsource/images/WinCert-custom-field-JEAEndpointName-dialog.svg)
+   ![WinCert Custom Field - JEAEndpointName](docsource/images/WinCert-custom-field-JEAEndpointName-validation-options-dialog.svg)
 
 
    ##### Entry Parameters Tab
@@ -941,6 +949,7 @@ the Keyfactor Command Portal
    | ServerUsername | Server Username | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) | Secret |  | 🔲 Unchecked |
    | ServerPassword | Server Password | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) | Secret |  | 🔲 Unchecked |
    | ServerUseSsl | Use SSL | Determine whether the server uses SSL or not (This field is automatically created) | Bool | true | ✅ Checked |
+   | JEAEndpointName | JEA End Point Name | Name of the JEA endpoint to use for the session (This field is automatically created) | String |  | 🔲 Unchecked |
 
    The Custom Fields tab should look like this:
 
@@ -988,6 +997,13 @@ the Keyfactor Command Portal
 
    ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-dialog.svg)
    ![IISU Custom Field - ServerUseSsl](docsource/images/IISU-custom-field-ServerUseSsl-validation-options-dialog.svg)
+
+
+   ###### JEA End Point Name
+   Name of the JEA endpoint to use for the session (This field is automatically created)
+
+   ![IISU Custom Field - JEAEndpointName](docsource/images/IISU-custom-field-JEAEndpointName-dialog.svg)
+   ![IISU Custom Field - JEAEndpointName](docsource/images/IISU-custom-field-JEAEndpointName-validation-options-dialog.svg)
 
 
    ##### Entry Parameters Tab
@@ -1069,6 +1085,53 @@ The WinSql Certificate Store Type, referred to by its short name 'WinSql,' is de
 
 - **Limitations:** Users should be aware that for this store type to function correctly, certain permissions are necessary. While some advanced users successfully use non-administrator accounts with specific permissions, it is officially supported only with Local Administrator permissions. Complexities with interactions between Group Policy, WinRM, User Account Control, and other environmental factors may impede operations if not properly configured.
 
+#### Verifying a Certificate Binding
+
+After the orchestrator binds a certificate to a SQL Server instance, **SQL Server Configuration Manager (SSCM) may show an empty value in the Certificate dropdown** under SQL Server Network Configuration → Protocols → Properties → Certificate tab. This is a known display limitation of SSCM and does not indicate a problem with the binding. SSCM applies its own certificate eligibility filter when populating the dropdown and may exclude certificates that SQL Server itself loads and uses successfully, particularly certificates bound programmatically rather than through the SSCM UI.
+
+Use the following two-step process to confirm a binding is correct independently of SSCM.
+
+##### Step 1 — Confirm the thumbprint is written to the registry
+
+Run the following on the SQL Server machine, replacing `MSSQLSERVER` with your instance name if using a named instance:
+
+```powershell
+$instance = "MSSQLSERVER"
+$full = Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL" -Name $instance
+(Get-ItemPropertyValue "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$full\MSSQLServer\SuperSocketNetLib" -Name "Certificate").ToUpper()
+```
+
+This should return the thumbprint of the bound certificate. If the value is empty, the binding was not written to the registry.
+
+##### Step 2 — Confirm SQL Server loaded the certificate
+
+After the SQL Server service restarts, it writes a confirmation to the SQL Server error log. Run the following to check:
+
+```powershell
+$logPath = (Resolve-Path "C:\Program Files\Microsoft SQL Server\MSSQL*\MSSQL\Log\ERRORLOG").Path
+Select-String -Path $logPath -Pattern "certificate" -CaseSensitive:$false | ForEach-Object { $_.Line }
+```
+
+A successful binding produces a line similar to the following:
+
+```
+The certificate [Cert Hash(sha1) "D54E6CFFD7DF55FF9610355025BD603D7C25A2D4"] was successfully loaded for encryption.
+```
+
+The thumbprint in this message should match the value returned in Step 1. If the log instead shows `was not found or was not loaded`, the SQL Server service account does not have read access to the certificate's private key — contact your administrator to review private key permissions.
+
+##### Note on `encrypt_option`
+
+Binding a certificate does not automatically encrypt all client connections. The certificate is loaded and ready for use, but SQL Server will only negotiate TLS for a given connection when either the client requests it (`Encrypt=True` in the connection string) or the server is configured to force encryption. To verify that TLS is active for a specific connection, execute the following after connecting to the instance:
+
+```sql
+SELECT session_id, encrypt_option, net_transport
+FROM sys.dm_exec_connections
+WHERE session_id = @@SPID
+```
+
+`encrypt_option = TRUE` confirms TLS is in use for that connection. Whether to enforce encryption server-wide (Force Encryption setting in SSCM) is a separate operational decision outside the scope of the orchestrator.
+
 #### Supported Operations
 
 | Operation    | Is Supported |
@@ -1076,7 +1139,7 @@ The WinSql Certificate Store Type, referred to by its short name 'WinSql,' is de
 | Add          | ✅ Checked |
 | Remove       | ✅ Checked |
 | Discovery    | 🔲 Unchecked |
-| Reenrollment | 🔲 Unchecked |
+| Reenrollment | ✅ Checked |
 | Create       | 🔲 Unchecked |
 
 #### Store Type Creation
@@ -1120,7 +1183,7 @@ the Keyfactor Command Portal
    | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
    | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
    | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
-   | Supports Reenrollment | 🔲 Unchecked | Indicates that the Store Type supports Reenrollment |
+   | Supports Reenrollment | ✅ Checked | Indicates that the Store Type supports Reenrollment |
    | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
    | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | ✅ Checked | Determines if store type may be included in an Orchestrator blueprint |
@@ -1157,6 +1220,7 @@ the Keyfactor Command Portal
    | ServerPassword | Server Password | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) | Secret |  | 🔲 Unchecked |
    | ServerUseSsl | Use SSL | Determine whether the server uses SSL or not (This field is automatically created) | Bool | true | ✅ Checked |
    | RestartService | Restart SQL Service After Cert Installed | Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation. | Bool | false | ✅ Checked |
+   | JEAEndpointName | JEA End Point Name | Name of the JEA endpoint to use for the session (This field is automatically created) | String |  | 🔲 Unchecked |
 
    The Custom Fields tab should look like this:
 
@@ -1211,6 +1275,13 @@ the Keyfactor Command Portal
 
    ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-dialog.svg)
    ![WinSql Custom Field - RestartService](docsource/images/WinSql-custom-field-RestartService-validation-options-dialog.svg)
+
+
+   ###### JEA End Point Name
+   Name of the JEA endpoint to use for the session (This field is automatically created)
+
+   ![WinSql Custom Field - JEAEndpointName](docsource/images/WinSql-custom-field-JEAEndpointName-dialog.svg)
+   ![WinSql Custom Field - JEAEndpointName](docsource/images/WinSql-custom-field-JEAEndpointName-validation-options-dialog.svg)
 
 
    ##### Entry Parameters Tab
@@ -1480,6 +1551,7 @@ The Windows Certificate Universal Orchestrator extension implements 4 Certificat
    | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'.  (This field is automatically created) |
    | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
    | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
 
 </details>
 
@@ -1509,6 +1581,7 @@ The Windows Certificate Universal Orchestrator extension implements 4 Certificat
    | Properties.ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'.  (This field is automatically created) |
    | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
    | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | Properties.JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
 
 3. **Import the CSV file to create the certificate stores**
 
@@ -1566,6 +1639,7 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
    | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
    | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
    | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
 
 </details>
 
@@ -1595,6 +1669,7 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
    | Properties.ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
    | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
    | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | Properties.JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
 
 3. **Import the CSV file to create the certificate stores**
 
@@ -1653,6 +1728,7 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
    | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
    | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
    | RestartService | Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation. |
+   | JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
 
 </details>
 
@@ -1683,6 +1759,7 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
    | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
    | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
    | Properties.RestartService | Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation. |
+   | Properties.JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
 
 3. **Import the CSV file to create the certificate stores**
 

@@ -80,6 +80,15 @@ $Body = @'
       "DefaultValue": "true",
       "Required": true,
       "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+    },
+    {
+      "Name": "JEAEndpointName",
+      "DisplayName": "JEA End Point Name",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Name of the JEA endpoint to use for the session (This field is automatically created)"
     }
   ],
   "EntryParameters": [
@@ -183,6 +192,15 @@ $Body = @'
       "DefaultValue": "true",
       "Required": true,
       "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+    },
+    {
+      "Name": "JEAEndpointName",
+      "DisplayName": "JEA End Point Name",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Name of the JEA endpoint to use for the session (This field is automatically created)"
     }
   ],
   "EntryParameters": [
@@ -319,7 +337,7 @@ $Body = @'
     "Add": true,
     "Create": false,
     "Discovery": false,
-    "Enrollment": false,
+    "Enrollment": true,
     "Remove": true
   },
   "Properties": [
@@ -385,6 +403,15 @@ $Body = @'
       "DefaultValue": "false",
       "Required": true,
       "Description": "Boolean value (true or false) indicating whether to restart the SQL Server service after installing the certificate. Example: 'true' to enable service restart after installation."
+    },
+    {
+      "Name": "JEAEndpointName",
+      "DisplayName": "JEA End Point Name",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Name of the JEA endpoint to use for the session (This field is automatically created)"
     }
   ],
   "EntryParameters": [
