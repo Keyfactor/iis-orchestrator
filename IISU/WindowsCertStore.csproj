@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Keyfactor.Extensions.Orchestrator.WindowsCertStore</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-	<TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+	<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Nullable>disable</Nullable>
   </PropertyGroup>
@@ -31,30 +31,45 @@
   </ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Cake.Powershell" Version="4.0.0" />
 		<PackageReference Include="Keyfactor.Logging" Version="1.1.1" />
 		<PackageReference Include="Keyfactor.Orchestrators.Common" Version="3.2.0" />
 		<PackageReference Include="Keyfactor.Orchestrators.IOrchestratorJobExtensions" Version="1.0.0" />
-		<PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" Condition="'$(TargetFramework)' == 'net6.0'" />
-		<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.13" Condition="'$(TargetFramework)' == 'net8.0'" />
-		<PackageReference Include="runtime.linux-arm64.runtime.native.System.IO.Ports" Version="9.0.5" />
-		<PackageReference Include="runtime.osx-arm64.runtime.native.System.IO.Ports" Version="9.0.5" />
-		<PackageReference Include="System.Formats.Asn1" Version="8.0.2" Condition="'$(TargetFramework)' == 'net6.0'" />
+		<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.15" Condition="'$(TargetFramework)' == 'net8.0'" />
+		<PackageReference Include="Microsoft.PowerShell.SDK" Version="7.6.1" Condition="'$(TargetFramework)' == 'net10.0'" />
+		<PackageReference Include="runtime.linux-arm64.runtime.native.System.IO.Ports" Version="10.0.8" />
+		<PackageReference Include="runtime.osx-arm64.runtime.native.System.IO.Ports" Version="10.0.8" />
 		<PackageReference Include="System.Formats.Asn1" Version="9.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
-		<PackageReference Include="System.IO.Packaging" Version="6.0.2" Condition="'$(TargetFramework)' == 'net6.0'" />
 		<PackageReference Include="System.IO.Packaging" Version="8.0.1" Condition="'$(TargetFramework)' == 'net8.0'" />
-		<PackageReference Include="System.Text.Json" Version="8.0.5" />
+		<PackageReference Include="System.IO.Packaging" Version="10.0.8" Condition="'$(TargetFramework)' == 'net10.0'" />
 	</ItemGroup>
 
   <ItemGroup>
     <None Update="manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="PowerShellScripts\WinADFSScripts.ps1">
+    <None Update="PowerShell\Keyfactor.WinCert.Common\**\*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="PowerShellScripts\WinCertScripts.ps1">
+    <None Update="PowerShell\Keyfactor.WinCert.IIS\**\*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="PowerShell\Keyfactor.WinCert.SQL\**\*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShell\Build\KeyfactorWinCert.pssc">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="PowerShell\WinADFSScripts.ps1">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="PowerShell\Build\" />
+    <Folder Include="PowerShell\Documentation\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.Common\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.IIS\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.SQL\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.ADFS\" />
   </ItemGroup>
 </Project>
