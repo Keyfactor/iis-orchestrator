@@ -110,7 +110,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
             {
                 _logger.LogTrace(LogHandler.FlattenException(ex));
 
-                var failureMessage = $"Inventory job failed for Site '{jobConfiguration.CertificateStoreDetails.StorePath}' on server '{jobConfiguration.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
+                var failureMessage = $"Inventory job failed for Site '{jobConfiguration.CertificateStoreDetails.StorePath}' on server '{jobConfiguration.CertificateStoreDetails.ClientMachine}' with error: '{ex.Message}'";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult

@@ -564,94 +564,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 PS.Commands.Clear();
             }
         }
-        private void InitializeLocalSessionOLD2()
-        {
-            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
-            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
-            rs.Open();
-            PS.Runspace = rs;
-
-            // Set execution policy - ignore informational messages
-            _logger.LogTrace("Setting Execution Policy to Unrestricted");
-            SetExecutionPolicyUnrestricted();
-
-            // Load all scripts
-            _logger.LogTrace("Loading PowerShell scripts");
-            var scriptFiles = GetScriptFiles(scriptFileLocation);
-            _logger.LogInformation($"Found {scriptFiles.Count} script file(s) to load");
-
-            foreach (var scriptFile in scriptFiles)
-            {
-                var fileName = Path.GetFileName(scriptFile);
-
-                if (this.isADFSStore && fileName.ToLower().Contains("adfs"))
-                {
-                    // Import ADFS module (CRITICAL!)
-                    _logger.LogTrace("Importing ADFS module");
-                    try
-                    {
-                        PS.AddCommand("Import-Module").AddParameter("Name", "ADFS");
-                        var moduleResult = PS.Invoke();
-
-                        if (PS.HadErrors)
-                        {
-                            _logger.LogWarning("ADFS module import had errors (may not be available on this machine)");
-                            foreach (var error in PS.Streams.Error)
-                            {
-                                _logger.LogWarning($"  {error}");
-                            }
-                            PS.Streams.Error.Clear();
-                        }
-                        else
-                        {
-                            _logger.LogInformation("ADFS module imported successfully");
-                        }
-
-                        PS.Commands.Clear();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning($"Could not import ADFS module: {ex.Message}");
-                        _logger.LogWarning("ADFS cmdlets may not be available");
-                    }
-
-                    _logger.LogTrace($"Skipping non-ADFS script: {fileName} for ADFS store type");
-                    continue;
-                }
-
-                _logger.LogTrace($"Loading script: {fileName}");
-
-                PS.AddScript($". '{scriptFile}'");
-                PS.Invoke();
-                CheckErrors();  // Check errors for actual scripts
-                PS.Commands.Clear();
-            }
-
-            _logger.LogInformation("Local PowerShell session initialized successfully");
-        }
-        private void InitializeLocalSessionOLD()
-        {
-            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
-            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
-            rs.Open();
-            PS.Runspace = rs;
-
-            _logger.LogTrace("Setting Execution Policy to Unrestricted");
-            PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
-            PS.Invoke();  // Ensure the script is invoked and loaded
-            CheckErrors();
-
-            PS.Commands.Clear();  // Clear commands after loading functions
-
-            _logger.LogTrace("Setting script file into memory");
-            PS.AddScript(". '" + scriptFileLocation + "'");
-            PS.Invoke();  // Ensure the script is invoked and loaded
-            CheckErrors();
-
-            PS.Commands.Clear();  // Clear commands after loading functions
-        }
 
         public void Terminate()
         {
@@ -1144,53 +1056,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             return null;
         }
-        private List<string> GetScriptFiles(string scriptFileLocation)
-        {
-            /*
-             * Gets all .ps1 files from the scripts directory
-             * 
-             * scriptFileLocation can be:
-             * - A file path: C:\MyApp\Scripts\WinCertScripts.ps1
-             * - A directory path: C:\MyApp\Scripts
-             * 
-             * Returns: List of full file paths to all .ps1 files
-             */
 
-            // Determine the scripts directory
-            string scriptsDirectory;
-
-            if (File.Exists(scriptFileLocation))
-            {
-                // It's a file path - get the directory
-                scriptsDirectory = Path.GetDirectoryName(scriptFileLocation);
-                _logger.LogTrace($"Script file provided: {scriptFileLocation}");
-                _logger.LogTrace($"Using directory: {scriptsDirectory}");
-            }
-            else if (Directory.Exists(scriptFileLocation))
-            {
-                // It's already a directory
-                scriptsDirectory = scriptFileLocation;
-                _logger.LogTrace($"Script directory provided: {scriptFileLocation}");
-            }
-            else
-            {
-                throw new DirectoryNotFoundException($"Scripts location not found: {scriptFileLocation}");
-            }
-
-            // Get all .ps1 files, excluding .example files
-            var scriptFiles = Directory.GetFiles(scriptsDirectory, "*.ps1")
-                .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            if (scriptFiles.Count == 0)
-            {
-                throw new FileNotFoundException($"No .ps1 files found in: {scriptsDirectory}");
-            }
-
-            _logger.LogTrace($"Found {scriptFiles.Count} script file(s): {string.Join(", ", scriptFiles.Select(Path.GetFileName))}");
-
-            return scriptFiles;
-        }
         public static string LoadScript(string scriptFileName)
         {
             _logger.LogTrace($"Attempting to load script {scriptFileName}");
