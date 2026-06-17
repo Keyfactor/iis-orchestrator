@@ -1398,56 +1398,16 @@ try {
         # ============================================================
         if ($RestartService) {
             Write-Information "Restarting SQL Server service..."
-            
+
             try {
-                # Get current service status
-                $service = Get-Service -Name $serviceName -ErrorAction Stop
-                $originalStatus = $service.Status
-                
-                Write-Verbose "Current service status: $originalStatus"
-                
-                # Stop the service if running
-                if ($originalStatus -eq 'Running') {
-                    Write-Information "Stopping SQL Server service: $serviceName"
-                    Stop-Service -Name $serviceName -Force -ErrorAction Stop
-                    
-                    # Wait for service to stop (with timeout)
-                    $stopTimeout = 60
-                    $elapsed = 0
-                    
-                    while ((Get-Service -Name $serviceName).Status -ne 'Stopped' -and $elapsed -lt $stopTimeout) {
-                        Start-Sleep -Seconds 2
-                        $elapsed += 2
-                        Write-Verbose "Waiting for service to stop... ($elapsed seconds)"
-                    }
-                    
-                    if ((Get-Service -Name $serviceName).Status -ne 'Stopped') {
-                        throw "Service did not stop within $stopTimeout seconds"
-                    }
-                    
-                    Write-Information "SQL Server service stopped successfully"
-                }
-                
-                # Start the service
-                Write-Information "Starting SQL Server service: $serviceName"
-                Start-Service -Name $serviceName -ErrorAction Stop
-                
-                # Wait for service to start (with timeout)
-                $startTimeout = 90
-                $elapsed = 0
-                
-                while ((Get-Service -Name $serviceName).Status -ne 'Running' -and $elapsed -lt $startTimeout) {
-                    Start-Sleep -Seconds 2
-                    $elapsed += 2
-                    Write-Verbose "Waiting for service to start... ($elapsed seconds)"
-                }
-                
+                Restart-Service -Name $serviceName -Force -ErrorAction Stop
+
                 $finalStatus = (Get-Service -Name $serviceName).Status
-                
+
                 if ($finalStatus -eq 'Running') {
                     Write-Information "SQL Server service restarted successfully"
                 } else {
-                    throw "Service did not start within $startTimeout seconds. Current status: $finalStatus"
+                    throw "Service restart completed but current status is: $finalStatus"
                 }
             }
             catch {
@@ -1455,9 +1415,6 @@ try {
                 Write-Warning "Certificate binding completed but service restart failed."
                 Write-Warning "Please restart SQL Server manually to apply the certificate binding."
                 Write-Warning "You can restart using: Restart-Service -Name '$serviceName' -Force"
-                
-                # Don't throw here - the certificate binding succeeded
-                # Just warn the user to restart manually
             }
         } else {
             Write-Information "Service restart skipped. You must restart SQL Server for the certificate binding to take effect."
