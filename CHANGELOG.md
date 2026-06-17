@@ -1,5 +1,5 @@
 3.0.2
-* Fixed issue with SQL Service restart, was stopping all SQL services, then not starting them all.  Now only restarts the specific SQL Service that is associated with the certificate being renewed.
+* Fixed SQL service restart behavior: previously the extension could stop multiple SQL services and fail to start all of them. It now restarts only the SQL service associated with the certificate being renewed.
 
 3.0.1
 * Fixed an issues when renewing ECC Certificates 
