@@ -1,3 +1,6 @@
+3.0.2
+* Fixed issue with SQL Service restart, was stopping all SQL services, then not starting them all.  Now only restarts the specific SQL Service that is associated with the certificate being renewed.
+
 3.0.1
 * Fixed an issues when renewing ECC Certificates 
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- local.runsettings — NOT committed to source control (see .gitignore)
+     Set your test credentials here. This file is loaded by VS Test Explorer
+     and applies environment variables during both test discovery and execution,
+     which is required for [MemberData] providers that check credentials.
+
+     To activate: Test menu → Configure Run Settings → Select Solution Wide runsettings File
+     Then browse to this file.
+-->
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <KEYFACTOR_TEST_USER>ad\Administrator</KEYFACTOR_TEST_USER>
+      <KEYFACTOR_TEST_PASSWORD>@dminP@ssword%</KEYFACTOR_TEST_PASSWORD>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>
