@@ -1,12 +1,59 @@
 #
 # KeyfactorWinCert.pssc
 # JEA Session Configuration file for Keyfactor Windows Certificate Store management
+# ============================================================
+# OVERVIEW
+# ============================================================
+#
+# This file defines a JEA (Just Enough Administration) endpoint that controls:
+#
+#   1. WHO can connect        -- defined in RoleDefinitions (and the Permission
+#                                list set when registering with Register-PSSessionConfiguration)
+#   2. WHAT they can do       -- defined by the RoleCapabilities (.psrc files)
+#                                referenced inside RoleDefinitions
+#   3. WHAT IDENTITY executes -- defined by GroupManagedServiceAccount (gMSA)
+#                                or RunAsVirtualAccount
+#
+# The recommended production pattern uses TWO separate gMSA accounts:
+#
+#   LOW-PRIV gMSA  (e.g. AD\KeyfactorSVC$)
+#     - The identity your Windows Service or orchestrator runs as.
+#     - Used only to AUTHENTICATE to WinRM on the remote machine.
+#     - Needs no special rights beyond WinRM access.
+#     - Listed in RoleDefinitions as the connecting identity.
+#     - Password is managed automatically by Active Directory.
+#     - Never needs to be entered or stored anywhere.
+#
+#   HIGH-PRIV gMSA  (e.g. AD\KeyfactorJEA$)
+#     - The identity that commands EXECUTE AS inside the JEA session.
+#     - Granted only the specific rights needed (e.g. IIS, cert store, SQL).
+#     - Set via GroupManagedServiceAccount -- never exposed over the network.
+#     - Password is managed automatically by Active Directory.
+#     - Cannot be used to open an interactive session directly.
+#
+# Visual flow:
+#
+#   Windows Service          WinRM / JEA               Remote Resource
+#   (AD\KeyfactorSVC$)  -->  Endpoint                  (IIS, Cert Store)
+#        |                   'keyfactor.wincert'              ^
+#        |                        |                           |
+#        | authenticates          | RoleDefinitions           |
+#        | via Kerberos           | match KeyfactorSVC$       |
+#        |                        |                           |
+#        |                        | session runs AS           |
+#        |                        | AD\KeyfactorJEA$  --------+
+#        |                        | (has IIS/cert rights)
+#        +------------------------+
+#          No password needed --
+#          Kerberos handles it
 #
 # ============================================================
 # PREREQUISITES (run once per target machine as Administrator)
 # ============================================================
 #
-# 1. Install the modules to the system module path so they are treated as trusted code:
+# 1. Install the Keyfactor modules to the system module path.
+#           Modules placed here are treated as FULLY TRUSTED by PowerShell,
+#           which is required for them to work under ConstrainedLanguage mode.
 #
 #      $base = 'C:\Program Files\WindowsPowerShell\Modules'
 #      Copy-Item -Path '.\Keyfactor.WinCert.Common' -Destination "$base\Keyfactor.WinCert.Common" -Recurse -Force
@@ -15,12 +62,28 @@
 #
 #    (Only install the modules needed for the store types you use on this endpoint.)
 #
-# 2. (Optional) Create the transcript directory for audit logging.
+# 2. Install the gMSA accounts on this machine (PRODUCTION only).
+#      This must be done on EACH machine that will host the JEA endpoint.
+#      The machine must be in the gMSA's PrincipalsAllowedToRetrieveManagedPassword group in AD.
+#      The gMSA accounts are only shown for example -- your AD administrator may have named them differently.
+#
+#      # Install the HIGH-PRIV RunAs gMSA (executes the commands)
+#      Install-ADServiceAccount -Identity 'KeyfactorJEA$'
+#      Test-ADServiceAccount    -Identity 'KeyfactorJEA$'   # Must return True
+#
+#      # Install the LOW-PRIV connecting gMSA (authenticates to WinRM)
+#      Install-ADServiceAccount -Identity 'KeyfactorSVC$'
+#      Test-ADServiceAccount    -Identity 'KeyfactorSVC$'   # Must return True
+#
+#      If Test-ADServiceAccount returns False, the machine has not been added to
+#      PrincipalsAllowedToRetrieveManagedPassword in AD. Contact your AD administrator.
+#
+# 3. (Optional) Create the transcript directory for audit logging.
 #    Only required if TranscriptDirectory is uncommented in the session configuration below.
 #
 #      New-Item -ItemType Directory -Path 'C:\ProgramData\Keyfactor\JEA\Transcripts' -Force
 #
-# 3. Register this session configuration (required once; re-run after any change):
+# 4. Register this session configuration (required once; re-run after any change):
 #
 #      Register-PSSessionConfiguration `
 #          -Name 'keyfactor.wincert' `
@@ -28,11 +91,13 @@
 #          -Force
 #      Restart-Service WinRM
 #
-# 4. Verify the endpoint is registered:
+#      The Name parameter is the endpoint name that the cert store will specify when connecting (e.g. New-PSSession -ConfigurationName 'keyfactor.wincert').
+#
+# 5. Verify the endpoint is registered:
 #
 #      Get-PSSessionConfiguration | Where-Object Name -eq 'keyfactor.wincert'
 #
-# 5. To update or remove the endpoint:
+# 6. To update or remove the endpoint:
 #
 #      Unregister-PSSessionConfiguration -Name 'keyfactor.wincert'
 #      Restart-Service WinRM
@@ -70,15 +135,55 @@
     # C:\Program Files\WindowsPowerShell\Modules\ run as FULLY TRUSTED regardless of this setting.
     LanguageMode = 'ConstrainedLanguage'
 
+    # RUN-AS ACCOUNT
+    # ------------------------------------------------------------------
+    # This defines WHAT IDENTITY executes commands inside the session.
+    # The connecting user's own rights are NOT used -- all commands run
+    # as this account regardless of who connected.
+    #
+    # CHOOSE ONE of the following options:
+    #
+    # OPTION A -- Group Managed Service Account (PRODUCTION RECOMMENDED)
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Use a gMSA that has been granted only the rights needed on this machine.
+    # AD manages the password automatically -- no password rotation or storage needed.
+    # The gMSA must be installed on this machine first (see PREREQUISITES, Step 2).
+    #
+    # IMPORTANT: Do NOT include the trailing '$' here.
+    # Windows automatically appends '$' when registering the configuration.
+    # If you include '$' yourself, Windows will register it as 'AD\KeyfactorJEA$$'
+    # and all connection attempts will fail.
+    #
+    # Correct:   GroupManagedServiceAccount = 'AD\KeyfactorJEA'   <-- no $
+    # Incorrect: GroupManagedServiceAccount = 'AD\KeyfactorJEA$'  <-- breaks registration
+    #
+    # Uncomment and set for PRODUCTION:
+    #
+    GroupManagedServiceAccount = 'AD\KeyfactorJEA'
+    #
+    # Replace 'AD' with your actual NetBIOS domain name (e.g. DOMAIN\KeyfactorJEA).
+    #
+    #
+    # OPTION B -- Virtual Account (DEVELOPMENT / TESTING ONLY)
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Windows auto-creates a temporary local admin account for the duration
+    # of the session. No AD account or gMSA setup required.
+    # NOT recommended for production -- the virtual account has local admin
+    # rights and cannot be granted specific AD resource permissions.
+    #
+    # Comment out GroupManagedServiceAccount above and uncomment for DEV/TEST:
+    #
+    # RunAsVirtualAccount = $true
+
     # --- Run-As Account ---
     # For development/testing: RunAsVirtualAccount creates a temporary local admin account.
     # For production: comment out RunAsVirtualAccount and use a Group Managed Service Account
     # that has been granted only the rights needed (read/write the certificate store).
     #
     #   Production example:
-    #     GroupManagedServiceAccount = 'DOMAIN\KeyfactorJEA$'
+    #     GroupManagedServiceAccount = 'DOMAIN\KeyfactorJEA'
     #
-    RunAsVirtualAccount = $true
+    # RunAsVirtualAccount = $true
 
     # --- Transcript Logging (Optional) ---
     # Uncomment TranscriptDirectory to record a full transcript of every JEA session.
@@ -90,19 +195,69 @@
     # TranscriptDirectory = 'C:\ProgramData\Keyfactor\JEA\Transcripts'
 
     # --- Role Definitions ---
-    # Map the connecting user/group to one or more Keyfactor role capabilities.
-    # Replace 'BUILTIN\Administrators' with the AD group or local group whose members
-    # are authorized to connect (e.g. 'DOMAIN\KeyfactorOrchestrators').
+    # Maps the CONNECTING IDENTITY to one or more RoleCapabilities.
+    # This controls WHO is allowed in and WHAT commands they can run.
     #
-    # Add only the role capabilities whose modules are installed on this machine.
-    # Multiple capabilities are merged — the session exposes all their VisibleFunctions.
+    # Key points:
+    #   - The connecting identity is authenticated by WinRM BEFORE this mapping is checked.
+    #   - Multiple capabilities are merged -- the session exposes all their VisibleFunctions.
+    #   - An identity not listed here will be denied access even if WinRM lets them connect.
+    #   - Group membership is evaluated at connection time (e.g. BUILTIN\Administrators
+    #     matches any local admin or domain admin on this machine).
+    #   - gMSA accounts MUST include the trailing '$' in the account name.
     #
-    # Examples:
+    # Available RoleCapabilities (add only modules installed on this machine):
+    #   'Keyfactor.WinCert.Common'  -- core certificate store operations (always include)
+    #   'Keyfactor.WinCert.IIS'     -- IIS binding management
+    #   'Keyfactor.WinCert.SQL'     -- SQL certificate management
+    #
+    # gMSA CONNECTING IDENTITY PATTERN
+    # ------------------------------------------------------------------
+    # When a Windows Service runs as a gMSA (e.g. AD\KeyfactorSVC$), it connects
+    # to WinRM using Kerberos automatically -- no credentials are passed in code.
+    # To allow this, add the LOW-PRIV gMSA to RoleDefinitions as shown below.
+    #
+    # The low-priv gMSA (KeyfactorSVC$) authenticates the connection.
+    # The high-priv gMSA (KeyfactorJEA$, set via GroupManagedServiceAccount above)
+    # executes the commands. These are intentionally two different accounts.
+    #
+    # To add a gMSA as a connecting identity:
+    #   'DOMAIN\gMSAName$' = @{ RoleCapabilities = '...' }
+    #
+    # To add an AD security group (recommended over individual user accounts):
+    #   'DOMAIN\GroupName' = @{ RoleCapabilities = '...' }
+    # 
+    # Example of Role Definitions:
     #   WinCert + IIS:       @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS' }
     #   WinCert + SQL:       @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL' }
     #   WinCert + IIS + SQL: @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
     #   WinCert only:        @{ RoleCapabilities = 'Keyfactor.WinCert.Common' }
     RoleDefinitions = @{
-        'BUILTIN\Administrators' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
+        # LOW-PRIV SERVICE gMSA -- the connecting identity used by the Windows Service.
+        # This account authenticates via Kerberos; no password is ever stored or passed.
+        # Once connected, commands execute as AD\KeyfactorJEA$ (the RunAs gMSA above),
+        # not as KeyfactorSVC$ -- so KeyfactorSVC$ itself needs no elevated rights.
+        # Replace 'AD' with your NetBIOS domain name. The trailing '$' is required.
+        'AD\KeyfactorSVC$' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
+
+        # AD SECURITY GROUP (recommended for human operator access).
+        # Using a group rather than individual accounts means you manage membership
+        # in AD without having to re-register the JEA endpoint.
+        # Uncomment and set to your group when ready:
+        # 'AD\KeyfactorOperators' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS' }
+
+        # LOCAL/DOMAIN ADMINISTRATORS -- full access for break-glass and troubleshooting.
+        # BUILTIN\Administrators matches any member of the local Administrators group,
+        # which includes Domain Admins on domain-joined machines. Be aware that domain
+        # admins will connect through this rule and execute as KeyfactorJEA$, which
+        # means their individual identity is not directly reflected in resource audit logs.
+        # Consider removing this entry and using a dedicated AD group in production
+        # to enforce individual accountability.
+        # 'BUILTIN\Administrators' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
+        
+        # INDIVIDUAL USER ACCOUNTS -- useful during initial setup and testing.
+        # For production, prefer AD security groups over individual accounts to reduce
+        # the maintenance burden of updating this file when personnel change.
+        # 'AD\UserAccount' = @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS' }
     }
 }

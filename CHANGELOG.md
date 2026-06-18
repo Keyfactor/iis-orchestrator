@@ -4,9 +4,13 @@
 * Adding JEA Support for local PowerShell execution.  This will allow for more secure execution of the extension when running in a local PowerShell Runspace.  To utilize this feature, you will need to create a JEA endpoint on the target server and specify the endpoint name as a new parameter in the specific Cert Store definition.  Refer to the README for more details.
 * .NET6 assemblies are no longer supported.
 
-3.0.1
-* Fixed an issues when renewing ECC Certificates
+3.0.2
 
+* Fixed SQL service restart behavior: previously the extension could stop multiple SQL services and fail to start all of them. It now restarts only the SQL service associated with the certificate being renewed.
+
+3.0.1
+
+* Fixed an issues when renewing ECC Certificates
 
 3.0.0
 
@@ -17,29 +21,29 @@
 * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
 * Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
 * Added SSL Flag validation to make sure the bit flag is correct.  These are the valid bit flags for the version of Windows:
-  ### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5):
+  ### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5):
+
 
   * 0    No SNI
-
   * 1    Use SNI
   * 2    Use Centralized SSL certificate store.
 
-  ### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0):
-  * 0    No SNI
+  ### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0)### Windows Server 2016 (IIS 10.0):
 
+  * 0    No SNI
   * 1    Use SNI
   * 4    Disable HTTP/2.
 
 ### Windows Server 2019 (IIS 10.0.17763)
-  * 0    No SNI
 
+  * 0    No SNI
   * 1    Use SNI
   * 4    Disable HTTP/2.
   * 8    Disable OCSP Stapling.
 
 ### Windows Server 2022+ (IIS 10.0.20348+)
-  * 0    No SNI
 
+  * 0    No SNI
   * 1    Use SNI
   * 4    Disable HTTP/2.
   * 8    Disable OCSP Stapling.
@@ -165,6 +169,7 @@
 * Fixed issue where https binding without cert was causing an error
   
 2.2.0
+
 * Added Support for GMSA Account by using no value for ServerUsernanme and ServerPassword. KF Command version 10.2 or later is required to specify empty credentials.
 
 * Added local PowerShell support, triggered when specifying 'localhost' as the client machine while using the IISU or WinCert Orchestrator.  This change was tested using KF Command 10.3

@@ -333,9 +333,25 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             else
             {
-                throw new Exception("Failed to create the remote PowerShell Session.");
-            }
+                // Attempt to extract error details from the PowerShell error stream
+                var errorDetails = new StringBuilder();
 
+                if (PS.HadErrors && PS.Streams.Error.Count > 0)
+                {
+                    foreach (var error in PS.Streams.Error)
+                    {
+                        if (error == null) continue;
+                        errorDetails.AppendLine(error.Exception?.Message ?? error.ToString());
+                    }
+                }
+
+                var errorSummary = errorDetails.Length > 0
+                    ? $" Errors:{Environment.NewLine}{errorDetails.ToString().TrimEnd()}"
+                    : " No errors were recorded in the PowerShell error stream.";
+
+                throw new Exception(
+                    $"Failed to create the remote PowerShell session to '{machineName}'. {errorSummary}");
+            }
         }
 
         private void InitializeLocalSession()
