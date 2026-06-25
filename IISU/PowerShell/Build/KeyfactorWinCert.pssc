@@ -161,7 +161,7 @@
     #
     GroupManagedServiceAccount = 'AD\KeyfactorJEA'
     #
-    # Replace 'AD' with your actual NetBIOS domain name (e.g. DOMAIN\KeyfactorJEA).
+    # Replace 'AD' with your actual NetBIOS domain name and the Group Managed Account that has been granted the necessary permissions (e.g. DOMAIN\{gMSA}).
     #
     #
     # OPTION B -- Virtual Account (DEVELOPMENT / TESTING ONLY)
@@ -172,16 +172,6 @@
     # rights and cannot be granted specific AD resource permissions.
     #
     # Comment out GroupManagedServiceAccount above and uncomment for DEV/TEST:
-    #
-    # RunAsVirtualAccount = $true
-
-    # --- Run-As Account ---
-    # For development/testing: RunAsVirtualAccount creates a temporary local admin account.
-    # For production: comment out RunAsVirtualAccount and use a Group Managed Service Account
-    # that has been granted only the rights needed (read/write the certificate store).
-    #
-    #   Production example:
-    #     GroupManagedServiceAccount = 'DOMAIN\KeyfactorJEA'
     #
     # RunAsVirtualAccount = $true
 
