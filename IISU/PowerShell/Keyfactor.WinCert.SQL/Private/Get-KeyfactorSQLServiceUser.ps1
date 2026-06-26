@@ -10,7 +10,7 @@ function Get-KeyfactorSQLServiceUser {
     if ($serviceUser) {
         return $serviceUser
     } else {
-        Write-Error "SQL Server instance '$SQLInstanceName' not found or no service user associated."
+        Write-Error "SQL Server service '$SQLServiceName' not found or no service user associated."
         return $null
     }
 
