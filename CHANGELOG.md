@@ -1,3 +1,6 @@
+3.0.3
+* Updated the PowerShell SDK to 7.4.17 to address a vulnerability in the System.Security.Cryptography.XML package.
+
 3.0.2
 * Fixed SQL service restart behavior: previously the extension could stop multiple SQL services and fail to start all of them. It now restarts only the SQL service associated with the certificate being renewed.
 
