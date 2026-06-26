@@ -33,6 +33,7 @@
     # (e.g. Keyfactor.WinCert.IIS) call them cross-module, which requires them to be exported.
     VisibleFunctions = @(
         'Get-KeyfactorCertificates',
+        'Get-KeyfactorDiagnostics',
         'Add-KeyfactorCertificate',
         'Remove-KeyfactorCertificate',
         'New-KeyfactorResult',
