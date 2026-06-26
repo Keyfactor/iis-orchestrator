@@ -394,6 +394,11 @@ $s = New-PSSession -ComputerName '<target-server>' `
 # List all commands available in the JEA session (should be limited to Keyfactor functions only)
 Invoke-Command -Session $s -ScriptBlock { Get-Command }
 
+# Run the full diagnostic report — confirms identity, JEA configuration, WinRM, network,
+# firewall, group memberships, privileges, and environment in a single command.
+# -InformationAction Continue is required because the function writes to the Information stream.
+Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorDiagnostics } -InformationAction Continue
+
 # Test a certificate inventory call (WinCert)
 Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorCertificates -StoreName 'My' }
 
@@ -405,6 +410,8 @@ Remove-PSSession $s
 ```
 
 The `Get-Command` output should show only a small set of Keyfactor functions plus the basic infrastructure cmdlets allowed by the session (e.g., `Write-Output`, `ConvertTo-Json`). If you see hundreds of commands, the session is not properly restricted and the session configuration should be reviewed.
+
+The `Get-KeyfactorDiagnostics` output is a multi-section health report covering the run-as account's identity and group memberships, the JEA configuration on the target, the WinRM service and listeners, network and firewall state, user privileges, and the environment variables (including `PSModulePath`) that PowerShell sees inside the session. This single command is the fastest way to confirm that everything from registration through to identity is configured correctly. See the **Troubleshooting** section below for details on interpreting each part of the report.
 
 ---
 
@@ -456,9 +463,57 @@ After removing the endpoint, any certificate stores in Keyfactor Command that re
 
 ### Troubleshooting
 
+#### Quick Diagnostic: Using `Get-KeyfactorDiagnostics`
+
+For nearly every JEA setup and troubleshooting question — *Is the endpoint reachable? Is the run-as account what I expected? Does the run-as account have the right group memberships? Is WinRM healthy? Are the firewall rules in place? Where will PowerShell load modules from?* — the fastest first step is to run `Get-KeyfactorDiagnostics` inside the JEA session. This function is provided by the `Keyfactor.WinCert.Common` module and writes a multi-section health report covering identity, session/JEA configuration, WinRM, network connectivity, firewall, group memberships, privileges, and the relevant environment variables.
+
+**Why it matters:** In a JEA session, the account that authenticates the WinRM connection (the *connecting account*) and the account that actually executes the certificate management commands (the *run-as account*) are intentionally different. When a job fails with an "access denied" or similar permission error, the question is almost always *"what identity does the certificate store, IIS, or SQL service actually see at the moment the command runs?"* — and that identity is the run-as account, whose group memberships and privileges determine which ACLs it satisfies.
+
+**Run the diagnostic from any machine that can reach the target server:**
+
+```powershell
+$cred = Get-Credential   # Use the orchestrator service account credentials
+$s = New-PSSession -ComputerName '<target-server>' `
+                   -ConfigurationName 'keyfactor.wincert' `
+                   -Credential $cred
+
+# -InformationAction Continue is required so the diagnostic output is displayed
+# (the function writes to the Information stream, not the Output stream).
+Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorDiagnostics } -InformationAction Continue
+
+Remove-PSSession $s
+```
+
+**What the report covers and how to use each section:**
+
+| Section | What it shows | What to look for |
+|---|---|---|
+| **Header** | Timestamp, whether the call is remote, and whether the session is in Constrained Language Mode (JEA). | The `*** Running in Constrained Language Mode (JEA) ***` banner confirms you are actually inside the JEA session and not accidentally running locally. |
+| **Identity** | `whoami`, username, domain, computer, PowerShell version/edition, OS. | Confirms the run-as account is the one you configured. The `User` line is the actual run-as identity — compare it to the `GroupManagedServiceAccount` or `RunAsVirtualAccount` setting in the `.pssc`. A mismatch usually means the `.pssc` was not re-registered after a change. |
+| **Session Information** | Runspace Id, execution policy, language mode, plus (when remote) the connecting user and connection string. | `Language Mode: ConstrainedLanguage` confirms the session is constrained. `Connected User` is who authenticated; the **Identity** section above is who actually runs commands. They should differ in a correctly configured JEA setup. |
+| **JEA** | Every registered PSSession configuration on the target, with `Enabled`, `Permission`, `RunAsUser`, `SessionType`, `LanguageMode`, and `RoleDefinitions`. | Confirms `keyfactor.wincert` (or your chosen name) is registered, `Enabled: True`, set to `SessionType: RestrictedRemoteServer` + `LanguageMode: ConstrainedLanguage`, and lists the expected role bindings. If this section reports "access denied," the run-as account doesn't have rights to enumerate registered configurations — that's usually fine, but worth noting. |
+| **WinRM Service** | WinRM service status and start type, throughput limits (`MaxShellsPerUser`, `MaxMemoryPerShellMB`, `MaxTimeoutms`), and configured listeners. | Service must be `Running`. The **Listeners** subsection shows which transports/ports are active — if the protocol you use (HTTP/5985 or HTTPS/5986) is missing here, the orchestrator cannot connect on that protocol no matter what the certificate store says. |
+| **Network / Connectivity** | Local TCP tests for ports 5985 (HTTP) and 5986 (HTTPS). | Both should report `True` if the corresponding listener is running. `False` means WinRM isn't listening on that port, or the local firewall is blocking it. |
+| **Firewall Rules (WinRM)** | All firewall rules in the `Windows Remote Management` display group, with `Enabled`, `Action`, and `Direction`. | The rule for the protocol you use, on the network profile your server is on (Domain / Private / Public), must be `Enabled: True` + `Action: Allow` + `Direction: Inbound`. If this section reports "access denied," the run-as account can't read firewall rules — re-run the diagnostic from an administrative session to see the rules. |
+| **Group Memberships** | Every security group the run-as account belongs to, with SIDs. | This is **the key answer to most "access denied" errors**. The run-as account passes an ACL only if it (or a group listed here) was granted access. If the AD group you ACL'd is not in the list, the run-as account is not in that group. |
+| **User Privileges** | Every Windows privilege held by the run-as account, with its `State` (Enabled / Disabled). | Useful when an operation that needs a specific privilege (for example `SeRestorePrivilege` or `SeBackupPrivilege`) fails — confirms the privilege is present **and** enabled in the token. A privilege listed as `Disabled` is not in effect even though it is granted. |
+| **Environment Variables** | `PSModulePath`, `TEMP`, `TMP`, `PATH`, `PATHEXT`, `APPDATA`, `LOCALAPPDATA`, `SystemRoot` — as the run-as account sees them. | `PSModulePath` must include `C:\Program Files\WindowsPowerShell\Modules\` for the Keyfactor modules to load as trusted. `TEMP` must point to a writable directory for re-enrollment jobs that drop CSR/INF files. |
+
+**Important behavior notes:**
+
+* In a JEA session (`ConstrainedLanguage` mode), a small number of checks are skipped because they require unconstrained .NET access — for example, the `Run As Admin` line will read `N/A (Constrained Language Mode)`. The report header explicitly calls this out, and the rest of the report still runs.
+* Sections that need elevation (WinRM config, firewall rules, registered PSSession configurations) gracefully report "access denied" when the run-as account doesn't have rights to read them, rather than failing the whole report. This is by design — the report keeps going so you still see the parts that did work.
+* `Get-KeyfactorDiagnostics` is also exported by the module in standard (non-JEA) WinRM and local-machine modes, so the same command can be used against any orchestrator-managed server — useful for diagnosing the UAC token filtering and group policy issues described in the **Security and Permission Considerations** section.
+
+**During a real job run:**
+
+The function writes to the Information stream, which the orchestrator captures and forwards to its log file. If you need a permanent diagnostic snapshot tied to a specific failing job, you can call `Get-KeyfactorDiagnostics` from a quick interactive `Invoke-Command` immediately before re-running the job — the full report will appear in your terminal, and the orchestrator's log around the job-failure timestamp will show the run-as account's view of the world at the moment the job ran.
+
+---
+
 **"JEA endpoint is reachable but Keyfactor modules are not installed"**
 
-The orchestrator connected to the JEA session but the pre-flight check for `New-KeyfactorResult` failed. This means the Keyfactor modules are not installed in a location that PowerShell recognizes as trusted. Verify that the modules are installed under `C:\Program Files\WindowsPowerShell\Modules\` (not under the user profile or any other path) and that the module folder name exactly matches the module name (e.g., `Keyfactor.WinCert.Common`).
+The orchestrator connected to the JEA session but the pre-flight check for `New-KeyfactorResult` failed. This means the Keyfactor modules are not installed in a location that PowerShell recognizes as trusted. Verify that the modules are installed under `C:\Program Files\WindowsPowerShell\Modules\` (not under the user profile or any other path) and that the module folder name exactly matches the module name (e.g., `Keyfactor.WinCert.Common`). The **Environment Variables** section of `Get-KeyfactorDiagnostics` shows the exact `PSModulePath` the session is using — if `C:\Program Files\WindowsPowerShell\Modules\` is missing from it, that is the cause.
 
 **"The term 'Get-KeyfactorCertificates' is not recognized..."**
 
