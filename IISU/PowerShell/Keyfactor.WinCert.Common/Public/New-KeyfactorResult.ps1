@@ -27,6 +27,13 @@
 # 300	Error	Unknown or unhandled exception
 # 400   Error   Invalid Ssl Flag bit combination
 
+# Codes reserved for Add-KeyfactorCertificate / import path
+# 501  Error   PFX payload could not be decoded or password was incorrect
+# 510  Error   Requested CSP was not found on the target system
+# 520  Error   certutil.exe returned a non-zero exit code
+# 521  Error   certutil.exe could not be started
+# 530  Error   Windows certificate store could not be opened for write
+
 function New-KeyfactorResult {
     param(
         [ValidateSet("Success", "Warning", "Error", "Skipped")]

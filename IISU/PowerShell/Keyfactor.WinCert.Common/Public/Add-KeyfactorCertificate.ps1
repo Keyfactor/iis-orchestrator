@@ -1,128 +1,172 @@
-﻿function Add-KeyfactorCertificate {
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$Base64Cert,
-    
-        [Parameter(Mandatory = $false)]
-        [string]$PrivateKeyPassword,
-    
-        [Parameter(Mandatory = $true)]
-        [string]$StoreName,
-    
-        [Parameter(Mandatory = $false)]
-        [string]$CryptoServiceProvider
-    )
+function Add-KeyfactorCertificate {
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$Base64Cert,
 
-    try {
-        Write-Information "Entering PowerShell Script Add-KeyfactorCertificateToStore"
-        Write-Information "[VERBOSE] Add-KeyfactorCertificateToStore - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider', Base64Cert: '$Base64Cert'"
+		[Parameter(Mandatory = $false)]
+		[string]$PrivateKeyPassword,
 
-        # Get the thumbprint of the passed in certificate
-        # Convert password to secure string if provided, otherwise use $null
-        $bytes = [System.Convert]::FromBase64String($Base64Cert)
-        $securePassword = if ($PrivateKeyPassword) { ConvertTo-SecureString -String $PrivateKeyPassword -AsPlainText -Force } else { $null }
+		[Parameter(Mandatory = $true)]
+		[string]$StoreName,
 
-        # Set the storage flags and get the certificate's thumbprint
-        $keyStorageFlags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor `
-                   [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet
+		[Parameter(Mandatory = $false)]
+		[string]$CryptoServiceProvider
+	)
 
-        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($bytes, $securePassword, $keyStorageFlags)
-        $thumbprint = $cert.Thumbprint
-        
-        if (-not $thumbprint) { throw "Failed to get the certificate thumbprint.  The PFX may be invalid or the password is incorrect." }
+	$thumbprint = $null
+	$tempPfx    = $null
 
-        if ($CryptoServiceProvider) 
-        {
-            # Test to see if CSP exists
-            if(-not (Test-CryptoServiceProvider -CSPName $CryptoServiceProvider))
-            {
-                Write-Information "INFO: The CSP $CryptoServiceProvider was not found on the system."
-                Write-Warning "WARN: CSP $CryptoServiceProvider was not found on the system."
-                return
-            }
+	try {
+		Write-Information "Entering PowerShell Script Add-KeyfactorCertificate"
+		Write-Information "[VERBOSE] Add-KeyfactorCertificate - Received: StoreName: '$StoreName', CryptoServiceProvider: '$CryptoServiceProvider'"
 
-            Write-Information "Adding certificate with the CSP '$CryptoServiceProvider'"
+		# --- Step: LoadPfx ---------------------------------------------------
+		# Parse the PFX and extract the thumbprint. This validates the payload
+		# and the private key password before we attempt any store operations.
+		try {
+			$bytes          = [System.Convert]::FromBase64String($Base64Cert)
+			$securePassword = if ($PrivateKeyPassword) { ConvertTo-SecureString -String $PrivateKeyPassword -AsPlainText -Force } else { $null }
 
-            # Create temporary file for the PFX
-            $tempPfx = [System.IO.Path]::GetTempFileName() + ".pfx"
-            [System.IO.File]::WriteAllBytes($tempPfx, [Convert]::FromBase64String($Base64Cert))
+			$keyStorageFlags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor `
+							   [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet
 
+			$cert       = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($bytes, $securePassword, $keyStorageFlags)
+			$thumbprint = $cert.Thumbprint
+		}
+		catch {
+			$msg = "Failed to parse PFX payload (invalid Base64, corrupt PFX, or wrong password): $($_.Exception.Message)"
+			Write-Error $msg
+			return New-KeyfactorResult -Status Error -Code 501 -Step LoadPfx -ErrorMessage $msg
+		}
 
-            # Execute certutil based on whether a private key password was supplied
-            try {
-                # Start building certutil arguments
-                $arguments = @('-f')
+		if (-not $thumbprint) {
+			$msg = "PFX parsed but no thumbprint was produced. The PFX may be invalid or the password is incorrect."
+			Write-Error $msg
+			return New-KeyfactorResult -Status Error -Code 501 -Step LoadPfx -ErrorMessage $msg
+		}
 
-                if ($PrivateKeyPassword) {
-                    Write-Information "[VERBOSE] Has a private key"
-                    $arguments += '-p'
-                    $arguments += $PrivateKeyPassword
-                }
+		# --- Step: ValidateCSP -----------------------------------------------
+		# If the caller requested a specific CSP, verify it exists on the
+		# target system BEFORE attempting the import. When it is missing,
+		# enumerate the installed CSPs so the operator sees what is available.
+		if ($CryptoServiceProvider) {
+			if (-not (Test-CryptoServiceProvider -CSPName $CryptoServiceProvider)) {
+				$available = @()
+				try { $available = @(Get-CryptoProviders) } catch { }
 
-                if ($CryptoServiceProvider) {
-                    Write-Information "[VERBOSE] Has a CryptoServiceProvider: $CryptoServiceProvider"
-                    $arguments += '-csp'
-                    $arguments += $CryptoServiceProvider
-                }
+				$availableText = if ($available.Count -gt 0) { ($available -join ', ') } else { '(none enumerated)' }
+				$msg = "The requested Crypto Service Provider '$CryptoServiceProvider' was not found on the target system. Available CSPs: $availableText"
 
-                $arguments += '-importpfx'
-                $arguments += $StoreName
-                $arguments += $tempPfx
+				Write-Warning $msg
+				return New-KeyfactorResult -Status Error -Code 510 -Step ValidateCSP `
+					-ErrorMessage $msg `
+					-Details @{
+						RequestedCSP  = $CryptoServiceProvider
+						AvailableCSPs = $available
+						Thumbprint    = $thumbprint
+					}
+			}
 
-                # Quote any arguments with spaces
-                $argLine = ($arguments | ForEach-Object {
-                    if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
-                }) -join ' '
+			# --- Step: CertUtilImport ---------------------------------------
+			# Import via certutil.exe so the requested CSP is honoured.
+			Write-Information "Adding certificate with the CSP '$CryptoServiceProvider'"
 
-                Write-Information "[VERBOSE] Running certutil with arguments: $argLine"
+			$tempPfx = [System.IO.Path]::GetTempFileName() + ".pfx"
+			[System.IO.File]::WriteAllBytes($tempPfx, $bytes)
 
-                # Setup process execution
-                $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-                $processInfo.FileName = "certutil.exe"
-                $processInfo.Arguments = $argLine.Trim()
-                $processInfo.RedirectStandardOutput = $true
-                $processInfo.RedirectStandardError = $true
-                $processInfo.UseShellExecute = $false
-                $processInfo.CreateNoWindow = $true
+			$arguments = @('-f')
+			if ($PrivateKeyPassword) {
+				Write-Information "[VERBOSE] Has a private key"
+				$arguments += @('-p', $PrivateKeyPassword)
+			}
+			Write-Information "[VERBOSE] Has a CryptoServiceProvider: $CryptoServiceProvider"
+			$arguments += @('-csp', $CryptoServiceProvider, '-importpfx', $StoreName, $tempPfx)
 
-                $process = New-Object System.Diagnostics.Process
-                $process.StartInfo = $processInfo
+			# Quote any argument containing whitespace
+			$argLine = ($arguments | ForEach-Object {
+				if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
+			}) -join ' '
 
-                $process.Start() | Out-Null
+			Write-Information "[VERBOSE] Running certutil with arguments: $argLine"
 
-                $stdOut = $process.StandardOutput.ReadToEnd()
-                $stdErr = $process.StandardError.ReadToEnd()
+			$processInfo = New-Object System.Diagnostics.ProcessStartInfo
+			$processInfo.FileName               = "certutil.exe"
+			$processInfo.Arguments              = $argLine.Trim()
+			$processInfo.RedirectStandardOutput = $true
+			$processInfo.RedirectStandardError  = $true
+			$processInfo.UseShellExecute        = $false
+			$processInfo.CreateNoWindow         = $true
 
-                $process.WaitForExit()
+			$process = New-Object System.Diagnostics.Process
+			$process.StartInfo = $processInfo
 
-                if ($process.ExitCode -ne 0) {
-                    throw "certutil failed with code $($process.ExitCode). Output:`n$stdOut`nError:`n$stdErr"
-                }
-            } catch {
-                Write-Error "ERROR: $_"
-            } finally {
-                if (Test-Path $tempPfx) {
-                    Remove-Item $tempPfx -Force
-                }
-            }
+			try {
+				[void]$process.Start()
+			}
+			catch {
+				$msg = "Failed to launch certutil.exe: $($_.Exception.Message)"
+				Write-Error $msg
+				return New-KeyfactorResult -Status Error -Code 521 -Step CertUtilImport `
+					-ErrorMessage $msg `
+					-Details @{ Thumbprint = $thumbprint }
+			}
 
-        } else {
-            $certStore = New-Object -TypeName System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $storeName, "LocalMachine"
-            Write-Information "Store '$StoreName' is open." 
+			$stdOut = $process.StandardOutput.ReadToEnd()
+			$stdErr = $process.StandardError.ReadToEnd()
+			$process.WaitForExit()
 
-            # Open store with read/write, and don't create the store if it doesn't exist
-            $openFlags = [System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite -bor `
-                    [System.Security.Cryptography.X509Certificates.OpenFlags]::OpenExistingOnly
-            $certStore.Open($openFlags)
-            $certStore.Add($cert)
-            $certStore.Close();
-            Write-Information "Store '$StoreName' is closed." 
-        }
+			if ($process.ExitCode -ne 0) {
+				$msg = "certutil exited with code $($process.ExitCode) while importing PFX with CSP '$CryptoServiceProvider'. StdErr: $stdErr StdOut: $stdOut"
+				Write-Error $msg
+				return New-KeyfactorResult -Status Error -Code 520 -Step CertUtilImport `
+					-ErrorMessage $msg `
+					-Details @{
+						ExitCode   = $process.ExitCode
+						StdOut     = $stdOut
+						StdErr     = $stdErr
+						Thumbprint = $thumbprint
+					}
+			}
+		}
+		else {
+			# --- Step: ImportCertificate (managed API path) -----------------
+			try {
+				$certStore = New-Object System.Security.Cryptography.X509Certificates.X509Store -ArgumentList $StoreName, "LocalMachine"
+				Write-Information "Store '$StoreName' is open."
 
-        Write-Information "The thumbprint '$thumbprint' was added to store $StoreName." 
-        return $thumbprint
-    } catch {
-        Write-Error "An error occurred: $_" 
-        return $null
-    }
+				$openFlags = [System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite -bor `
+							 [System.Security.Cryptography.X509Certificates.OpenFlags]::OpenExistingOnly
+
+				$certStore.Open($openFlags)
+				$certStore.Add($cert)
+				$certStore.Close()
+				Write-Information "Store '$StoreName' is closed."
+			}
+			catch {
+				$msg = "Failed to open/write certificate store '$StoreName' on LocalMachine: $($_.Exception.Message)"
+				Write-Error $msg
+				return New-KeyfactorResult -Status Error -Code 530 -Step ImportCertificate `
+					-ErrorMessage $msg `
+					-Details @{ Thumbprint = $thumbprint }
+			}
+		}
+
+		Write-Information "The thumbprint '$thumbprint' was added to store $StoreName."
+
+		return New-KeyfactorResult -Status Success -Code 0 -Step ImportCertificate `
+			-Message "Certificate '$thumbprint' added to store '$StoreName'." `
+			-Details @{ Thumbprint = $thumbprint }
+	}
+	catch {
+		$msg = "Unexpected error in Add-KeyfactorCertificate: $($_.Exception.Message)"
+		Write-Error $msg
+		return New-KeyfactorResult -Status Error -Code 300 -Step CatchAll `
+			-ErrorMessage $msg `
+			-Details @{ Thumbprint = $thumbprint }
+	}
+	finally {
+		if ($tempPfx -and (Test-Path $tempPfx)) {
+			Remove-Item $tempPfx -Force -ErrorAction SilentlyContinue
+		}
+	}
 }

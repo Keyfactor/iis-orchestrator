@@ -26,6 +26,7 @@ using System.Management.Automation;
 using Keyfactor.Logging;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
@@ -146,7 +147,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 {
                     _psHelper.Initialize();
 
-                    _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
+                    _logger.LogTrace("Attempting to execute PS function (Add-KeyfactorCertificate)");
 
                     // Mandatory parameters
                     var parameters = new Dictionary<string, object>
@@ -162,17 +163,31 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
                     _logger.LogTrace("Returned from executing PS function (Add-KeyfactorCertificate)");
 
-                    // This should return the thumbprint of the certificate
-                    if (_results != null && _results.Count > 0)
-                    {
-                        var thumbprint = _results[0].ToString();
-                        _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {thumbprint}");
-                    }
-                    else
-                    {
-                        _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
-                    }
+                    ResultObject addResult = ResultObject.FromPSResults(_results);
+                    _logger.LogTrace($"Add-KeyfactorCertificate returned Status={addResult.Status}, Code={addResult.Code}, Step={addResult.Step}, Thumbprint='{addResult.Thumbprint}'");
+
                     _psHelper.Terminate();
+
+                    if (!addResult.IsSuccess)
+                    {
+                        string detail = !string.IsNullOrEmpty(addResult.ErrorMessage)
+                            ? addResult.ErrorMessage
+                            : addResult.Message;
+
+                        string failureMessage =
+                            $"Add certificate to store '{_storePath}' failed at step '{addResult.Step}' (code {addResult.Code}): {detail}";
+
+                        _logger.LogWarning(failureMessage);
+
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = _jobHistoryID,
+                            FailureMessage = failureMessage
+                        };
+                    }
+
+                    _logger.LogTrace($"Added certificate to store {_storePath}, thumbprint {addResult.Thumbprint}");
                 }
 
                 return new JobResult

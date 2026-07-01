@@ -888,9 +888,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             {
                                 var msg = infoMessages[e.Index].MessageData?.ToString() ?? string.Empty;
                                 if (msg.StartsWith("[VERBOSE] ", StringComparison.Ordinal))
-                                    _logger.LogTrace("{Message}", msg[10..]);
+                                    _logger.LogTrace($"{msg[10..]}");
                                 else
-                                    _logger.LogInformation("INFO: {Message}", msg);
+                                    _logger.LogInformation($"{msg}");
                             }
                             break;
 
@@ -899,7 +899,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             if (warningMessages != null)
                             {
                                 var warningMessage = warningMessages[e.Index];
-                                _logger.LogWarning($"WARN: {warningMessage.Message}");
+                                _logger.LogWarning($"{warningMessage.Message}");
                             }
                             break;
                         default:

@@ -27,7 +27,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
-
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
@@ -122,9 +121,31 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                                     OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
                                     string failureMessage = "";
-                                    
-                                    string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
-                                    _logger.LogTrace($"Completed adding the certificate to the store");
+
+                                    ResultObject addResult = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
+                                    _logger.LogTrace($"Completed adding the certificate to the store. Status={addResult.Status}, Code={addResult.Code}, Step={addResult.Step}");
+
+                                    if (!addResult.IsSuccess)
+                                    {
+                                        string detail = !string.IsNullOrEmpty(addResult.ErrorMessage)
+                                            ? addResult.ErrorMessage
+                                            : addResult.Message;
+
+                                        string addFailureMessage =
+                                            $"Add certificate to store '{_storePath}' failed at step '{addResult.Step}' (code {addResult.Code}): {detail}";
+
+                                        _logger.LogError(addFailureMessage);
+
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = addFailureMessage
+                                        };
+                                        break;
+                                    }
+
+                                    string newThumbprint = addResult.Thumbprint;
                                     _logger.LogTrace($"New thumbprint: {newThumbprint}");
 
                                     // Bind Certificate to IIS Site
@@ -201,8 +222,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                         {
                                             Result = OrchestratorJobStatusJobResult.Failure,
                                             JobHistoryId = _jobHistoryID,
-                                            FailureMessage = $"No thumbprint was returned.  Unable to bind certificate to site: {bindingInfo.SiteName}."
-                                        };                                    }
+                                            FailureMessage = $"Add-KeyfactorCertificate reported Success but did not return a thumbprint. Unable to bind certificate to site: {bindingInfo.SiteName}."
+                                        };
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -277,13 +299,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             }
         }
 
-        public string AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
+        public ResultObject AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
         {
             try
             {
-                string newThumbprint = string.Empty;
-
-                _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
+                _logger.LogTrace("Attempting to execute PS function (Add-KeyfactorCertificate)");
 
                 // Mandatory parameters
                 var parameters = new Dictionary<string, object>
@@ -297,20 +317,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
 
                 _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
-                _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+                _logger.LogTrace("Returned from executing PS function (Add-KeyfactorCertificate)");
 
-                // This should return the thumbprint of the certificate
-                if (_results != null && _results.Count > 0)
+                ResultObject result = ResultObject.FromPSResults(_results);
+                _logger.LogTrace($"Add-KeyfactorCertificate returned Status={result.Status}, Code={result.Code}, Step={result.Step}, Thumbprint='{result.Thumbprint}'");
+
+                if (!result.IsSuccess && !string.IsNullOrEmpty(result.ErrorMessage))
                 {
-                    newThumbprint = _results[0].ToString();
-                    _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {newThumbprint}");
-                }
-                else
-                {
-                    _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
+                    _logger.LogWarning($"Add-KeyfactorCertificate error: {result.ErrorMessage}");
                 }
 
-                return newThumbprint;
+                return result;
             }
             catch (Exception ex)        
             {

@@ -67,7 +67,6 @@
   <ItemGroup>
     <Folder Include="PowerShell\Build\" />
     <Folder Include="PowerShell\Documentation\" />
-    <Folder Include="PowerShell\Keyfactor.WinCert.Common\" />
     <Folder Include="PowerShell\Keyfactor.WinCert.IIS\" />
     <Folder Include="PowerShell\Keyfactor.WinCert.SQL\" />
     <Folder Include="PowerShell\Keyfactor.WinCert.ADFS\" />
