@@ -7,6 +7,7 @@ using WindowsCertStore.IntegrationTests.Factories;
 
 namespace WindowsCertStore.IntegrationTests
 {
+    [Trait("Category", "Integration")]
     public class WinSQLIntegrationTests
     {
         private static (string thumbprint, string base64Pfx, string pfxPassword) CreateTestCertificate()
@@ -76,7 +77,8 @@ namespace WindowsCertStore.IntegrationTests
                 ["ServerUsername"] = connection.Username,
                 ["ServerPassword"] = connection.PrivateKey,
                 ["ServerUseSsl"] = "false",
-                ["RestartService"] = "false"
+                ["RestartService"] = "false",
+                ["JEAEndpointName"] = connection.JEAEndpointName ?? ""
             });
 
         private static (bool found, string? alias) FindAliasByThumbprint(IEnumerable<CurrentInventoryItem> inventory, string thumbprint)
@@ -105,7 +107,7 @@ namespace WindowsCertStore.IntegrationTests
         }
 
         [Theory]
-        [MemberData(nameof(ConnectionFactory.GetConnection), MemberType = typeof(ConnectionFactory))]
+        [MemberData(nameof(ConnectionFactory.GetSQLConnections), MemberType = typeof(ConnectionFactory))]
         public void WinSql_Management_Add_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
         {
             var (thumbprint, base64Pfx, pfxPassword) = CreateTestCertificate();
@@ -153,8 +155,8 @@ namespace WindowsCertStore.IntegrationTests
         }
 
         [Theory]
-        [MemberData(nameof(ConnectionFactory.GetConnection), MemberType = typeof(ConnectionFactory))]
-        public void WinCert_Management_Add_Inventory_Renewal_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
+        [MemberData(nameof(ConnectionFactory.GetSQLConnections), MemberType = typeof(ConnectionFactory))]
+        public void WinSQL_Management_Add_Inventory_Renewal_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
         {
             var (thumbprint, base64Pfx, pfxPassword) = CreateTestCertificate();
             var secretResolver = new Mock<IPAMSecretResolver>();

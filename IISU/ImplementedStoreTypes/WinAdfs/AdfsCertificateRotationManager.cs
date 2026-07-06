@@ -553,7 +553,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }
