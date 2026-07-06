@@ -7,7 +7,10 @@
 
     $availableProviders = Get-CryptoProviders
 
-    if (-not ($availableProviders | Where-Object { $_.Trim().ToLowerInvariant() -eq $ProviderName.Trim().ToLowerInvariant() })) {
+    $trimmedProvider = $ProviderName.Trim()
+    if (-not ($availableProviders | Where-Object {
+            [string]::Equals($_.Trim(), $trimmedProvider, [System.StringComparison]::OrdinalIgnoreCase)
+        })) {
 
         throw "Crypto Service Provider '$ProviderName' is either invalid or not found on this system."
     }
