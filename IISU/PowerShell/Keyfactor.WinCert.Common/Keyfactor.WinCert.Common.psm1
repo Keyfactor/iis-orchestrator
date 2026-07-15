@@ -11,6 +11,7 @@
 . "$PSScriptRoot\Private\Test-CryptoServiceProvider.ps1"
 . "$PSScriptRoot\Private\Validate-CryptoProvider.ps1"
 . "$PSScriptRoot\Private\Convert-DNSSubject.ps1"
+. "$PSScriptRoot\Private\Test-KeyfactorAdminRights.ps1"
 
 # Public functions
 . "$PSScriptRoot\Public\New-KeyfactorResult.ps1"
@@ -33,7 +34,8 @@ Export-ModuleMember -Function @(
     'New-KeyfactorODKGEnrollment',
     'Import-KeyfactorSignedCertificate',
     'Get-KeyfactorDiagnostics',
-    # Shared certificate inspection utilities — exported so other modules (e.g. IIS) can call them
+    # Shared utilities — exported so other modules (e.g. IIS) can call them
     'Get-CertificateCSP',
-    'Get-CertificateSAN'
+    'Get-CertificateSAN',
+    'Test-KeyfactorAdminRights'
 )

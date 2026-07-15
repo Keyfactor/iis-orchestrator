@@ -25,6 +25,11 @@
     Write-Information "[VERBOSE] Parameters: $(($PSBoundParameters.GetEnumerator() | ForEach-Object { "$($_.Key): '$($_.Value)'" }) -join ', ')"
 
     try {
+        $adminCheck = Test-KeyfactorAdminRights
+        if ($adminCheck) {
+            return $adminCheck
+        }
+
         # Step 1: Perform verifications and get management info
         # Check SslFlags
         $sslValidationResult = Test-ValidSslFlags -Flags $SslFlags

@@ -9,6 +9,8 @@
 # CompareThumbprint	Checking if binding needs to be updated
 # BindSSL	        Adding SSL cert to a binding
 # ImportModules	    Importing IIS-related PowerShell modules
+# AdminCheck	    Verifying the caller has local Administrator rights
+# RemoveCertificate	Checking/removing a certificate if unused by any binding
 # CatchAll	        Fallback for unexpected or generic errors
 
 # Standard Error Codes
@@ -24,6 +26,11 @@
 # 205	Error	Thumbprint mismatch
 # 206	Error	WebAdministration module missing
 # 207	Error	IISAdministration module missing
+# 208	Skipped	Certificate still in use on another binding — removal skipped
+# 209	Skipped	Certificate not found in store — nothing to remove
+# 231	Error	Failed to load Microsoft.Web.Administration assembly
+# 232	Error	Unexpected error while removing certificate from store
+# 240	Error	Caller lacks local Administrator rights (shared check, Common module)
 # 300	Error	Unknown or unhandled exception
 # 400   Error   Invalid Ssl Flag bit combination
 

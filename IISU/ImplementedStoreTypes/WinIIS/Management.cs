@@ -205,7 +205,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                         if (psResult == OrchestratorJobStatusJobResult.Success && !string.IsNullOrEmpty(alias))
                                         {
                                             _logger.LogTrace("Attempting to remove original certificate from store if it is no longer bound to any site.");
-                                            RemoveIISCertificate(alias);
+                                            var cleanupResult = RemoveIISCertificate(alias);
+                                            if (cleanupResult != null)
+                                            {
+                                                // Binding already succeeded — a cleanup failure downgrades to a
+                                                // Warning rather than masking the successful bind as a Failure.
+                                                psResult = cleanupResult.Result;
+                                                failureMessage = cleanupResult.FailureMessage;
+                                            }
                                             _logger.LogTrace("Returned from removing cert if not used.");
                                         }
 
@@ -250,10 +257,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 {
                                     if (WinIISBinding.UnBindCertificate(_psHelper, thisBinding))
                                     {
-                                        // This function will only remove the certificate from the store if not used by any other sites
-                                        RemoveIISCertificate(thisBinding.Thumbprint);
+                                        // This function will only remove the certificate from the store if not used by any other sites.
+                                        // The unbind already succeeded — a cleanup failure downgrades to a Warning
+                                        // rather than masking the successful unbind as a Failure.
+                                        var cleanupResult = RemoveIISCertificate(thisBinding.Thumbprint);
 
-                                        complete = new JobResult
+                                        complete = cleanupResult ?? new JobResult
                                         {
                                             Result = OrchestratorJobStatusJobResult.Success,
                                             JobHistoryId = _jobHistoryID,
@@ -338,7 +347,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 throw new Exception (niceMessage);
             }
 }
-        public void RemoveIISCertificate(string thumbprint)
+        /// <summary>
+        /// Attempts to remove a certificate from the store if it is no longer bound to any IIS site.
+        /// Returns null when there is nothing to report (removed, skipped because still in use, or not
+        /// found). Returns a Warning JobResult when the cleanup itself failed, since at the point this is
+        /// called the primary bind/unbind operation has already succeeded and a cleanup failure should
+        /// not be reported to the orchestrator as if the whole job failed.
+        /// </summary>
+        public JobResult RemoveIISCertificate(string thumbprint)
         {
             _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
 
@@ -348,8 +364,41 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                         { "StoreName", _storePath }
                     };
 
-            _psHelper.ExecutePowerShell("Remove-KeyfactorIISCertificateIfUnused", parameters);
+            try
+            {
+                var results = _psHelper.ExecutePowerShell("Remove-KeyfactorIISCertificateIfUnused", parameters);
+                ResultObject result = ResultObject.FromPSResults(results);
 
+                _logger.LogTrace($"Remove-KeyfactorIISCertificateIfUnused returned Status={result.Status}, Code={result.Code}, Step={result.Step}");
+
+                if (string.Equals(result.Status, ResultObject.StatusError, StringComparison.OrdinalIgnoreCase))
+                {
+                    var warningMessage = $"Certificate '{thumbprint}' could not be removed from store '{_storePath}': {result.ErrorMessage}";
+                    _logger.LogWarning(warningMessage);
+
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Warning,
+                        JobHistoryId = _jobHistoryID,
+                        FailureMessage = warningMessage
+                    };
+                }
+
+                // Success or Skipped (still in use elsewhere / not found) are both benign outcomes.
+                return null;
+            }
+            catch (Exception ex)
+            {
+                var warningMessage = $"Certificate '{thumbprint}' could not be removed from store '{_storePath}': {ex.Message}";
+                _logger.LogWarning(warningMessage);
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Warning,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = warningMessage
+                };
+            }
         }
 
         public JobResult RemoveCertificateORIG(string thumbprint)

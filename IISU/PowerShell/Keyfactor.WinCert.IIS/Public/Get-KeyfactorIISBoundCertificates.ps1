@@ -6,13 +6,9 @@ function Get-KeyfactorIISBoundCertificates {
     #
     # Verify the current process is running with an elevated token.
     #
-    $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = [Security.Principal.WindowsPrincipal]::new($currentIdentity)
-
-    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        Write-Information `
-            -Message "Get-KeyfactorIISBoundCertificates requires an elevated PowerShell session (Run as Administrator) or a JEA endpoint configured with administrative privileges." `
-            -ErrorAction Stop
+    $adminCheck = Test-KeyfactorAdminRights
+    if ($adminCheck) {
+        Write-Error $adminCheck.ErrorMessage -ErrorAction Stop
     }
 
     try {

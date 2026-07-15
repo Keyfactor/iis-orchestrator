@@ -13,6 +13,11 @@
         [System.Nullable[bool]]$UseIISDrive = $null
     )
 
+    $adminCheck = Test-KeyfactorAdminRights
+    if ($adminCheck) {
+        return $adminCheck
+    }
+
     # Auto-detect IIS Drive availability if not explicitly provided
     if ($null -eq $UseIISDrive) {
         $UseIISDrive = Test-IISDrive

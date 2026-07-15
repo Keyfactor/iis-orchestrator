@@ -29,8 +29,9 @@
     ModulesToImport = @('Keyfactor.WinCert.Common')
 
     # Functions the orchestrator is allowed to invoke in this JEA session.
-    # Get-CertificateCSP and Get-CertificateSAN are also listed because other modules
-    # (e.g. Keyfactor.WinCert.IIS) call them cross-module, which requires them to be exported.
+    # Get-CertificateCSP, Get-CertificateSAN, and Test-KeyfactorAdminRights are also listed
+    # because other modules (e.g. Keyfactor.WinCert.IIS) call them cross-module, which
+    # requires them to be exported.
     VisibleFunctions = @(
         'Get-KeyfactorCertificates',
         'Get-KeyfactorDiagnostics',
@@ -40,7 +41,8 @@
         'New-KeyfactorODKGEnrollment',
         'Import-KeyfactorSignedCertificate',
         'Get-CertificateCSP',
-        'Get-CertificateSAN'
+        'Get-CertificateSAN',
+        'Test-KeyfactorAdminRights'
     )
 
     # Cmdlets available to caller scriptblocks (param() wrappers sent by PSHelper).
