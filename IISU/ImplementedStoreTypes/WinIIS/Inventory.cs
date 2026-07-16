@@ -128,7 +128,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, jeaEndpoint: settings.JEAEndpointName))
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, jeaEndpoint: settings.JEAEndpointName, adminPrivilegesRequired: true))
             {
                 ps.Initialize();
 

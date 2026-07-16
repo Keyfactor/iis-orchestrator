@@ -62,6 +62,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private bool isADFSStore = false;
         private string jeaEndpoint = "";
         private bool useJea => !string.IsNullOrEmpty(jeaEndpoint);
+        private bool adminPrivilegesRequired = false;
 
         public bool IsLocalMachine
         {
@@ -97,7 +98,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = LogHandler.GetClassLogger<PSHelper>();
         }
 
-        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false, string jeaEndpoint = "")
+        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false, string jeaEndpoint = "", bool adminPrivilegesRequired = false)
         {
             this.protocol = protocol.ToLower();
             this.port = port;
@@ -107,6 +108,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             this.serverPassword = serverPassword;
             this.isADFSStore = isADFSStore;
             this.jeaEndpoint = jeaEndpoint;
+            this.adminPrivilegesRequired = adminPrivilegesRequired;
 
             _logger = LogHandler.GetClassLogger<PSHelper>();
             _logger.LogTrace("Entered PSHelper Constructor");
@@ -183,6 +185,57 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 foreach (var result in results)
                 {
                     _logger.LogTrace($"{result}");
+                }
+            }
+
+            // Check if admin privileges are required and if the current user has them
+            if (adminPrivilegesRequired)
+            {
+                bool isAdmin;
+                string errorMessage = null;
+
+                if (isLocalMachine)
+                {
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                        var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                        isAdmin = principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+
+                        if (!isAdmin)
+                        {
+                            errorMessage = $"Administrator privileges are required to perform this operation. " +
+                                           $"Current identity: {identity.Name}.";
+                        }
+                    }
+                    else
+                    {
+                        isAdmin = false;
+                        errorMessage = "Administrator privileges are required to perform this operation.";
+                    }
+                }
+                else
+                {
+                    // Single source of truth: call the same cmdlet PowerShell callers use
+                    const string checkAdminScript = "Test-KeyfactorAdminRights -Step 'RemoteAdminCheck'";
+                    var results = ExecutePowerShell(checkAdminScript, isScript: true);
+
+                    if (results == null || results.Count == 0)
+                    {
+                        // Cmdlet returns $null when the identity has admin rights
+                        isAdmin = true;
+                    }
+                    else
+                    {
+                        isAdmin = false;
+                        errorMessage = results[0].Properties["ErrorMessage"]?.Value?.ToString()
+                            ?? "Administrator privileges are required to perform this operation.";
+                    }
+                }
+
+                if (!isAdmin)
+                {
+                    throw new Exception(errorMessage);
                 }
             }
         }

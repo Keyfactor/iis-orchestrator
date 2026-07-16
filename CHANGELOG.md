@@ -5,6 +5,8 @@
 * .NET6 assemblies are no longer supported.
 * Fixed a problem when passing a bad CSP, the job was reporting successful, but did not actually add/bind the certificate.
 * Enhanced Crypto Service Provider (CSP) discovery and validation to work correctly on localized Windows installations. Customers running Traditional Chinese Windows (zh-TW / CP950) reported that certificate add jobs were failing with "Crypto Service Provider ... is either invalid or not found on this system." even when the requested CSP was installed. The root cause was that `Get-CryptoProviders` parsed `certutil -csplist` output and matched on the literal English label "Provider Name:", which is translated on non en-US Windows, causing the enumerated provider list to come back empty and every CSP name to fail validation. Provider enumeration now reads from the culture-invariant registry hive `HKLM:\SOFTWARE\Microsoft\Cryptography\Defaults\Provider` (with a code-page-safe `certutil` fallback for hardened systems where the registry hive is unavailable), and CSP name matching in `Validate-CryptoProvider` now uses ordinal, case-insensitive comparison so results are unaffected by the current thread culture (Turkish-I folding, full-/half-width character folding, etc.).
+* Since adding JEA, lower privileged users can now run the extension in a local PowerShell Runspace without needing to be a member of the Administrators group.  This is a security improvement, but it does require that the user has been granted access to the JEA endpoint on the target server.  When running IIS jobs without JEA endpoints, the credentials entered will still need Administrative permissions.  If you are running into permission issues, please check your JEA configuration and ensure that the user has been granted access to the endpoint.
+* Fixed IIS Inventory error propagation across all connection types (Local, WinRM, JEA, SSH). Previously, when the cmdlet encountered errors (e.g., insufficient admin rights), it used Write-Warning/Write-Information which didn't signal failure to the orchestrator. Over remote sessions, PS.HadErrors remained false and jobs returned 0 certificates with no indication of failure, making it impossible to distinguish between "no certificates found" vs "access denied". The cmdlet now returns structured KeyfactorResult JSON objects for all error scenarios, which the orchestrator detects and reports in JobResult.FailureMessage. This ensures reliable error detection and reporting regardless of connection type (Local PowerShell, WinRM HTTP/HTTPS, JEA endpoints, SSH sessions).
 
 3.0.2
 
@@ -23,26 +25,27 @@
 * Fixed the SNI/SSL flag being returned during inventory, now returns extended SSL flags
 * Fixed the SNI/SSL flag when binding the certificate to allow for extended SSL flags
 * Added SSL Flag validation to make sure the bit flag is correct.  These are the valid bit flags for the version of Windows:
-  ### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)
+### Windows Server 2012 R2 / Windows 8.1 and earlier (IIS 8.5)
+
   
   * 0    No SNI
   * 1    Use SNI
   * 2    Use Centralized SSL certificate store.
 
-  ### Windows Server 2016 (IIS 10.0)
+### Windows Server 2016 (IIS 10.0)
 
   * 0    No SNI
   * 1    Use SNI
   * 4    Disable HTTP/2.
 
-  ### Windows Server 2019 (IIS 10.0.17763)
+### Windows Server 2019 (IIS 10.0.17763)
 
   * 0    No SNI
   * 1    Use SNI
   * 4    Disable HTTP/2.
   * 8    Disable OCSP Stapling.
 
-  ### Windows Server 2022+ (IIS 10.0.20348+)
+### Windows Server 2022+ (IIS 10.0.20348+)
 
   * 0    No SNI
   * 1    Use SNI

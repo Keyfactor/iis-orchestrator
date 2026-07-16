@@ -97,7 +97,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 // Assign the binding information
                 IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired:true);
 
                 _psHelper.Initialize();
 

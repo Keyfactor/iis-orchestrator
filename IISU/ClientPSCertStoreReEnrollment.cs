@@ -94,7 +94,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string clientMachineName = config.CertificateStoreDetails.ClientMachine;
                 string storePath = config.CertificateStoreDetails.StorePath;
 
-                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
+                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired: bindingType == CertStoreBindingTypeENUM.WinIIS);
                 _psHelper.Initialize();
 
                 using (_psHelper)

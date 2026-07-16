@@ -3,14 +3,6 @@ function Get-KeyfactorIISBoundCertificates {
     $certificates = @()
     $totalBoundCertificates = 0
 
-    #
-    # Verify the current process is running with an elevated token.
-    #
-    $adminCheck = Test-KeyfactorAdminRights
-    if ($adminCheck) {
-        Write-Error $adminCheck.ErrorMessage -ErrorAction Stop
-    }
-
     try {
         Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll" -ErrorAction Stop
         $serverManager = [Microsoft.Web.Administration.ServerManager]::new()

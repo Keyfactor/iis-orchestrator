@@ -2,21 +2,37 @@ function Test-KeyfactorAdminRights {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param(
-        [string]$Step = "AdminCheck"
+        [string]$Step = "AdminCheck",
+        [switch]$Force
     )
 
-    $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = [Security.Principal.WindowsPrincipal]::new($currentIdentity)
-
-    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        return $null
+    # Return cached result if we've already checked this session (identity won't
+    # change mid-session, so this avoids redundant token lookups on repeat calls)
+    if (-not $Force -and $script:__KfAdminCheckDone) {
+        return $script:__KfAdminCheckResult
     }
 
-    $errorMessage = "This operation requires an elevated session (Run as Administrator) " +
-        "or a JEA endpoint whose RunAs identity has local Administrator rights on this machine. " +
-        "Current identity: $($currentIdentity.Name)."
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    try {
+        $isAdmin = [Security.Principal.WindowsPrincipal]::new($identity).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
 
-    Write-Warning $errorMessage
+        if ($isAdmin) {
+            $result = $null
+        }
+        else {
+            $errorMessage = "This operation requires an elevated session (Run as Administrator) " +
+                "or a JEA endpoint whose RunAs identity has local Administrator rights on this machine. " +
+                "Current identity: $($identity.Name)."
+            Write-Warning $errorMessage
+            $result = New-KeyfactorResult -Status Error -Code 240 -Step $Step -ErrorMessage $errorMessage
+        }
 
-    return New-KeyfactorResult -Status Error -Code 240 -Step $Step -ErrorMessage $errorMessage
+        $script:__KfAdminCheckResult = $result
+        $script:__KfAdminCheckDone = $true
+        return $result
+    }
+    finally {
+        $identity.Dispose()
+    }
 }

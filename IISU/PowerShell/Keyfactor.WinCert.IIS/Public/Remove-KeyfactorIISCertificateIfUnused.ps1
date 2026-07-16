@@ -9,11 +9,6 @@ function Remove-KeyfactorIISCertificateIfUnused {
         [string]$StoreName = "My"
     )
 
-    $adminCheck = Test-KeyfactorAdminRights
-    if ($adminCheck) {
-        return $adminCheck
-    }
-
     try {
         Add-Type -Path "$env:windir\System32\inetsrv\Microsoft.Web.Administration.dll"
     }
