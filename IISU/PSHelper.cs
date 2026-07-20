@@ -220,190 +220,214 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     const string checkAdminScript = "Test-KeyfactorAdminRights -Step 'RemoteAdminCheck'";
                     var results = ExecutePowerShell(checkAdminScript, isScript: true);
 
-                    if (results == null || results.Count == 0)
+                    if (results == null || results.Count == 0 || results[0] == null)
                     {
-                        // Cmdlet returns $null when the identity has admin rights
-                        isAdmin = true;
+                        isAdmin = false;
+                        errorMessage = "Administrator privileges check returned no result from the remote session.";
                     }
                     else
                     {
-                        isAdmin = false;
-                        errorMessage = results[0].Properties["ErrorMessage"]?.Value?.ToString()
-                            ?? "Administrator privileges are required to perform this operation.";
-                    }
-                }
+                        PSObject adminResult = results[0] as PSObject;
 
-                if (!isAdmin)
-                {
-                    throw new Exception(errorMessage);
+                        if (adminResult == null)
+                        {
+                            isAdmin = false;
+                            errorMessage = "Administrator privileges check returned an unexpected result type from the remote session.";
+                        }
+                        else
+                        {
+                            PSPropertyInfo isAdminProp = adminResult.Properties["IsAdmin"];
+                            isAdmin = isAdminProp != null && isAdminProp.Value is bool b && b;
+
+                            if (!isAdmin)
+                            {
+                                PSPropertyInfo errProp = adminResult.Properties["ErrorMessage"];
+                                errorMessage = errProp?.Value?.ToString()
+                                    ?? "Administrator privileges are required to perform this operation.";
+                            }
+                        }
+
+                        if (!isAdmin)
+                        {
+                            throw new Exception(errorMessage);
+                        }
+                    }
                 }
             }
         }
 
         private void InitializeRemoteSession()
         {
-            if (this.isADFSStore) throw new Exception("Remote ADFS stores are not supported.");
-            if (this.useJea && protocol == "ssh") throw new Exception("JEA is not supported over SSH. Use WinRM (http/https) for JEA.");
-
-            double timeoutSeconds = 30.0;
-
-            if (protocol == "ssh")
+            try
             {
-                _logger.LogTrace("Initializing SSH connection");
+                if (this.isADFSStore) throw new Exception("Remote ADFS stores are not supported.");
+                if (this.useJea && protocol == "ssh") throw new Exception("JEA is not supported over SSH. Use WinRM (http/https) for JEA.");
 
-                try
-                {
-                    _logger.LogInformation("Attempting to create a temporary key file");
-                    tempKeyFilePath = createPrivateKeyFile();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
-                    throw new Exception("Error while creating temporary KeyFilePath.");
-                }
+                double timeoutSeconds = 30.0;
 
-                Hashtable options = new Hashtable
+                if (protocol == "ssh")
+                {
+                    _logger.LogTrace("Initializing SSH connection");
+
+                    try
+                    {
+                        _logger.LogInformation("Attempting to create a temporary key file");
+                        tempKeyFilePath = createPrivateKeyFile();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
+                        throw new Exception("Error while creating temporary KeyFilePath.");
+                    }
+
+                    Hashtable options = new Hashtable
                 {
                     { "StrictHostKeyChecking", "No" },
                     { "UserKnownHostsFile", "/dev/null" },
                 };
 
-                PS.AddCommand("New-PSSession")
-                    .AddParameter("HostName", ClientMachineName)
-                    .AddParameter("UserName", serverUserName)
-                    .AddParameter("KeyFilePath", tempKeyFilePath)
-                    .AddParameter("ConnectingTimeout", 10000)
-                    .AddParameter("Options", options);
-            }
-            else
-            {
-                _logger.LogTrace("Initializing WinRM connection");
-                try
-                {
                     PS.AddCommand("New-PSSession")
-                        .AddParameter("ComputerName", ClientMachineName)
-                        .AddParameter("Port", port);
-
-                    if (useSPN)
-                    {
-                        var sessionOption = new PSSessionOption { IncludePortInSPN = true };
-                        PS.AddParameter("SessionOption", sessionOption);
-                    }
-
-                    if (useJea)
-                    {
-                        PS.AddParameter("ConfigurationName", jeaEndpoint);
-                        _logger.LogDebug($"JEA enabled - connecting to endpoint: {jeaEndpoint}");
-                    }
-
-                    if (protocol == "https")
-                    {
-                        _logger.LogTrace($"Using HTTPS to connect to: {clientMachineName}");
-                        PS.AddParameter("UseSSL");
-                    }
-
-                    if (!string.IsNullOrEmpty(serverUserName))
-                    {
-                        var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                        PSCredential myCreds = new PSCredential(serverUserName, pw);
-
-                        PS.AddParameter("Credential", myCreds);
-                    }
-
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"An error occurred while attempting to establish a remote connection.\n {ex.Message}");
-                    throw new Exception("Problems establishing network credentials.  Please check the User name and Password for the Certificate Store");
-                }
-
-            }
-
-            _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
-
-            var asyncResult = PS.BeginInvoke();
-            if (!asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds)))
-            {
-                PS.Stop();
-                throw new TimeoutException(
-                    $"Could not establish a remote PowerShell session to '{machineName}:{port}' within {timeoutSeconds} seconds. " +
-                    "Verify WinRM is reachable and the firewall allows the connection.");
-            }
-            _PSSession = new Collection<PSObject>(PS.EndInvoke(asyncResult));
-
-            if (_PSSession.Count > 0)
-            {
-                _logger.LogTrace("Session Invoked...Checking for errors.");
-                PS.Commands.Clear();
-                _logger.LogTrace("PS-Session established");
-
-                if (!useJea)
-                {
-                    PS.AddCommand("Invoke-Command")
-                        .AddParameter("Session", _PSSession)
-                        .AddParameter("ScriptBlock", ScriptBlock.Create(LoadAllScripts(scriptFileLocation)));
-
-                    PS.Invoke();
-                    CheckErrors();
-                    _logger.LogTrace("Scripts loaded into remote session successfully.");
+                        .AddParameter("HostName", ClientMachineName)
+                        .AddParameter("UserName", serverUserName)
+                        .AddParameter("KeyFilePath", tempKeyFilePath)
+                        .AddParameter("ConnectingTimeout", 10000)
+                        .AddParameter("Options", options);
                 }
                 else
                 {
-                    _logger.LogDebug($"JEA session active on endpoint '{jeaEndpoint}' - skipping script injection, functions are pre-registered.");
+                    _logger.LogTrace("Initializing WinRM connection");
+                    try
+                    {
+                        PS.AddCommand("New-PSSession")
+                            .AddParameter("ComputerName", ClientMachineName)
+                            .AddParameter("Port", port);
 
-                    // Pre-flight: verify Keyfactor modules are installed on the JEA endpoint.
+                        if (useSPN)
+                        {
+                            var sessionOption = new PSSessionOption { IncludePortInSPN = true };
+                            PS.AddParameter("SessionOption", sessionOption);
+                        }
+
+                        if (useJea)
+                        {
+                            PS.AddParameter("ConfigurationName", jeaEndpoint);
+                            _logger.LogDebug($"JEA enabled - connecting to endpoint: {jeaEndpoint}");
+                        }
+
+                        if (protocol == "https")
+                        {
+                            _logger.LogTrace($"Using HTTPS to connect to: {clientMachineName}");
+                            PS.AddParameter("UseSSL");
+                        }
+
+                        if (!string.IsNullOrEmpty(serverUserName))
+                        {
+                            var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                            PSCredential myCreds = new PSCredential(serverUserName, pw);
+
+                            PS.AddParameter("Credential", myCreds);
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"An error occurred while attempting to establish a remote connection.\n {ex.Message}");
+                        throw new Exception("Problems establishing network credentials.  Please check the User name and Password for the Certificate Store");
+                    }
+
+                }
+
+                _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
+
+                var asyncResult = PS.BeginInvoke();
+                if (!asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds)))
+                {
+                    PS.Stop();
+                    throw new TimeoutException(
+                        $"Could not establish a remote PowerShell session to '{machineName}:{port}' within {timeoutSeconds} seconds. " +
+                        "Verify WinRM is reachable and the firewall allows the connection.");
+                }
+                _PSSession = new Collection<PSObject>(PS.EndInvoke(asyncResult));
+
+                if (_PSSession.Count > 0)
+                {
+                    _logger.LogTrace("Session Invoked...Checking for errors.");
+                    PS.Commands.Clear();
+                    _logger.LogTrace("PS-Session established");
+
+                    if (!useJea)
+                    {
+                        PS.AddCommand("Invoke-Command")
+                            .AddParameter("Session", _PSSession)
+                            .AddParameter("ScriptBlock", ScriptBlock.Create(LoadAllScripts(scriptFileLocation)));
+
+                        PS.Invoke();
+                        CheckErrors();
+                        _logger.LogTrace("Scripts loaded into remote session successfully.");
+                    }
+                    else
+                    {
+                        _logger.LogDebug($"JEA session active on endpoint '{jeaEndpoint}' - skipping script injection, functions are pre-registered.");
+
+                        // Pre-flight: verify Keyfactor modules are installed on the JEA endpoint.
+                        PS.AddCommand("Invoke-Command")
+                            .AddParameter("Session", _PSSession)
+                            .AddParameter("ScriptBlock", ScriptBlock.Create("[bool](Get-Command 'New-KeyfactorResult' -ErrorAction SilentlyContinue)"));
+                        var preFlightResults = PS.Invoke();
+                        PS.Commands.Clear();
+
+                        bool modulesInstalled = preFlightResults != null &&
+                            preFlightResults.Count > 0 &&
+                            preFlightResults[0]?.BaseObject is bool preFlightBool &&
+                            preFlightBool;
+
+                        if (!modulesInstalled)
+                        {
+                            throw new Exception(
+                                $"JEA endpoint '{jeaEndpoint}' is reachable but Keyfactor modules are not installed. " +
+                                "Install Keyfactor.WinCert.Common (and any required store-type modules) under " +
+                                "'C:\\Program Files\\WindowsPowerShell\\Modules\\' on the target machine, " +
+                                "re-register the JEA session configuration, and restart WinRM.");
+                        }
+
+                        _logger.LogDebug("JEA pre-flight passed: Keyfactor modules are installed on the endpoint.");
+                    }
+
+                    // Set $InformationPreference globally so Write-Information output is forwarded
+                    // back to PSHelper's Information stream listener for all function calls in this session.
                     PS.AddCommand("Invoke-Command")
                         .AddParameter("Session", _PSSession)
-                        .AddParameter("ScriptBlock", ScriptBlock.Create("[bool](Get-Command 'New-KeyfactorResult' -ErrorAction SilentlyContinue)"));
-                    var preFlightResults = PS.Invoke();
+                        .AddParameter("ScriptBlock", ScriptBlock.Create("$global:InformationPreference = 'Continue'"));
+                    PS.Invoke();
                     PS.Commands.Clear();
-
-                    bool modulesInstalled = preFlightResults != null &&
-                        preFlightResults.Count > 0 &&
-                        preFlightResults[0]?.BaseObject is bool preFlightBool &&
-                        preFlightBool;
-
-                    if (!modulesInstalled)
-                    {
-                        throw new Exception(
-                            $"JEA endpoint '{jeaEndpoint}' is reachable but Keyfactor modules are not installed. " +
-                            "Install Keyfactor.WinCert.Common (and any required store-type modules) under " +
-                            "'C:\\Program Files\\WindowsPowerShell\\Modules\\' on the target machine, " +
-                            "re-register the JEA session configuration, and restart WinRM.");
-                    }
-
-                    _logger.LogDebug("JEA pre-flight passed: Keyfactor modules are installed on the endpoint.");
+                    _logger.LogTrace("Remote session preference variables configured.");
                 }
-
-                // Set $InformationPreference globally so Write-Information output is forwarded
-                // back to PSHelper's Information stream listener for all function calls in this session.
-                PS.AddCommand("Invoke-Command")
-                    .AddParameter("Session", _PSSession)
-                    .AddParameter("ScriptBlock", ScriptBlock.Create("$global:InformationPreference = 'Continue'"));
-                PS.Invoke();
-                PS.Commands.Clear();
-                _logger.LogTrace("Remote session preference variables configured.");
-            }
-            else
-            {
-                // Attempt to extract error details from the PowerShell error stream
-                var errorDetails = new StringBuilder();
-
-                if (PS.HadErrors && PS.Streams.Error.Count > 0)
+                else
                 {
-                    foreach (var error in PS.Streams.Error)
+                    // Attempt to extract error details from the PowerShell error stream
+                    var errorDetails = new StringBuilder();
+
+                    if (PS.HadErrors && PS.Streams.Error.Count > 0)
                     {
-                        if (error == null) continue;
-                        errorDetails.AppendLine(error.Exception?.Message ?? error.ToString());
+                        foreach (var error in PS.Streams.Error)
+                        {
+                            if (error == null) continue;
+                            errorDetails.AppendLine(error.Exception?.Message ?? error.ToString());
+                        }
                     }
+
+                    var errorSummary = errorDetails.Length > 0
+                        ? $" Errors:{Environment.NewLine}{errorDetails.ToString().TrimEnd()}"
+                        : " No errors were recorded in the PowerShell error stream.";
+
+                    throw new Exception(
+                        $"Failed to create the remote PowerShell session to '{machineName}'. {errorSummary}");
                 }
-
-                var errorSummary = errorDetails.Length > 0
-                    ? $" Errors:{Environment.NewLine}{errorDetails.ToString().TrimEnd()}"
-                    : " No errors were recorded in the PowerShell error stream.";
-
-                throw new Exception(
-                    $"Failed to create the remote PowerShell session to '{machineName}'. {errorSummary}");
+            }
+            catch 
+            {
+                CleanupTempKeyFile();
+                throw;
             }
         }
 
@@ -655,22 +679,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
             }
 
-            if (File.Exists(tempKeyFilePath))
-            {
-                try
-                {
-                    File.Delete(tempKeyFilePath);
-                    _logger.LogTrace($"Temporary KeyFilePath deleted: {tempKeyFilePath}");
-                }
-                catch (FileNotFoundException)
-                {
-                    _logger.LogTrace($"Temporary KeyFilePath was not found: {tempKeyFilePath}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug($"Error while deleting KeyFilePath: {ex.Message}");
-                }
-            }
+            CleanupTempKeyFile();
 
             try
             {
@@ -976,11 +985,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 PS.Dispose();
             }
+
+            CleanupTempKeyFile();
         }
 
         private string createPrivateKeyFile()
         {
             string tmpFile = Path.GetTempFileName();  // "logs/AdminFile";
+            tempKeyFilePath = tmpFile;
             _logger.LogTrace($"Created temporary KeyFilePath: {tmpFile}, writing bytes.");
 
             File.WriteAllText(tmpFile, formatPrivateKey(serverPassword));
@@ -1242,6 +1254,28 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             });
 
             return string.Join(Environment.NewLine, filteredLines);
+        }
+
+        private void CleanupTempKeyFile()
+        {
+            if (string.IsNullOrEmpty(tempKeyFilePath)) return;
+
+            try
+            {
+                if (File.Exists(tempKeyFilePath))
+                {
+                    File.Delete(tempKeyFilePath);
+                    _logger.LogTrace($"Temporary KeyFilePath deleted: {tempKeyFilePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug($"Error while deleting KeyFilePath: {ex.Message}");
+            }
+            finally
+            {
+                tempKeyFilePath = null;
+            }
         }
     }
 }
