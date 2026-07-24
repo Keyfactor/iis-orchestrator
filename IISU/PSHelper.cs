@@ -60,6 +60,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
         private bool isLocalMachine;
         private bool isADFSStore = false;
+        private string jeaEndpoint = "";
+        private bool useJea => !string.IsNullOrEmpty(jeaEndpoint);
+        private bool adminPrivilegesRequired = false;
 
         public bool IsLocalMachine
         {
@@ -95,7 +98,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger = LogHandler.GetClassLogger<PSHelper>();
         }
 
-        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false)
+        public PSHelper(string protocol, string port, bool useSPN, string clientMachineName, string serverUserName, string serverPassword, bool isADFSStore = false, string jeaEndpoint = "", bool adminPrivilegesRequired = false)
         {
             this.protocol = protocol.ToLower();
             this.port = port;
@@ -103,6 +106,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             ClientMachineName = clientMachineName;
             this.serverUserName = serverUserName;
             this.serverPassword = serverPassword;
+            this.isADFSStore = isADFSStore;
+            this.jeaEndpoint = jeaEndpoint;
+            this.adminPrivilegesRequired = adminPrivilegesRequired;
 
             _logger = LogHandler.GetClassLogger<PSHelper>();
             _logger.LogTrace("Entered PSHelper Constructor");
@@ -110,8 +116,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace($"Port: {this.port}");
             _logger.LogTrace($"UseSPN: {this.useSPN}");
             _logger.LogTrace($"ClientMachineName: {ClientMachineName}");
+            _logger.LogTrace($"JEA Active: {this.useJea}");
+            _logger.LogTrace($"JEAEndpoint: {this.jeaEndpoint}");
             _logger.LogTrace("Constructor Completed");
-            this.isADFSStore = isADFSStore;
         }
 
         public void Initialize()
@@ -132,10 +139,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogDebug($"isLocalMachine flag set to: {isLocalMachine}");
             _logger.LogDebug($"Protocol is set to: {protocol}");
 
-            scriptFileLocation = FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShellScripts");
-            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script files,"); }
+            scriptFileLocation = FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShell");
+            if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script files."); }
 
             _logger.LogTrace($"Script file located here: {scriptFileLocation}");
+
+            if (isLocalMachine && useJea)
+            {
+                throw new Exception(
+                    $"Ambiguous configuration: the store target is set to the local machine but JEA endpoint '{jeaEndpoint}' is also configured. " +
+                    "JEA requires a remote WinRM connection and cannot be used with a local machine store. " +
+                    "To resolve: either clear the JEA Endpoint Name to use a direct local connection, " +
+                    "or replace 'LocalMachine'/'localhost' with the server's hostname or IP address to connect via JEA over WinRM.");
+            }
 
             if (!isLocalMachine)
             {
@@ -146,8 +162,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 InitializeLocalSession();
             }
 
-            // Display Hosting information
-            string psInfo = @"
+            // Display hosting information.
+            // Skipped in JEA sessions: [System.Environment] and [System.Net.Dns] are blocked
+            // by ConstrainedLanguage and this script runs as untrusted inline code, not as a
+            // trusted module function.
+            if (!useJea)
+            {
+                string psInfo = @"
                     $psVersion = $PSVersionTable.PSVersion
                     $os = [System.Environment]::OSVersion
                     $hostName = [System.Net.Dns]::GetHostName()
@@ -158,107 +179,283 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         HostName          = $hostName
                     } | ConvertTo-Json
                 ";
-            var results = ExecutePowerShell(psInfo, isScript: true);
-            foreach (var result in results)
+                var results = ExecutePowerShell(psInfo, isScript: true);
+                foreach (var result in results)
+                {
+                    _logger.LogTrace($"{result}");
+                }
+            }
+
+            // Check if admin privileges are required and if the current user has them
+            if (adminPrivilegesRequired)
             {
-                _logger.LogTrace($"{result}");
+                bool isAdmin;
+                string errorMessage = null;
+
+                if (isLocalMachine)
+                {
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+                        var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                        isAdmin = principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+
+                        if (!isAdmin)
+                        {
+                            errorMessage = $"Administrator privileges are required to perform this operation. " +
+                                           $"Current identity: {identity.Name}.";
+                        }
+                    }
+                    else
+                    {
+                        isAdmin = false;
+                        errorMessage = "Administrator privileges are required to perform this operation.";
+                    }
+                }
+                else
+                {
+                    // Single source of truth: call the same cmdlet PowerShell callers use
+                    const string checkAdminScript = "Test-KeyfactorAdminRights -Step 'RemoteAdminCheck'";
+                    var results = ExecutePowerShell(checkAdminScript, isScript: true);
+
+                    if (results == null || results.Count == 0 || results[0] == null)
+                    {
+                        isAdmin = false;
+                        errorMessage = "Administrator privileges check returned no result from the remote session.";
+                    }
+                    else
+                    {
+                        PSObject adminResult = results[0] as PSObject;
+
+                        if (adminResult == null)
+                        {
+                            isAdmin = false;
+                            errorMessage = "Administrator privileges check returned an unexpected result type from the remote session.";
+                        }
+                        else
+                        {
+                            PSPropertyInfo isAdminProp = adminResult.Properties["IsAdmin"];
+                            isAdmin = isAdminProp != null && isAdminProp.Value is bool b && b;
+
+                            if (!isAdmin)
+                            {
+                                PSPropertyInfo errProp = adminResult.Properties["ErrorMessage"];
+                                errorMessage = errProp?.Value?.ToString()
+                                    ?? "Administrator privileges are required to perform this operation.";
+                            }
+                        }
+
+                        if (!isAdmin)
+                        {
+                            throw new Exception(errorMessage);
+                        }
+                    }
+                }
             }
         }
 
         private void InitializeRemoteSession()
         {
-            if (this.isADFSStore) throw new Exception("Remote ADFS stores are not supported.");
-
-            if (protocol == "ssh")
+            try
             {
-                _logger.LogTrace("Initializing SSH connection");
+                if (this.isADFSStore) throw new Exception("Remote ADFS stores are not supported.");
+                if (this.useJea && protocol == "ssh") throw new Exception("JEA is not supported over SSH. Use WinRM (http/https) for JEA.");
+
+                double timeoutSeconds = 30.0;
+
+                if (protocol == "ssh")
+                {
+                    try
+                    {
+                        _logger.LogTrace("Initializing SSH connection");
+
+                        try
+                        {
+                            _logger.LogInformation("Attempting to create a temporary key file");
+                            tempKeyFilePath = createPrivateKeyFile();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
+                            throw new Exception("Error while creating temporary KeyFilePath.");
+                        }
+
+                        Hashtable options = new Hashtable
+                    {
+                        { "StrictHostKeyChecking", "No" },
+                        { "UserKnownHostsFile", "/dev/null" },
+                    };
+
+                        _logger.LogInformation($"Temporary KeyFilePath created at: {tempKeyFilePath}");
+                        _logger.LogInformation($"HostName: {ClientMachineName}");
+                        _logger.LogInformation($"Username: {serverUserName}");
+
+                        PS.AddCommand("New-PSSession")
+                            .AddParameter("HostName", ClientMachineName)
+                            .AddParameter("UserName", serverUserName)
+                            .AddParameter("KeyFilePath", tempKeyFilePath)
+                            .AddParameter("ConnectingTimeout", 10000)
+                            .AddParameter("Options", options);
+
+                        _logger.LogInformation("Completed adding parameters to New-PSSession command for SSH connection.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"An error occurred while attempting to establish an SSH connection.\n {ex.Message}");
+                        throw new Exception("Problems establishing SSH connection.  Please check the User name and KeyFilePath for the Certificate Store");
+                    }
+                }
+                else
+                {
+                    _logger.LogTrace("Initializing WinRM connection");
+                    try
+                    {
+                        PS.AddCommand("New-PSSession")
+                            .AddParameter("ComputerName", ClientMachineName)
+                            .AddParameter("Port", port);
+
+                        if (useSPN)
+                        {
+                            var sessionOption = new PSSessionOption { IncludePortInSPN = true };
+                            PS.AddParameter("SessionOption", sessionOption);
+                        }
+
+                        if (useJea)
+                        {
+                            PS.AddParameter("ConfigurationName", jeaEndpoint);
+                            _logger.LogDebug($"JEA enabled - connecting to endpoint: {jeaEndpoint}");
+                        }
+
+                        if (protocol == "https")
+                        {
+                            _logger.LogTrace($"Using HTTPS to connect to: {clientMachineName}");
+                            PS.AddParameter("UseSSL");
+                        }
+
+                        if (!string.IsNullOrEmpty(serverUserName))
+                        {
+                            var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
+                            PSCredential myCreds = new PSCredential(serverUserName, pw);
+
+                            PS.AddParameter("Credential", myCreds);
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"An error occurred while attempting to establish a remote connection.\n {ex.Message}");
+                        throw new Exception("Problems establishing network credentials.  Please check the User name and Password for the Certificate Store");
+                    }
+
+                }
+
+                _logger.LogInformation("Attempting to invoke PS-Session command on remote machine.");
+
+                var asyncResult = PS.BeginInvoke();
+                if (!asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds)))
+                {
+                    PS.Stop();
+                    throw new TimeoutException(
+                        $"Could not establish a remote PowerShell session to '{machineName}:{port}' within {timeoutSeconds} seconds. " +
+                        "Verify WinRM is reachable and the firewall allows the connection.");
+                }
 
                 try
                 {
-                    _logger.LogInformation("Attempting to create a temporary key file");
-                    tempKeyFilePath = createPrivateKeyFile();
+                    _PSSession = new Collection<PSObject>(PS.EndInvoke(asyncResult));
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
-                    throw new Exception("Error while creating temporary KeyFilePath.");
-                }
-
-                Hashtable options = new Hashtable
-                {
-                    { "StrictHostKeyChecking", "No" },
-                    { "UserKnownHostsFile", "/dev/null" },
-                };
-
-                PS.AddCommand("New-PSSession")
-                    .AddParameter("HostName", ClientMachineName)
-                    .AddParameter("UserName", serverUserName)
-                    .AddParameter("KeyFilePath", tempKeyFilePath)
-                    .AddParameter("ConnectingTimeout", 10000)
-                    .AddParameter("Options", options);
-            }
-            else
-            {
-                _logger.LogTrace("Initializing WinRM connection");
-                try
-                {
-                    // Create the PSSessionOption object
-                    var sessionOption = new PSSessionOption
+                    _logger.LogError(ex.ToString());
+                    if (ex.InnerException != null)
                     {
-                        IncludePortInSPN = useSPN
-                    };
-
-                    PS.AddCommand("New-PSSession")
-                    .AddParameter("ComputerName", ClientMachineName)
-                    .AddParameter("Port", port)
-                    .AddParameter("SessionOption", sessionOption);
-
-                    if (protocol == "https")
-                    {
-                        _logger.LogTrace($"Using HTTPS to connect to: {clientMachineName}");
-                        PS.AddParameter("UseSSL");
+                        _logger.LogError($"Inner Exception: {ex.InnerException.Message}");
                     }
 
-                    if (!string.IsNullOrEmpty(serverUserName))
-                    {
-                        var pw = new NetworkCredential(serverUserName, serverPassword).SecurePassword;
-                        PSCredential myCreds = new PSCredential(serverUserName, pw);
+                    throw;
+                }
 
-                        PS.AddParameter("Credential", myCreds);
+                if (_PSSession.Count > 0)
+                {
+                    _logger.LogTrace("Session Invoked...Checking for errors.");
+                    PS.Commands.Clear();
+                    _logger.LogTrace("PS-Session established");
+
+                    if (!useJea)
+                    {
+                        PS.AddCommand("Invoke-Command")
+                            .AddParameter("Session", _PSSession)
+                            .AddParameter("ScriptBlock", ScriptBlock.Create(LoadAllScripts(scriptFileLocation)));
+
+                        PS.Invoke();
+                        CheckErrors();
+                        _logger.LogTrace("Scripts loaded into remote session successfully.");
+                    }
+                    else
+                    {
+                        _logger.LogDebug($"JEA session active on endpoint '{jeaEndpoint}' - skipping script injection, functions are pre-registered.");
+
+                        // Pre-flight: verify Keyfactor modules are installed on the JEA endpoint.
+                        PS.AddCommand("Invoke-Command")
+                            .AddParameter("Session", _PSSession)
+                            .AddParameter("ScriptBlock", ScriptBlock.Create("[bool](Get-Command 'New-KeyfactorResult' -ErrorAction SilentlyContinue)"));
+                        var preFlightResults = PS.Invoke();
+                        PS.Commands.Clear();
+
+                        bool modulesInstalled = preFlightResults != null &&
+                            preFlightResults.Count > 0 &&
+                            preFlightResults[0]?.BaseObject is bool preFlightBool &&
+                            preFlightBool;
+
+                        if (!modulesInstalled)
+                        {
+                            throw new Exception(
+                                $"JEA endpoint '{jeaEndpoint}' is reachable but Keyfactor modules are not installed. " +
+                                "Install Keyfactor.WinCert.Common (and any required store-type modules) under " +
+                                "'C:\\Program Files\\WindowsPowerShell\\Modules\\' on the target machine, " +
+                                "re-register the JEA session configuration, and restart WinRM.");
+                        }
+
+                        _logger.LogDebug("JEA pre-flight passed: Keyfactor modules are installed on the endpoint.");
                     }
 
+                    // Set $InformationPreference globally so Write-Information output is forwarded
+                    // back to PSHelper's Information stream listener for all function calls in this session.
+                    PS.AddCommand("Invoke-Command")
+                        .AddParameter("Session", _PSSession)
+                        .AddParameter("ScriptBlock", ScriptBlock.Create("$global:InformationPreference = 'Continue'"));
+                    PS.Invoke();
+                    PS.Commands.Clear();
+                    _logger.LogTrace("Remote session preference variables configured.");
                 }
-                catch (Exception)
+                else
                 {
-                    throw new Exception("Problems establishing network credentials.  Please check the User name and Password for the Certificate Store");
+                    // Attempt to extract error details from the PowerShell error stream
+                    var errorDetails = new StringBuilder();
+
+                    if (PS.HadErrors && PS.Streams.Error.Count > 0)
+                    {
+                        foreach (var error in PS.Streams.Error)
+                        {
+                            if (error == null) continue;
+                            errorDetails.AppendLine(error.Exception?.Message ?? error.ToString());
+                        }
+                    }
+
+                    var errorSummary = errorDetails.Length > 0
+                        ? $" Errors:{Environment.NewLine}{errorDetails.ToString().TrimEnd()}"
+                        : " No errors were recorded in the PowerShell error stream.";
+
+                    throw new Exception(
+                        $"Failed to create the remote PowerShell session to '{machineName}'. {errorSummary}");
                 }
-
             }
-
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
-            _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
-            _PSSession = PS.Invoke();
-
-            if (_PSSession.Count > 0)
+            catch (Exception ex)
             {
-                _logger.LogTrace("Session Invoked...Checking for errors.");
-                PS.Commands.Clear();
-                _logger.LogTrace("PS-Session established");
-
-                PS.AddCommand("Invoke-Command")
-                    .AddParameter("Session", _PSSession)
-                    .AddParameter("ScriptBlock", ScriptBlock.Create(LoadAllScripts(scriptFileLocation)));
-
-                var results = PS.Invoke();
-                CheckErrors();
-                _logger.LogTrace("Script loaded into remote session successfully.");
+                _logger.LogError($"An error occurred while initializing the remote session: {ex.Message}");
+                CleanupTempKeyFile();
+                throw;
             }
-            else
-            {
-                throw new Exception("Failed to create the remote PowerShell Session.");
-            }
-
         }
 
         private void InitializeLocalSession()
@@ -273,6 +470,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             _logger.LogTrace("Setting Execution Policy to Unrestricted");
             SetExecutionPolicyUnrestricted();
 
+            // Set $InformationPreference globally so Write-Information output is forwarded
+            // back to PSHelper's Information stream listener for all function calls in this session.
+            PS.AddScript("$global:InformationPreference = 'Continue'");
+            PS.Invoke();
+            PS.Commands.Clear();
+            _logger.LogTrace("Local session preference variables configured.");
+
             // Check if ADFS module is available (only needed for ADFS stores)
             bool adfsModuleImported = false;
             if (this.isADFSStore)
@@ -280,40 +484,61 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 adfsModuleImported = ImportAdfsModule();
             }
 
-            // Load all scripts
-            _logger.LogTrace("Loading PowerShell scripts");
-            var scriptFiles = GetScriptFiles(scriptFileLocation);
+            // Import all module .psm1 files alphabetically (ensures Common loads before IIS, etc.)
+            _logger.LogTrace("Loading PowerShell modules");
+            var moduleDirs = Directory.GetDirectories(scriptFileLocation)
+                .OrderBy(d => d)
+                .ToList();
 
-            foreach (var scriptFile in scriptFiles)
+            foreach (var moduleDir in moduleDirs)
+            {
+                var moduleName = Path.GetFileName(moduleDir);
+                var modulePsm1 = Path.Combine(moduleDir, $"{moduleName}.psm1");
+
+                if (!File.Exists(modulePsm1))
+                {
+                    _logger.LogTrace($"No .psm1 found in {moduleName}, skipping");
+                    continue;
+                }
+
+                _logger.LogTrace($"Importing module: {modulePsm1}");
+                PS.AddCommand("Import-Module")
+                    .AddParameter("Name", modulePsm1)
+                    .AddParameter("Force");
+                PS.Invoke();
+
+                if (PS.HadErrors)
+                {
+                    _logger.LogError($"Errors importing {moduleName} module:");
+                    foreach (var error in PS.Streams.Error)
+                        _logger.LogError($"  {error}");
+                    PS.Streams.Error.Clear();
+                }
+                else
+                {
+                    _logger.LogInformation($"{moduleName} module imported successfully.");
+                }
+                PS.Commands.Clear();
+            }
+
+            // Load flat legacy .ps1 scripts from the PowerShell root directory
+            var rootScripts = Directory.GetFiles(scriptFileLocation, "*.ps1")
+                .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f)
+                .ToList();
+
+            foreach (var scriptFile in rootScripts)
             {
                 var fileName = Path.GetFileName(scriptFile);
                 bool isAdfsScript = fileName.IndexOf("adfs", StringComparison.OrdinalIgnoreCase) >= 0;
 
-                // Decide whether to load this script
-                if (isAdfsScript)
+                if (isAdfsScript && (!this.isADFSStore || !adfsModuleImported))
                 {
-                    if (this.isADFSStore)
-                    {
-                        if (!adfsModuleImported)
-                        {
-                            _logger.LogWarning($"Skipping ADFS script '{fileName}' - ADFS module not available");
-                            continue;
-                        }
-
-                        _logger.LogTrace($"Loading ADFS script: {fileName}");
-                    }
-                    else
-                    {
-                        _logger.LogTrace($"Skipping ADFS script '{fileName}' - not an ADFS store");
-                        continue;
-                    }
-                }
-                else
-                {
-                    _logger.LogTrace($"Loading script: {fileName}");
+                    _logger.LogTrace($"Skipping ADFS script '{fileName}'");
+                    continue;
                 }
 
-                // Load the script
+                _logger.LogTrace($"Loading script: {fileName}");
                 try
                 {
                     PS.AddScript($". '{scriptFile}'");
@@ -323,16 +548,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     {
                         _logger.LogError($"Errors loading script '{fileName}':");
                         foreach (var error in PS.Streams.Error)
-                        {
                             _logger.LogError($"  {error}");
-                        }
+                        PS.Streams.Error.Clear();
                     }
                     else
                     {
-                        _logger.LogTrace($"  ✓ Successfully loaded {fileName}");
+                        _logger.LogTrace($"  Successfully loaded {fileName}");
                     }
 
-                    CheckErrors();
                     PS.Commands.Clear();
                 }
                 catch (Exception ex)
@@ -461,94 +684,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 PS.Commands.Clear();
             }
         }
-        private void InitializeLocalSessionOLD2()
-        {
-            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
-            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
-            rs.Open();
-            PS.Runspace = rs;
-
-            // Set execution policy - ignore informational messages
-            _logger.LogTrace("Setting Execution Policy to Unrestricted");
-            SetExecutionPolicyUnrestricted();
-
-            // Load all scripts
-            _logger.LogTrace("Loading PowerShell scripts");
-            var scriptFiles = GetScriptFiles(scriptFileLocation);
-            _logger.LogInformation($"Found {scriptFiles.Count} script file(s) to load");
-
-            foreach (var scriptFile in scriptFiles)
-            {
-                var fileName = Path.GetFileName(scriptFile);
-
-                if (this.isADFSStore && fileName.ToLower().Contains("adfs"))
-                {
-                    // Import ADFS module (CRITICAL!)
-                    _logger.LogTrace("Importing ADFS module");
-                    try
-                    {
-                        PS.AddCommand("Import-Module").AddParameter("Name", "ADFS");
-                        var moduleResult = PS.Invoke();
-
-                        if (PS.HadErrors)
-                        {
-                            _logger.LogWarning("ADFS module import had errors (may not be available on this machine)");
-                            foreach (var error in PS.Streams.Error)
-                            {
-                                _logger.LogWarning($"  {error}");
-                            }
-                            PS.Streams.Error.Clear();
-                        }
-                        else
-                        {
-                            _logger.LogInformation("ADFS module imported successfully");
-                        }
-
-                        PS.Commands.Clear();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning($"Could not import ADFS module: {ex.Message}");
-                        _logger.LogWarning("ADFS cmdlets may not be available");
-                    }
-
-                    _logger.LogTrace($"Skipping non-ADFS script: {fileName} for ADFS store type");
-                    continue;
-                }
-
-                _logger.LogTrace($"Loading script: {fileName}");
-
-                PS.AddScript($". '{scriptFile}'");
-                PS.Invoke();
-                CheckErrors();  // Check errors for actual scripts
-                PS.Commands.Clear();
-            }
-
-            _logger.LogInformation("Local PowerShell session initialized successfully");
-        }
-        private void InitializeLocalSessionOLD()
-        {
-            _logger.LogTrace("Creating out-of-process Powershell Runspace.");
-            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
-            Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
-            rs.Open();
-            PS.Runspace = rs;
-
-            _logger.LogTrace("Setting Execution Policy to Unrestricted");
-            PS.AddScript("Set-ExecutionPolicy Unrestricted -Scope Process -Force");
-            PS.Invoke();  // Ensure the script is invoked and loaded
-            CheckErrors();
-
-            PS.Commands.Clear();  // Clear commands after loading functions
-
-            _logger.LogTrace("Setting script file into memory");
-            PS.AddScript(". '" + scriptFileLocation + "'");
-            PS.Invoke();  // Ensure the script is invoked and loaded
-            CheckErrors();
-
-            PS.Commands.Clear();  // Clear commands after loading functions
-        }
 
         public void Terminate()
         {
@@ -571,22 +706,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
             }
 
-            if (File.Exists(tempKeyFilePath))
-            {
-                try
-                {
-                    File.Delete(tempKeyFilePath);
-                    _logger.LogTrace($"Temporary KeyFilePath deleted: {tempKeyFilePath}");
-                }
-                catch (FileNotFoundException)
-                {
-                    _logger.LogTrace($"Temporary KeyFilePath was not found: {tempKeyFilePath}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug($"Error while deleting KeyFilePath: {ex.Message}");
-                }
-            }
+            CleanupTempKeyFile();
 
             try
             {
@@ -735,14 +855,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 }
                 else
                 {
-                    // For remote execution, use Invoke-Command
-                    var scriptBlock = isScript
-                        ? ScriptBlock.Create(commandOrScript) // Use the script as a ScriptBlock
-                        : ScriptBlock.Create($"& {{ {commandOrScript} }}"); // Wrap commands in ScriptBlock
-
+                    // For remote execution use Invoke-Command. The command/script becomes the
+                    // scriptblock body directly — no & { } child-scope wrapper, which can
+                    // prevent JEA ConstrainedLanguage sessions from seeing visible functions.
                     PS.AddCommand("Invoke-Command")
                       .AddParameter("Session", _PSSession)
-                      .AddParameter("ScriptBlock", scriptBlock);
+                      .AddParameter("ScriptBlock", ScriptBlock.Create(commandOrScript));
                 }
 
                 // Add Parameters if provided
@@ -757,12 +875,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     }
                     else
                     {
-                        // Remote execution: Use ArgumentList for parameters
-                        var paramBlock = string.Join(", ", parameters.Select(p =>
-                        {
-                            string typeName = p.Value?.GetType().Name ?? "object";
-                            return $"[{typeName}] ${p.Key}";
-                        }));
+                        // Remote execution: Use ArgumentList for parameters.
+                        // No type annotations in the param block — they are unnecessary for
+                        // correct ArgumentList binding and some CLR types (arrays, nulls) produce
+                        // names that break ConstrainedLanguage JEA sessions.
+                        var paramBlock = string.Join(", ", parameters.Keys.Select(k => $"${k}"));
 
                         var paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
 
@@ -858,8 +975,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             var infoMessages = sender as PSDataCollection<InformationRecord>;
                             if (infoMessages != null)
                             {
-                                var infoMessage = infoMessages[e.Index];
-                                _logger.LogInformation($"INFO: {infoMessage.MessageData.ToString()}");
+                                var msg = infoMessages[e.Index].MessageData?.ToString() ?? string.Empty;
+                                if (msg.StartsWith("[VERBOSE] ", StringComparison.Ordinal))
+                                    _logger.LogTrace($"{msg[10..]}");
+                                else
+                                    _logger.LogInformation($"{msg}");
                             }
                             break;
 
@@ -868,7 +988,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             if (warningMessages != null)
                             {
                                 var warningMessage = warningMessages[e.Index];
-                                _logger.LogWarning($"WARN: {warningMessage.Message}");
+                                _logger.LogWarning($"{warningMessage.Message}");
                             }
                             break;
                         default:
@@ -892,11 +1012,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 PS.Dispose();
             }
+
+            CleanupTempKeyFile();
         }
 
         private string createPrivateKeyFile()
         {
             string tmpFile = Path.GetTempFileName();  // "logs/AdminFile";
+            tempKeyFilePath = tmpFile;
             _logger.LogTrace($"Created temporary KeyFilePath: {tmpFile}, writing bytes.");
 
             File.WriteAllText(tmpFile, formatPrivateKey(serverPassword));
@@ -927,25 +1050,35 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                ProcessStartInfo chmodInfo = new ProcessStartInfo()
+                var chmodInfo = new ProcessStartInfo()
                 {
                     FileName = "/bin/chmod",
-                    Arguments = "600 " + tmpFile,
+                    Arguments = $"600 \"{tmpFile}\"",
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
-                using (Process chmodProcess = new Process() { StartInfo = chmodInfo })
+
+                using (var chmodProcess = new Process { StartInfo = chmodInfo })
                 {
                     chmodProcess.Start();
+
+                    string output = chmodProcess.StandardOutput.ReadToEnd();
+                    string error = chmodProcess.StandardError.ReadToEnd();
+
                     chmodProcess.WaitForExit();
+
                     if (chmodProcess.ExitCode == 0)
                     {
-                        _logger.LogInformation("File permissions set to 600.");
+                        _logger.LogInformation($"SSH private key permissions set to 600 for file: {tmpFile}");
                     }
                     else
                     {
-                        _logger.LogWarning("Failed to set file permissions.");
+                        _logger.LogWarning(
+                            "Failed to set SSH private key permissions. ExitCode: {ExitCode}, Error: {Error}",
+                            chmodProcess.ExitCode,
+                            error);
                     }
                 }
             }
@@ -959,6 +1092,46 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             string footer = privateKey.Substring(privateKey.IndexOf("-----END"));
 
             return privateKey.Replace(header, "HEADER").Replace(footer, "FOOTER").Replace(" ", Environment.NewLine).Replace("HEADER", header).Replace("FOOTER", footer) + Environment.NewLine;
+        }
+
+        private static List<string> GetOrderedScriptFiles(string scriptsDirectory)
+        {
+            /*
+             * Returns .ps1 files in dependency order for remote non-JEA sessions:
+             *   1. Flat .ps1 files in the root PowerShell directory (legacy scripts)
+             *   2. For each module subdirectory: Private/*.ps1 first, then Public/*.ps1
+             */
+            var ordered = new List<string>();
+
+            // Root flat scripts (WinCertScripts.ps1, WinADFSScripts.ps1, etc.)
+            ordered.AddRange(
+                Directory.GetFiles(scriptsDirectory, "*.ps1")
+                    .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(f => f));
+
+            // Module subdirectories: Private before Public so helpers are defined first
+            foreach (var subDir in Directory.GetDirectories(scriptsDirectory).OrderBy(d => d))
+            {
+                var privatePath = Path.Combine(subDir, "Private");
+                if (Directory.Exists(privatePath))
+                {
+                    ordered.AddRange(
+                        Directory.GetFiles(privatePath, "*.ps1", SearchOption.AllDirectories)
+                            .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(f => f));
+                }
+
+                var publicPath = Path.Combine(subDir, "Public");
+                if (Directory.Exists(publicPath))
+                {
+                    ordered.AddRange(
+                        Directory.GetFiles(publicPath, "*.ps1", SearchOption.AllDirectories)
+                            .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(f => f));
+                }
+            }
+
+            return ordered;
         }
 
         public static string FindScriptsDirectory(string rootDirectory, string directoryName)
@@ -1001,53 +1174,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             return null;
         }
-        private List<string> GetScriptFiles(string scriptFileLocation)
-        {
-            /*
-             * Gets all .ps1 files from the scripts directory
-             * 
-             * scriptFileLocation can be:
-             * - A file path: C:\MyApp\Scripts\WinCertScripts.ps1
-             * - A directory path: C:\MyApp\Scripts
-             * 
-             * Returns: List of full file paths to all .ps1 files
-             */
 
-            // Determine the scripts directory
-            string scriptsDirectory;
-
-            if (File.Exists(scriptFileLocation))
-            {
-                // It's a file path - get the directory
-                scriptsDirectory = Path.GetDirectoryName(scriptFileLocation);
-                _logger.LogTrace($"Script file provided: {scriptFileLocation}");
-                _logger.LogTrace($"Using directory: {scriptsDirectory}");
-            }
-            else if (Directory.Exists(scriptFileLocation))
-            {
-                // It's already a directory
-                scriptsDirectory = scriptFileLocation;
-                _logger.LogTrace($"Script directory provided: {scriptFileLocation}");
-            }
-            else
-            {
-                throw new DirectoryNotFoundException($"Scripts location not found: {scriptFileLocation}");
-            }
-
-            // Get all .ps1 files, excluding .example files
-            var scriptFiles = Directory.GetFiles(scriptsDirectory, "*.ps1")
-                .Where(f => !f.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            if (scriptFiles.Count == 0)
-            {
-                throw new FileNotFoundException($"No .ps1 files found in: {scriptsDirectory}");
-            }
-
-            _logger.LogTrace($"Found {scriptFiles.Count} script file(s): {string.Join(", ", scriptFiles.Select(Path.GetFileName))}");
-
-            return scriptFiles;
-        }
         public static string LoadScript(string scriptFileName)
         {
             _logger.LogTrace($"Attempting to load script {scriptFileName}");
@@ -1094,8 +1221,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
             _logger.LogInformation($"Loading scripts from: {scriptsDirectory}");
 
-            // Load all .ps1 files from the scripts directory
-            var scriptFiles = Directory.GetFiles(scriptsDirectory, "*.ps1").ToList();
+            // Load scripts in dependency order: root files first, then module Private then Public
+            var scriptFiles = GetOrderedScriptFiles(scriptsDirectory);
 
             if (scriptFiles.Count == 0)
             {
@@ -1164,6 +1291,28 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             });
 
             return string.Join(Environment.NewLine, filteredLines);
+        }
+
+        private void CleanupTempKeyFile()
+        {
+            if (string.IsNullOrEmpty(tempKeyFilePath)) return;
+
+            try
+            {
+                if (File.Exists(tempKeyFilePath))
+                {
+                    File.Delete(tempKeyFilePath);
+                    _logger.LogTrace($"Temporary KeyFilePath deleted: {tempKeyFilePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug($"Error while deleting KeyFilePath: {ex.Message}");
+            }
+            finally
+            {
+                tempKeyFilePath = null;
+            }
         }
     }
 }
