@@ -273,6 +273,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     {
                         _logger.LogInformation("Attempting to create a temporary key file");
                         tempKeyFilePath = createPrivateKeyFile();
+                        _logger.LogTrace($"Temporary KeyFilePath created at: {tempKeyFilePath}");
                     }
                     catch (Exception ex)
                     {
@@ -1023,25 +1024,35 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                ProcessStartInfo chmodInfo = new ProcessStartInfo()
+                var chmodInfo = new ProcessStartInfo()
                 {
                     FileName = "/bin/chmod",
-                    Arguments = "600 " + tmpFile,
+                    Arguments = $"600 \"{tmpFile}\"",
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
-                using (Process chmodProcess = new Process() { StartInfo = chmodInfo })
+
+                using (var chmodProcess = new Process { StartInfo = chmodInfo })
                 {
                     chmodProcess.Start();
+
+                    string output = chmodProcess.StandardOutput.ReadToEnd();
+                    string error = chmodProcess.StandardError.ReadToEnd();
+
                     chmodProcess.WaitForExit();
+
                     if (chmodProcess.ExitCode == 0)
                     {
-                        _logger.LogInformation("File permissions set to 600.");
+                        _logger.LogInformation("SSH private key permissions set to 600.");
                     }
                     else
                     {
-                        _logger.LogWarning("Failed to set file permissions.");
+                        _logger.LogWarning(
+                            "Failed to set SSH private key permissions. ExitCode: {ExitCode}, Error: {Error}",
+                            chmodProcess.ExitCode,
+                            error);
                     }
                 }
             }
