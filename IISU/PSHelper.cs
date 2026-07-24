@@ -166,8 +166,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             // Skipped in JEA sessions: [System.Environment] and [System.Net.Dns] are blocked
             // by ConstrainedLanguage and this script runs as untrusted inline code, not as a
             // trusted module function.
-            // TODO: Create Get-KeyfactorHostInfo in Keyfactor.WinCert.Common so JEA sessions
-            //       can also log host details at startup.
             if (!useJea)
             {
                 string psInfo = @"
@@ -267,35 +265,43 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 if (protocol == "ssh")
                 {
-                    _logger.LogTrace("Initializing SSH connection");
-
                     try
                     {
-                        _logger.LogInformation("Attempting to create a temporary key file");
-                        tempKeyFilePath = createPrivateKeyFile();
+                        _logger.LogTrace("Initializing SSH connection");
+
+                        try
+                        {
+                            _logger.LogInformation("Attempting to create a temporary key file");
+                            tempKeyFilePath = createPrivateKeyFile();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
+                            throw new Exception("Error while creating temporary KeyFilePath.");
+                        }
+
+                        Hashtable options = new Hashtable
+                    {
+                        { "StrictHostKeyChecking", "No" },
+                        { "UserKnownHostsFile", "/dev/null" },
+                    };
+
+                        _logger.LogInformation($"Temporary KeyFilePath created at: {tempKeyFilePath}");
+                        _logger.LogInformation($"HostName: {ClientMachineName}");
+                        _logger.LogInformation($"Username: {serverUserName}");
+
+                        PS.AddCommand("New-PSSession")
+                            .AddParameter("HostName", ClientMachineName)
+                            .AddParameter("UserName", serverUserName)
+                            .AddParameter("KeyFilePath", tempKeyFilePath)
+                            .AddParameter("ConnectingTimeout", 10000)
+                            .AddParameter("Options", options);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"Error while creating temporary KeyFilePath: {ex.Message}");
-                        throw new Exception("Error while creating temporary KeyFilePath.");
+                        _logger.LogError($"An error occurred while attempting to establish an SSH connection.\n {ex.Message}");
+                        throw new Exception("Problems establishing SSH connection.  Please check the User name and KeyFilePath for the Certificate Store");
                     }
-
-                    Hashtable options = new Hashtable
-                {
-                    { "StrictHostKeyChecking", "No" },
-                    { "UserKnownHostsFile", "/dev/null" },
-                };
-
-                    _logger.LogTrace($"Temporary KeyFilePath created at: {tempKeyFilePath}");
-                    _logger.LogTrace($"HostName: {ClientMachineName}");
-                    _logger.LogTrace($"Username: {serverUserName}");
-
-                    PS.AddCommand("New-PSSession")
-                        .AddParameter("HostName", ClientMachineName)
-                        .AddParameter("UserName", serverUserName)
-                        .AddParameter("KeyFilePath", tempKeyFilePath)
-                        .AddParameter("ConnectingTimeout", 10000)
-                        .AddParameter("Options", options);
                 }
                 else
                 {
@@ -341,7 +347,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 }
 
-                _logger.LogTrace("Attempting to invoke PS-Session command on remote machine.");
+                _logger.LogInformation("Attempting to invoke PS-Session command on remote machine.");
 
                 var asyncResult = PS.BeginInvoke();
                 if (!asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds)))
