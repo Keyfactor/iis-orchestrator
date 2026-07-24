@@ -273,7 +273,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     {
                         _logger.LogInformation("Attempting to create a temporary key file");
                         tempKeyFilePath = createPrivateKeyFile();
-                        _logger.LogTrace($"Temporary KeyFilePath created at: {tempKeyFilePath}");
                     }
                     catch (Exception ex)
                     {
@@ -286,6 +285,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     { "StrictHostKeyChecking", "No" },
                     { "UserKnownHostsFile", "/dev/null" },
                 };
+
+                    _logger.LogTrace($"Temporary KeyFilePath created at: {tempKeyFilePath}");
+                    _logger.LogTrace($"HostName: {ClientMachineName}");
+                    _logger.LogTrace($"Username: {serverUserName}");
 
                     PS.AddCommand("New-PSSession")
                         .AddParameter("HostName", ClientMachineName)
@@ -348,7 +351,21 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         $"Could not establish a remote PowerShell session to '{machineName}:{port}' within {timeoutSeconds} seconds. " +
                         "Verify WinRM is reachable and the firewall allows the connection.");
                 }
-                _PSSession = new Collection<PSObject>(PS.EndInvoke(asyncResult));
+
+                try
+                {
+                    _PSSession = new Collection<PSObject>(PS.EndInvoke(asyncResult));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex.ToString());
+                    if (ex.InnerException != null)
+                    {
+                        _logger.LogError($"Inner Exception: {ex.InnerException.Message}");
+                    }
+
+                    throw;
+                }
 
                 if (_PSSession.Count > 0)
                 {
@@ -425,8 +442,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         $"Failed to create the remote PowerShell session to '{machineName}'. {errorSummary}");
                 }
             }
-            catch 
+            catch (Exception ex)
             {
+                _logger.LogError($"An error occurred while initializing the remote session: {ex.Message}");
                 CleanupTempKeyFile();
                 throw;
             }
@@ -1045,7 +1063,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                     if (chmodProcess.ExitCode == 0)
                     {
-                        _logger.LogInformation("SSH private key permissions set to 600.");
+                        _logger.LogInformation($"SSH private key permissions set to 600 for file: {tmpFile}");
                     }
                     else
                     {
