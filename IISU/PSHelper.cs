@@ -351,17 +351,17 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                 _logger.LogInformation("Attempting to invoke PS-Session command on remote machine.");
 
-                var asyncResult = PS.BeginInvoke();
-                if (!asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds)))
-                {
-                    PS.Stop();
-                    throw new TimeoutException(
-                        $"Could not establish a remote PowerShell session to '{machineName}:{port}' within {timeoutSeconds} seconds. " +
-                        "Verify WinRM is reachable and the firewall allows the connection.");
-                }
-
                 try
                 {
+                    var asyncResult = PS.BeginInvoke();
+                    if (!asyncResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(timeoutSeconds)))
+                    {
+                        PS.Stop();
+                        throw new TimeoutException(
+                            $"Could not establish a remote PowerShell session to '{machineName}:{port}' within {timeoutSeconds} seconds. " +
+                            "Verify WinRM is reachable and the firewall allows the connection.");
+                    }
+
                     _PSSession = new Collection<PSObject>(PS.EndInvoke(asyncResult));
                 }
                 catch (Exception ex)
