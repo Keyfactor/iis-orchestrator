@@ -296,6 +296,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                             .AddParameter("KeyFilePath", tempKeyFilePath)
                             .AddParameter("ConnectingTimeout", 10000)
                             .AddParameter("Options", options);
+
+                        _logger.LogInformation("Completed adding parameters to New-PSSession command for SSH connection.");
                     }
                     catch (Exception ex)
                     {
