@@ -24,11 +24,13 @@
     # Only the three public IIS functions need to be visible to the caller.
     # Internal helpers (New-KeyfactorResult, Get-CertificateCSP, Add-IISBindingWithSSL, etc.)
     # are called from within trusted module code and do not require explicit exposure.
+    # Test-KeyfactorAdminRights is called by the orchestrator's C# code when adminPrivilegesRequired=true.
     VisibleFunctions = @(
         'Get-KeyfactorIISBoundCertificates',
         'New-KeyfactorIISSiteBinding',
         'Remove-KeyfactorIISSiteBinding',
-        'Remove-KeyfactorIISCertificateIfUnused'
+        'Remove-KeyfactorIISCertificateIfUnused',
+        'Test-KeyfactorAdminRights'
     )
 
     VisibleCmdlets = @(

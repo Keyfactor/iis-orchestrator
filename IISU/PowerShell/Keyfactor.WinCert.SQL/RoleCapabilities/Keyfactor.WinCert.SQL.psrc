@@ -29,10 +29,12 @@
     ModulesToImport = @('Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL')
 
     # Functions the orchestrator is allowed to invoke in this JEA session.
+    # Test-KeyfactorAdminRights is included for potential future use when admin checks are required.
     VisibleFunctions = @(
         'Get-KeyfactorSQLInventory',
         'New-KeyfactorSQLBinding',
-        'Remove-KeyfactorSQLCertificate'
+        'Remove-KeyfactorSQLCertificate',
+        'Test-KeyfactorAdminRights'
     )
 
     # Cmdlets available to caller scriptblocks (param() wrappers sent by PSHelper).

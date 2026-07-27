@@ -417,6 +417,33 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         }
 
                         _logger.LogDebug("JEA pre-flight passed: Keyfactor modules are installed on the endpoint.");
+
+                        // Additional pre-flight: verify Test-KeyfactorAdminRights is available if admin check is required
+                        if (adminPrivilegesRequired)
+                        {
+                            PS.AddCommand("Invoke-Command")
+                                .AddParameter("Session", _PSSession)
+                                .AddParameter("ScriptBlock", ScriptBlock.Create("[bool](Get-Command 'Test-KeyfactorAdminRights' -ErrorAction SilentlyContinue)"));
+                            var adminCheckResults = PS.Invoke();
+                            PS.Commands.Clear();
+
+                            bool adminCheckAvailable = adminCheckResults != null &&
+                                adminCheckResults.Count > 0 &&
+                                adminCheckResults[0]?.BaseObject is bool adminCheckBool &&
+                                adminCheckBool;
+
+                            if (!adminCheckAvailable)
+                            {
+                                throw new Exception(
+                                    $"JEA endpoint '{jeaEndpoint}' requires the 'Test-KeyfactorAdminRights' function from Keyfactor.WinCert.Common module, but it is not available. " +
+                                    "Ensure the Keyfactor.WinCert.Common module is properly installed under " +
+                                    "'C:\\Program Files\\WindowsPowerShell\\Modules\\Keyfactor.WinCert.Common\\' on the target machine, " +
+                                    "and that the function is exposed in the JEA session configuration's VisibleFunctions list. " +
+                                    "After updating, re-register the JEA session configuration and restart WinRM.");
+                            }
+
+                            _logger.LogDebug("JEA pre-flight passed: Test-KeyfactorAdminRights is available on the endpoint.");
+                        }
                     }
 
                     // Set $InformationPreference globally so Write-Information output is forwarded
