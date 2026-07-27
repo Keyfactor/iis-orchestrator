@@ -524,43 +524,6 @@ The function is not visible in the JEA session. Verify that:
 * The module name in `RoleCapabilities` matches the module folder name exactly (case-sensitive on some systems).
 * The session configuration was re-registered and WinRM was restarted after any changes.
 
-**"The term 'Test-KeyfactorAdminRights' is not recognized..."**
-
-This function is called automatically by the orchestrator when managing IIS bindings (which require administrator rights). The error indicates that `Test-KeyfactorAdminRights` is not exposed in the JEA session. This function is defined in the `Keyfactor.WinCert.Common` module but must be explicitly listed in the `VisibleFunctions` array of any role capability that needs it.
-
-**For IIS certificate stores:** Ensure the `Keyfactor.WinCert.IIS.psrc` file includes `Test-KeyfactorAdminRights` in its `VisibleFunctions` list:
-
-```powershell
-VisibleFunctions = @(
-    'Get-KeyfactorIISBoundCertificates',
-    'New-KeyfactorIISSiteBinding',
-    'Remove-KeyfactorIISSiteBinding',
-    'Remove-KeyfactorIISCertificateIfUnused',
-    'Test-KeyfactorAdminRights'   # <-- Required for admin rights check
-)
-```
-
-After updating the role capability file, **no re-registration is necessary** — the next JEA session will pick up the updated module automatically. However, if you made changes to the `.pssc` file itself, you must re-register it and restart WinRM:
-
-```powershell
-Register-PSSessionConfiguration `
-    -Name 'keyfactor.wincert' `
-    -Path 'C:\Temp\KeyfactorWinCert.pssc' `
-    -Force
-
-Restart-Service WinRM
-```
-
-**Verification:** Connect to the JEA endpoint and verify the function is now available:
-
-```powershell
-$s = New-PSSession -ComputerName '<target-server>' `
-                   -ConfigurationName 'keyfactor.wincert' `
-                   -Credential (Get-Credential)
-Invoke-Command -Session $s -ScriptBlock { Get-Command Test-KeyfactorAdminRights }
-Remove-PSSession $s
-```
-
 **"Connecting user is not authorized to connect to this configuration"**
 
 The account used in the certificate store credentials is not a member of any group listed in `RoleDefinitions`. Add the account (or a group containing it) to the `RoleDefinitions` section in the `.pssc`, re-register the configuration, and restart WinRM.
