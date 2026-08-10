@@ -1,8 +1,8 @@
 {
     "$schema": "https://keyfactor.github.io/v2/integration-manifest-schema.json",
     "integration_type": "orchestrator",
-    "name": "Windows Certificate Orchestrator",
     "status": "production",
+    "name": "Windows Certificate Orchestrator",
     "link_github": true,
     "release_dir": "IISU/bin/Release",
     "release_project": "IISU/WindowsCertStore.csproj",
