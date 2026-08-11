@@ -26,6 +26,7 @@ using System.Management.Automation;
 using Keyfactor.Logging;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
@@ -88,8 +89,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "";
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
 
                 switch (_operationType)
                 {
@@ -125,7 +127,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
             {
                 _logger.LogTrace(LogHandler.FlattenException(ex));
 
-                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{ex.Message}'";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult
@@ -145,7 +147,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                 {
                     _psHelper.Initialize();
 
-                    _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
+                    _logger.LogTrace("Attempting to execute PS function (Add-KeyfactorCertificate)");
 
                     // Mandatory parameters
                     var parameters = new Dictionary<string, object>
@@ -158,20 +160,34 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                     if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
 
-                    _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
-                    _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+                    _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
+                    _logger.LogTrace("Returned from executing PS function (Add-KeyfactorCertificate)");
 
-                    // This should return the thumbprint of the certificate
-                    if (_results != null && _results.Count > 0)
-                    {
-                        var thumbprint = _results[0].ToString();
-                        _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {thumbprint}");
-                    }
-                    else
-                    {
-                        _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
-                    }
+                    ResultObject addResult = ResultObject.FromPSResults(_results);
+                    _logger.LogTrace($"Add-KeyfactorCertificate returned Status={addResult.Status}, Code={addResult.Code}, Step={addResult.Step}, Thumbprint='{addResult.Thumbprint}'");
+
                     _psHelper.Terminate();
+
+                    if (!addResult.IsSuccess)
+                    {
+                        string detail = !string.IsNullOrEmpty(addResult.ErrorMessage)
+                            ? addResult.ErrorMessage
+                            : addResult.Message;
+
+                        string failureMessage =
+                            $"Add certificate to store '{_storePath}' failed at step '{addResult.Step}' (code {addResult.Code}): {detail}";
+
+                        _logger.LogWarning(failureMessage);
+
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = _jobHistoryID,
+                            FailureMessage = failureMessage
+                        };
+                    }
+
+                    _logger.LogTrace($"Added certificate to store {_storePath}, thumbprint {addResult.Thumbprint}");
                 }
 
                 return new JobResult
@@ -212,8 +228,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                         { "StorePath", _storePath }
                     };
 
-                    _psHelper.ExecutePowerShell("Remove-KFCertificateFromStore", parameters);
-                    _logger.LogTrace("Returned from executing PS function (Remove-KFCertificateFromStore)");
+                    _psHelper.ExecutePowerShell("Remove-KeyfactorCertificate", parameters);
+                    _logger.LogTrace("Returned from executing PS function (Remove-KeyfactorCertificate)");
                     
                     _psHelper.Terminate();
                 }

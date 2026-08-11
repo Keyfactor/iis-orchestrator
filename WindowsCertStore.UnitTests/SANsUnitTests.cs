@@ -59,15 +59,18 @@ namespace WindowsCertStore.UnitTests
             Assert.DoesNotContain("legacy.example.com", result); // ensure legacy ignored
         }
 
-        [Fact]
-        public void ResolveSanString_UsesLegacySAN_WhenConfigSANsMissing()
+        [Theory]
+        [InlineData("dns=legacy.example.com&dns=old.example.com")]
+        [InlineData("")]
+        [InlineData(null)]
+        public void ResolveSanString_UsesLegacySAN_WhenConfigSANsMissing(string legacySan)
         {
             // Arrange
             var config = new ReenrollmentJobConfiguration
             {
                 JobProperties = new Dictionary<string, object>
                 {
-                    { "SAN", "dns=legacy.example.com&dns=old.example.com" }
+                    { "SAN", legacySan }
                 },
                 SANs = new Dictionary<string, string[]>()
             };
@@ -76,7 +79,21 @@ namespace WindowsCertStore.UnitTests
             string result = enrollment.ResolveSANString(config);
 
             // Assert
-            Assert.Equal("dns=legacy.example.com&dns=old.example.com", result);
+            //Assert.Equal(legacySan, result);
+
+            // Assert
+            if (legacySan == null)
+            {
+                Assert.Equal(string.Empty, result);
+            }
+            else if (legacySan == string.Empty)
+            {
+                Assert.Equal(string.Empty, result);
+            }
+            else
+            {
+                Assert.Equal(legacySan, result);
+            }
         }
 
         [Fact]

@@ -34,7 +34,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         public static Collection<PSObject> BindCertificate(PSHelper psHelper, IISBindingInfo bindingInfo, string thumbprint, string renewalThumbprint, string storePath)
         {
             _logger = LogHandler.GetClassLogger(typeof(WinIISBinding));
-            _logger.LogTrace("Attempting to bind and execute PS function (New-KFIISSiteBinding)");
+            _logger.LogTrace("Attempting to bind and execute PS function (New-KeyfactorIISSiteBinding)");
 
             // Mandatory parameters
             var parameters = new Dictionary<string, object>
@@ -53,7 +53,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
             try
             {
-                return psHelper.ExecutePowerShell("New-KFIISSiteBinding", parameters);      // returns true if successful
+                return psHelper.ExecutePowerShell("New-KeyfactorIISSiteBinding", parameters);
             }
             catch (Exception ex)
             {
@@ -64,26 +64,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
         public static bool UnBindCertificate(PSHelper psHelper, IISBindingInfo bindingInfo)
         {
             _logger = LogHandler.GetClassLogger(typeof(WinIISBinding));
-            _logger.LogTrace("Attempting to UnBind and execute PS function (Remove-KFIISSiteBinding)");
+            _logger.LogTrace("Attempting to UnBind and execute PS function (Remove-KeyfactorIISSiteBinding)");
 
-            // Mandatory parameters
+            string bindingInfoStr = $"{bindingInfo.IPAddress}:{bindingInfo.Port}:{bindingInfo.HostName ?? string.Empty}";
+
             var parameters = new Dictionary<string, object>
             {
                 { "SiteName", bindingInfo.SiteName },
-                { "IPAddress", bindingInfo.IPAddress },
-                { "Port", bindingInfo.Port },
+                { "BindingInfo", bindingInfoStr },
             };
-
-            // Optional parameters
-            if (!string.IsNullOrEmpty(bindingInfo.HostName))
-            {
-                parameters.Add("HostName", bindingInfo.HostName);
-            }
 
             try
             {
-                var results = psHelper.ExecutePowerShell("Remove-KFIISSiteBinding", parameters);
-                _logger.LogTrace("Returned from executing PS function (Remove-KFIISSiteBinding)");
+                var results = psHelper.ExecutePowerShell("Remove-KeyfactorIISSiteBinding", parameters);
+                _logger.LogTrace("Returned from executing PS function (Remove-KeyfactorIISSiteBinding)");
 
                 if (results == null || results.Count == 0)
                 {
@@ -91,15 +85,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                     return false;
                 }
 
-                if (results[0].BaseObject is bool success)
-                {
-                    return success;
-                }
-                else
-                {
-                    _logger.LogWarning("Unexpected result type from PowerShell function.");
-                    return false;
-                }
+                string status = results[0].Properties["Status"]?.Value as string ?? string.Empty;
+                if (status == "Success" || status == "Skipped")
+                    return true;
+
+                string errorMsg = results[0].Properties["ErrorMessage"]?.Value as string ?? string.Empty;
+                _logger.LogWarning($"Remove-KeyfactorIISSiteBinding returned status '{status}': {errorMsg}");
+                return false;
             }
             catch (Exception ex)
             {

@@ -27,7 +27,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerShell.Commands;
 using Newtonsoft.Json;
-
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 {
     public class Management : WinCertJobTypeBase, IManagementJobExtension
@@ -92,12 +91,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 string protocol = jobProperties?.WinRmProtocol;
                 string port = jobProperties?.WinRmPort;
                 bool includePortInSPN = (bool)jobProperties?.SpnPortFlag;
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "";
                 string alias = config.JobCertificate?.Alias?.Split(':').FirstOrDefault() ?? string.Empty;  // Thumbprint is first part of the alias
 
                 // Assign the binding information
                 IISBindingInfo bindingInfo = new IISBindingInfo(config.JobProperties);
 
-                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired:true);
 
                 _psHelper.Initialize();
 
@@ -121,9 +121,31 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
 
                                     OrchestratorJobStatusJobResult psResult = OrchestratorJobStatusJobResult.Unknown;
                                     string failureMessage = "";
-                                    
-                                    string newThumbprint = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
-                                    _logger.LogTrace($"Completed adding the certificate to the store");
+
+                                    ResultObject addResult = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
+                                    _logger.LogTrace($"Completed adding the certificate to the store. Status={addResult.Status}, Code={addResult.Code}, Step={addResult.Step}");
+
+                                    if (!addResult.IsSuccess)
+                                    {
+                                        string detail = !string.IsNullOrEmpty(addResult.ErrorMessage)
+                                            ? addResult.ErrorMessage
+                                            : addResult.Message;
+
+                                        string addFailureMessage =
+                                            $"Add certificate to store '{_storePath}' failed at step '{addResult.Step}' (code {addResult.Code}): {detail}";
+
+                                        _logger.LogError(addFailureMessage);
+
+                                        complete = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = _jobHistoryID,
+                                            FailureMessage = addFailureMessage
+                                        };
+                                        break;
+                                    }
+
+                                    string newThumbprint = addResult.Thumbprint;
                                     _logger.LogTrace($"New thumbprint: {newThumbprint}");
 
                                     // Bind Certificate to IIS Site
@@ -183,7 +205,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                         if (psResult == OrchestratorJobStatusJobResult.Success && !string.IsNullOrEmpty(alias))
                                         {
                                             _logger.LogTrace("Attempting to remove original certificate from store if it is no longer bound to any site.");
-                                            RemoveIISCertificate(alias);
+                                            var cleanupResult = RemoveIISCertificate(alias);
+                                            if (cleanupResult != null)
+                                            {
+                                                // Binding already succeeded — a cleanup failure downgrades to a
+                                                // Warning rather than masking the successful bind as a Failure.
+                                                psResult = cleanupResult.Result;
+                                                failureMessage = cleanupResult.FailureMessage;
+                                            }
                                             _logger.LogTrace("Returned from removing cert if not used.");
                                         }
 
@@ -200,8 +229,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                         {
                                             Result = OrchestratorJobStatusJobResult.Failure,
                                             JobHistoryId = _jobHistoryID,
-                                            FailureMessage = $"No thumbprint was returned.  Unable to bind certificate to site: {bindingInfo.SiteName}."
-                                        };                                    }
+                                            FailureMessage = $"Add-KeyfactorCertificate reported Success but did not return a thumbprint. Unable to bind certificate to site: {bindingInfo.SiteName}."
+                                        };
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -227,10 +257,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                                 {
                                     if (WinIISBinding.UnBindCertificate(_psHelper, thisBinding))
                                     {
-                                        // This function will only remove the certificate from the store if not used by any other sites
-                                        RemoveIISCertificate(thisBinding.Thumbprint);
+                                        // This function will only remove the certificate from the store if not used by any other sites.
+                                        // The unbind already succeeded — a cleanup failure downgrades to a Warning
+                                        // rather than masking the successful unbind as a Failure.
+                                        var cleanupResult = RemoveIISCertificate(thisBinding.Thumbprint);
 
-                                        complete = new JobResult
+                                        complete = cleanupResult ?? new JobResult
                                         {
                                             Result = OrchestratorJobStatusJobResult.Success,
                                             JobHistoryId = _jobHistoryID,
@@ -276,13 +308,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
             }
         }
 
-        public string AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
+        public ResultObject AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
         {
             try
             {
-                string newThumbprint = string.Empty;
-
-                _logger.LogTrace("Attempting to execute PS function (Add-KFCertificateToStore)");
+                _logger.LogTrace("Attempting to execute PS function (Add-KeyfactorCertificate)");
 
                 // Mandatory parameters
                 var parameters = new Dictionary<string, object>
@@ -295,21 +325,18 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                 if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
 
-                _results = _psHelper.ExecutePowerShell("Add-KFCertificateToStore", parameters);
-                _logger.LogTrace("Returned from executing PS function (Add-KFCertificateToStore)");
+                _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
+                _logger.LogTrace("Returned from executing PS function (Add-KeyfactorCertificate)");
 
-                // This should return the thumbprint of the certificate
-                if (_results != null && _results.Count > 0)
+                ResultObject result = ResultObject.FromPSResults(_results);
+                _logger.LogTrace($"Add-KeyfactorCertificate returned Status={result.Status}, Code={result.Code}, Step={result.Step}, Thumbprint='{result.Thumbprint}'");
+
+                if (!result.IsSuccess && !string.IsNullOrEmpty(result.ErrorMessage))
                 {
-                    newThumbprint = _results[0].ToString();
-                    _logger.LogTrace($"Added certificate to store {_storePath}, returned with the thumbprint {newThumbprint}");
-                }
-                else
-                {
-                    _logger.LogTrace("No results were returned.  There could have been an error while adding the certificate.  Look in the trace logs for PowerShell information.");
+                    _logger.LogWarning($"Add-KeyfactorCertificate error: {result.ErrorMessage}");
                 }
 
-                return newThumbprint;
+                return result;
             }
             catch (Exception ex)        
             {
@@ -320,7 +347,14 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                 throw new Exception (niceMessage);
             }
 }
-        public void RemoveIISCertificate(string thumbprint)
+        /// <summary>
+        /// Attempts to remove a certificate from the store if it is no longer bound to any IIS site.
+        /// Returns null when there is nothing to report (removed, skipped because still in use, or not
+        /// found). Returns a Warning JobResult when the cleanup itself failed, since at the point this is
+        /// called the primary bind/unbind operation has already succeeded and a cleanup failure should
+        /// not be reported to the orchestrator as if the whole job failed.
+        /// </summary>
+        public JobResult RemoveIISCertificate(string thumbprint)
         {
             _logger.LogTrace($"Attempting to remove thumbprint {thumbprint} from store {_storePath}");
 
@@ -330,8 +364,41 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU
                         { "StoreName", _storePath }
                     };
 
-            _psHelper.ExecutePowerShell("Remove-KFIISCertificateIfUnused", parameters);
+            try
+            {
+                var results = _psHelper.ExecutePowerShell("Remove-KeyfactorIISCertificateIfUnused", parameters);
+                ResultObject result = ResultObject.FromPSResults(results);
 
+                _logger.LogTrace($"Remove-KeyfactorIISCertificateIfUnused returned Status={result.Status}, Code={result.Code}, Step={result.Step}");
+
+                if (string.Equals(result.Status, ResultObject.StatusError, StringComparison.OrdinalIgnoreCase))
+                {
+                    var warningMessage = $"Certificate '{thumbprint}' could not be removed from store '{_storePath}': {result.ErrorMessage}";
+                    _logger.LogWarning(warningMessage);
+
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Warning,
+                        JobHistoryId = _jobHistoryID,
+                        FailureMessage = warningMessage
+                    };
+                }
+
+                // Success or Skipped (still in use elsewhere / not found) are both benign outcomes.
+                return null;
+            }
+            catch (Exception ex)
+            {
+                var warningMessage = $"Certificate '{thumbprint}' could not be removed from store '{_storePath}': {ex.Message}";
+                _logger.LogWarning(warningMessage);
+
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Warning,
+                    JobHistoryId = _jobHistoryID,
+                    FailureMessage = warningMessage
+                };
+            }
         }
 
         public JobResult RemoveCertificateORIG(string thumbprint)
