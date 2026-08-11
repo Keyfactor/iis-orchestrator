@@ -81,9 +81,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                     settings.IncludePortInSPN = jobProperties.SpnPortFlag;
                     settings.ServerUserName = serverUserName;
                     settings.ServerPassword = serverPassword;
+                    settings.JEAEndpointName = jobProperties.JEAEndpointName;
 
                     _logger.LogTrace($"Attempting to read bound SQL Server certificates from cert store: {storePath}");
-                    inventoryItems = QuerySQLCertificates(settings, storePath);
+                    inventoryItems = QuerySQLCertificates(settings);
 
                     _logger.LogTrace("Invoking submitInventory..");
                     submitInventoryUpdate.Invoke(inventoryItems);
@@ -109,7 +110,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             {
                 _logger.LogTrace(LogHandler.FlattenException(ex));
 
-                var failureMessage = $"SQL Inventory job failed for Site '{jobConfiguration.CertificateStoreDetails.StorePath}' on server '{jobConfiguration.CertificateStoreDetails.ClientMachine}' with error: '{LogHandler.FlattenException(ex)}'";
+                var failureMessage = $"SQL Inventory job failed for Site '{jobConfiguration.CertificateStoreDetails.StorePath}' on server '{jobConfiguration.CertificateStoreDetails.ClientMachine}' with error: '{ex.Message}'";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult
@@ -121,20 +122,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             }
         }
 
-        public List<CurrentInventoryItem> QuerySQLCertificates(RemoteSettings settings, string storeName)
+        public List<CurrentInventoryItem> QuerySQLCertificates(RemoteSettings settings)
         {
             List<CurrentInventoryItem> Inventory = new();
 
-            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword))
+            using (PSHelper ps = new(settings.Protocol, settings.Port, settings.IncludePortInSPN, settings.ClientMachineName, settings.ServerUserName, settings.ServerPassword, jeaEndpoint: settings.JEAEndpointName))
             {
                 ps.Initialize();
 
-                var parameters = new Dictionary<string, object>
-                {
-                    { "StoreName", storeName }
-                };
-
-                results = ps.ExecutePowerShell("GET-KFSQLInventory", parameters);
+                results = ps.ExecutePowerShell("Get-KeyfactorSQLInventory");
 
                 // If there are certificates, deserialize the results and send them back to command
                 if (results != null && results.Count > 0)
