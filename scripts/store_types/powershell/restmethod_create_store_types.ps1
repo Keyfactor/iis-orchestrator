@@ -562,3 +562,124 @@ $Body = @'
 
 Invoke-RestMethod -Uri "https://$KeyfactorHostname/$KeyfactorApiPath/CertificateStoreTypes" -Method POST -Headers $Headers -Body $Body
 
+Write-Host "Creating store type: WinLDAP"
+$Body = @'
+{
+  "Name": "Windows LDAPS (NTDS) Certificate",
+  "ShortName": "WinLDAP",
+  "Capability": "WinLDAP",
+  "LocalStore": false,
+  "SupportedOperations": {
+    "Add": true,
+    "Create": false,
+    "Discovery": false,
+    "Enrollment": false,
+    "Remove": true
+  },
+  "Properties": [
+    {
+      "Name": "spnwithport",
+      "DisplayName": "SPN With Port",
+      "Type": "Bool",
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Required": false,
+      "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+    },
+    {
+      "Name": "WinRM Protocol",
+      "DisplayName": "WinRM Protocol",
+      "Type": "MultipleChoice",
+      "DependsOn": "",
+      "DefaultValue": "https,http,ssh",
+      "Required": true,
+      "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
+    },
+    {
+      "Name": "WinRM Port",
+      "DisplayName": "WinRM Port",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "5986",
+      "Required": true,
+      "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+    },
+    {
+      "Name": "ServerUsername",
+      "DisplayName": "Server Username",
+      "Type": "Secret",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+    },
+    {
+      "Name": "ServerPassword",
+      "DisplayName": "Server Password",
+      "Type": "Secret",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
+    },
+    {
+      "Name": "ServerUseSsl",
+      "DisplayName": "Use SSL",
+      "Type": "Bool",
+      "DependsOn": "",
+      "DefaultValue": "true",
+      "Required": true,
+      "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+    },
+    {
+      "Name": "RestartService",
+      "DisplayName": "Restart NTDS Service After Cert Installed",
+      "Type": "Bool",
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Required": true,
+      "Description": "Boolean value (true or false) indicating whether to restart the NTDS service after installing the certificate, so the LDAPS listener picks it up immediately. Restarting NTDS briefly takes AD DS offline on this Domain Controller (via Restartable AD DS). If false, the LDAPS listener will pick up the certificate on its own schedule, or not until NTDS is next restarted."
+    },
+    {
+      "Name": "JEAEndpointName",
+      "DisplayName": "JEA End Point Name",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Name of the JEA endpoint to use for the session (This field is automatically created)"
+    }
+  ],
+  "EntryParameters": [
+    {
+      "Name": "ProviderName",
+      "DisplayName": "Crypto Provider Name",
+      "Type": "String",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Options": "",
+      "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    }
+  ],
+  "PasswordOptions": {
+    "EntrySupported": false,
+    "StoreRequired": false,
+    "Style": "Default"
+  },
+  "StorePathValue": "NTDS\\My",
+  "PrivateKeyAllowed": "Required",
+  "ServerRequired": true,
+  "PowerShell": false,
+  "BlueprintAllowed": false,
+  "CustomAliasAllowed": "Forbidden"
+}
+'@
+
+Invoke-RestMethod -Uri "https://$KeyfactorHostname/$KeyfactorApiPath/CertificateStoreTypes" -Method POST -Headers $Headers -Body $Body
+
