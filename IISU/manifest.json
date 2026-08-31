@@ -44,6 +44,14 @@
       "CertStores.WinAdfs.Management": {
         "assemblypath": "WindowsCertStore.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs.Management"
+      },
+      "CertStores.WinLDAP.Inventory": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap.Inventory"
+      },
+      "CertStores.WinLDAP.Management": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap.Management"
       }
     }
   }

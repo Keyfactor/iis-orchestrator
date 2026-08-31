@@ -566,6 +566,123 @@
                 "CustomAliasAllowed": "Forbidden",
                 "ClientMachineDescription": "Since this extension type must run as an agent (The UO Must be installed on the PRIMARY ADFS Server), the ClientMachine must follow the naming convention as outlined in the Client Machine Instructions. Secondary ADFS Nodes will be automatically be updated with the same certificate added on the PRIMARY ADFS server.",
                 "StorePathDescription": "Fixed string value of 'My' indicating the Personal store on the Local Machine. All ADFS Service-Communications certificates are located in the 'My' personal store by default."
+              },
+              {
+                "Name": "Windows LDAPS (NTDS) Certificate",
+                "ShortName": "WinLDAP",
+                "Capability": "WinLDAP",
+                "LocalStore": false,
+                "SupportedOperations": {
+                  "Add": true,
+                  "Create": false,
+                  "Discovery": false,
+                  "Enrollment": false,
+                  "Remove": true
+                },
+                "Properties": [
+                  {
+                    "Name": "spnwithport",
+                    "DisplayName": "SPN With Port",
+                    "Type": "Bool",
+                    "DependsOn": "",
+                    "DefaultValue": "false",
+                    "Required": false,
+                    "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+                  },
+                  {
+                    "Name": "WinRM Protocol",
+                    "DisplayName": "WinRM Protocol",
+                    "Type": "MultipleChoice",
+                    "DependsOn": "",
+                    "DefaultValue": "https,http,ssh",
+                    "Required": true,
+                    "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
+                  },
+                  {
+                    "Name": "WinRM Port",
+                    "DisplayName": "WinRM Port",
+                    "Type": "String",
+                    "DependsOn": "",
+                    "DefaultValue": "5986",
+                    "Required": true,
+                    "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+                  },
+                  {
+                    "Name": "ServerUsername",
+                    "DisplayName": "Server Username",
+                    "Type": "Secret",
+                    "DependsOn": "",
+                    "DefaultValue": "",
+                    "Required": false,
+                    "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+                  },
+                  {
+                    "Name": "ServerPassword",
+                    "DisplayName": "Server Password",
+                    "Type": "Secret",
+                    "DependsOn": "",
+                    "DefaultValue": "",
+                    "Required": false,
+                    "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
+                  },
+                  {
+                    "Name": "ServerUseSsl",
+                    "DisplayName": "Use SSL",
+                    "Type": "Bool",
+                    "DependsOn": "",
+                    "DefaultValue": "true",
+                    "Required": true,
+                    "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+                  },
+                  {
+                    "Name": "RestartService",
+                    "DisplayName": "Restart NTDS Service After Cert Installed",
+                    "Type": "Bool",
+                    "DependsOn": "",
+                    "DefaultValue": "false",
+                    "Required": true,
+                    "Description": "Boolean value (true or false) indicating whether to restart the NTDS service after installing the certificate, so the LDAPS listener picks it up immediately. Restarting NTDS briefly takes AD DS offline on this Domain Controller (via Restartable AD DS). If false, the LDAPS listener will pick up the certificate on its own schedule, or not until NTDS is next restarted."
+                  },
+                  {
+                    "Name": "JEAEndpointName",
+                    "DisplayName": "JEA End Point Name",
+                    "Type": "String",
+                    "DependsOn": "",
+                    "DefaultValue": "",
+                    "Required": false,
+                    "Description": "Name of the JEA endpoint to use for the session (This field is automatically created)"
+                  }
+                ],
+                "EntryParameters": [
+                  {
+                    "Name": "ProviderName",
+                    "DisplayName": "Crypto Provider Name",
+                    "Type": "String",
+                    "RequiredWhen": {
+                      "HasPrivateKey": false,
+                      "OnAdd": false,
+                      "OnRemove": false,
+                      "OnReenrollment": false
+                    },
+                    "DependsOn": "",
+                    "DefaultValue": "",
+                    "Options": "",
+                    "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+                  }
+                ],
+                "PasswordOptions": {
+                  "EntrySupported": false,
+                  "StoreRequired": false,
+                  "Style": "Default"
+                },
+                "StorePathValue": "NTDS\\My",
+                "PrivateKeyAllowed": "Required",
+                "ServerRequired": true,
+                "PowerShell": false,
+                "BlueprintAllowed": false,
+                "CustomAliasAllowed": "Forbidden",
+                "ClientMachineDescription": "Hostname of the Domain Controller whose AD DS (NTDS) LDAPS certificate is to be managed. This can be a remote hostname (a WinRM/JEA session will be established using the credentials specified in the Server Username and Server Password fields), or the local agent may be installed directly on the Domain Controller using the LocalMachine moniker. Unlike WinAdfs, WinLDAP does not require local-agent-only operation: each Domain Controller is managed as its own independent store with no fan-out to other nodes, so there is no WinRM double-hop concern. For more information, see [Client Machine](#note-regarding-client-machine).",
+                "StorePathDescription": "Fixed string value 'NTDS\\My' identifying the registry-backed AD DS (NTDS) service certificate store that the LDAPS listener (port 636) reads from - distinct from the Personal ('My') store. Certificate staging into the Personal store is handled internally by the Add operation and is not separately visible here."
               }
             ]
         }

@@ -1,3 +1,7 @@
+Unreleased
+
+* Added WinLDAP store type for managing the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller - automates staging the certificate into the Personal store and registering it into the NTDS service certificate store that the LDAPS listener uses. Supports both local-agent and remote WinRM/JEA connections, since each Domain Controller is managed as an independent store with no fan-out to other nodes. See docsource/winldap.md for known unverified implementation details pending lab validation on a real Domain Controller.
+
 4.0.0
 
 * As of this version of the extension, SANs will be handled through the ODKG Enrollment page in Command and will no longer use the SAN Entry Parameter. This version, we are removing all support for the SAN Entry Parameter. If you are still using the SAN Entry Parameter, you will need to remove it from your store types and re-run inventory to remove it from your database.
