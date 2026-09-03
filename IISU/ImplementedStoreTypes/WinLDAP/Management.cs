@@ -95,6 +95,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap
 
                 _psHelper = new(protocol, port, includePortInSPN, _clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint);
 
+                if (!_psHelper.IsLocalMachine)
+                {
+                    string failureMessage = $"WinLDAP is local-agent-only in this release - Client Machine '{_clientMachineName}' must use the '|LocalMachine' convention. Remote WinRM/JEA management of the NTDS service store is not yet supported (see docsource/winldap.md).";
+                    _logger.LogWarning(failureMessage);
+
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = _jobHistoryID,
+                        FailureMessage = failureMessage
+                    };
+                }
+
                 switch (_operationType)
                 {
                     case CertStoreOperationType.Add:

@@ -43,16 +43,10 @@ function Remove-KeyfactorLdapsCertificate {
         $removeResult = Remove-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName $leafStoreName -Thumbprint $Thumbprint
 
         if (-not $removeResult.Success) {
-            $msg = "certutil exited with code $($removeResult.ExitCode) while removing certificate '$Thumbprint' from the '$serviceName\$leafStoreName' service store. StdErr: $($removeResult.StdErr) StdOut: $($removeResult.StdOut)"
-            Write-Error $msg
+            Write-Error $removeResult.ErrorMessage
             return New-KeyfactorResult -Status Error -Code 720 -Step RemoveNtdsStore `
-                -ErrorMessage $msg `
-                -Details @{
-                    Thumbprint = $Thumbprint
-                    ExitCode   = $removeResult.ExitCode
-                    StdOut     = $removeResult.StdOut
-                    StdErr     = $removeResult.StdErr
-                }
+                -ErrorMessage $removeResult.ErrorMessage `
+                -Details @{ Thumbprint = $Thumbprint }
         }
 
         Write-Information "The thumbprint '$Thumbprint' was removed from the '$serviceName\$leafStoreName' service store."

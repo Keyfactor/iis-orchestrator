@@ -4,18 +4,23 @@ function Set-NtdsServiceStoreCertificate {
     Writes a certificate into a Windows service-specific certificate store (e.g. NTDS\My).
 
     .DESCRIPTION
-    UNVERIFIED - MUST BE LAB-VALIDATED. See Invoke-CertUtilNtdsStore.ps1 for the certutil argument
-    shape this assumes ("-addstore -service <ServiceName> <StoreName> <CertFile>").
+    Service-specific stores such as NTDS\My are registry-backed at
+    HKLM\SOFTWARE\Microsoft\Cryptography\Services\<ServiceName>\SystemCertificates\<StoreName>\
+    Certificates. Each certificate is one subkey named by its uppercase SHA1 thumbprint, holding a
+    single REG_BINARY value named "Blob". That Blob is exactly what
+    [X509Certificate2]::Export([X509ContentType]::SerializedCert) produces - confirmed by comparing
+    against a live registry-backed store - so no certutil.exe call or hand-built binary format is
+    needed.
 
-    Only the certificate's public bytes are written here (a .cer, not a .pfx) - the private key
-    itself is not re-imported. This assumes Windows resolves a certificate's private-key association
-    via CAPI/CNG machine-key-container matching (thumbprint/key match), independent of which logical
-    store lists the certificate object - the same assumption already relied upon implicitly by every
-    other store type in this repo that can bind one imported certificate into more than one place
-    (e.g. IIS binding a cert already staged in the machine store). This must be confirmed for the
-    NTDS store specifically by reading back HasPrivateKey on the NTDS-store copy in lab testing (see
-    docsource/winldap.md validation checklist) - if it does not hold, this function will need to
-    import the PFX directly into the service store instead of just the public certificate.
+    IMPORTANT: -Certificate must be a certificate object read back FROM an actual certificate store
+    (e.g. via the Cert: provider), not one constructed directly from raw/PFX bytes in memory - that
+    distinction was verified empirically: an X509Certificate2 loaded straight from PFX bytes (even
+    with PersistKeySet/MachineKeySet) does not reliably carry the CERT_KEY_PROV_INFO_PROP_ID
+    property when exported, so Export(SerializedCert) round-trips HasPrivateKey = False. Only a
+    certificate re-read from a store correctly carries that property, which is how the NTDS-store
+    copy resolves HasPrivateKey via CAPI/CNG machine-key-container matching without re-importing the
+    PFX itself. See the "RereadPersonal" step in Add-KeyfactorLdapsCertificate.ps1, which re-reads
+    the certificate from Cert:\LocalMachine\My after staging before calling this function.
     #>
     [CmdletBinding()]
     param (
@@ -26,35 +31,25 @@ function Set-NtdsServiceStoreCertificate {
         [string]$StoreName,
 
         [Parameter(Mandatory = $true)]
-        [byte[]]$RawCertificateBytes
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
     )
 
-    $tempCerFile = [System.IO.Path]::GetTempFileName() + ".cer"
-
     try {
-        [System.IO.File]::WriteAllBytes($tempCerFile, $RawCertificateBytes)
+        $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\$ServiceName\SystemCertificates\$StoreName\Certificates\$($Certificate.Thumbprint.ToUpper())"
+        $blob = $Certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::SerializedCert)
 
-        $result = Invoke-CertUtilNtdsStore -Arguments @('-f', '-addstore', '-service', $ServiceName, $StoreName, $tempCerFile)
-
-        if (-not $result.Started) {
-            return [PSCustomObject]@{
-                Success  = $false
-                ExitCode = -1
-                StdOut   = ""
-                StdErr   = $result.StdErr
-            }
-        }
+        New-Item -Path $regPath -Force | Out-Null
+        Set-ItemProperty -Path $regPath -Name 'Blob' -Value $blob -Type Binary
 
         return [PSCustomObject]@{
-            Success  = ($result.ExitCode -eq 0)
-            ExitCode = $result.ExitCode
-            StdOut   = $result.StdOut
-            StdErr   = $result.StdErr
+            Success      = $true
+            ErrorMessage = ""
         }
     }
-    finally {
-        if (Test-Path $tempCerFile) {
-            Remove-Item $tempCerFile -Force -ErrorAction SilentlyContinue
+    catch {
+        return [PSCustomObject]@{
+            Success      = $false
+            ErrorMessage = "Failed to write certificate '$($Certificate.Thumbprint)' into the '$ServiceName\$StoreName' registry store: $($_.Exception.Message)"
         }
     }
 }

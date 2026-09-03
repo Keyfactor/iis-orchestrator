@@ -124,6 +124,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap
             {
                 ps.Initialize();
 
+                if (!ps.IsLocalMachine)
+                {
+                    throw new InvalidOperationException($"WinLDAP is local-agent-only in this release - Client Machine '{settings.ClientMachineName}' must use the '|LocalMachine' convention. Remote WinRM/JEA management of the NTDS service store is not yet supported (see docsource/winldap.md).");
+                }
+
                 var parameters = new Dictionary<string, object>
                 {
                     { "StoreName", StoreName }
