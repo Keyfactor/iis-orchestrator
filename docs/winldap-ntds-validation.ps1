@@ -21,9 +21,11 @@ It intentionally does NOT delete anything by default - each step tells you what 
 run the "cleanup" section at the end once you're done, and only against a test certificate you
 created for this purpose.
 
-Prerequisites: run elevated (local Administrator) directly on the test DC. This release is
-local-agent-only (see docsource/winldap.md) - Step 5 below, covering remote WinRM/JEA, is optional/
-informational only and not required for this release.
+Prerequisites: run elevated (local Administrator) directly on the test DC for Steps 0-4 and 6-8.
+Step 5 covers remote WinRM/JEA, which WinLDAP now supports (see docsource/winldap.md) - the single
+most important open question for that path is whether a JEA virtual account/gMSA actually has
+write access to the NTDS registry hive, which Step 5 tests directly. Run it before relying on JEA
+for WinLDAP in production.
 #>
 
 # ============================================================================
@@ -103,22 +105,50 @@ Write-Host "HasPrivateKey: $($readBackCert.HasPrivateKey)" -ForegroundColor Red
 Write-Host "`n=== STEP 4: (holding off - see bottom of script for the Remove-Item command) ===" -ForegroundColor Yellow
 
 # ============================================================================
-# STEP 5 - OPTIONAL / INFORMATIONAL ONLY. This release is local-agent-only (see
-# docsource/winldap.md) - remote WinRM/JEA management is not supported, and there is currently no
-# Keyfactor.WinCert.LDAP.psrc JEA role-capability file to configure an endpoint with. This step is
-# left here only for future reference if remote/JEA support is reconsidered later: it would need to
-# confirm that a JEA virtual account's ACLs permit writes to the NTDS registry hive, e.g.
+# STEP 5 - THE CRUX QUESTION FOR REMOTE/JEA: does a JEA virtual account or gMSA actually have
+# write access to the NTDS registry hive? This has NOT been lab-validated as of this writing (see
+# docs/winldap-implementation-notes.md) - run this from a SEPARATE machine (not this DC) once you
+# have registered a JEA endpoint on this DC per docsource/content.md's setup steps, with
+# Keyfactor.WinCert.LDAP installed alongside Keyfactor.WinCert.Common under
+# C:\Program Files\WindowsPowerShell\Modules\ and Keyfactor.WinCert.LDAP added to the endpoint's
+# RoleDefinitions.
 #
-#   $session = New-PSSession -ComputerName <this-dc> -ConfigurationName <some-future-jea-endpoint>
-#   Invoke-Command -Session $session -ScriptBlock {
-#       Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates"
-#   }
-#
-# For this release, just confirm you're running as the same account the Universal Orchestrator's
-# Windows service runs as (not just an interactive Administrator session), since that's the account
-# that needs write access to this registry hive in local-agent mode.
+# Replace <this-dc> and <your-jea-endpoint-name> below, then run interactively.
 # ============================================================================
-Write-Host "`n=== STEP 5: not required for this release (local-agent-only) - see script comments ===" -ForegroundColor Yellow
+Write-Host "`n=== STEP 5: validate JEA registry-write access (run from a separate machine) ===" -ForegroundColor Red
+<#
+$cred = Get-Credential   # account that is a member of the JEA endpoint's RoleDefinitions
+$jeaSession = New-PSSession -ComputerName '<this-dc>' -ConfigurationName '<your-jea-endpoint-name>' -Credential $cred
+
+# Confirm identity, group memberships, and JEA/WinRM health first.
+Invoke-Command -Session $jeaSession -ScriptBlock { Get-KeyfactorDiagnostics } -InformationAction Continue
+
+# THE ACTUAL TEST: attempt a real write to the NTDS registry hive through the JEA session, using
+# the same mechanism Set-NtdsServiceStoreCertificate.ps1 uses. If the run-as account's ACLs are
+# insufficient, this will fail here with an access-denied error - that's the answer to the open
+# question, not a bug in the script.
+Invoke-Command -Session $jeaSession -ScriptBlock {
+    param($Thumbprint, $Blob)
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates\$Thumbprint"
+    New-Item -Path $regPath -Force | Out-Null
+    Set-ItemProperty -Path $regPath -Name 'Blob' -Value $Blob -Type Binary
+    Write-Host "JEA session successfully wrote to $regPath"
+} -ArgumentList $testCert.Thumbprint.ToUpper(), $testCertBlob
+
+# Read it back through the session to confirm HasPrivateKey survives the round trip remotely too.
+Invoke-Command -Session $jeaSession -ScriptBlock {
+    param($Thumbprint)
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates\$Thumbprint"
+    $blob = (Get-ItemProperty -Path $regPath -Name 'Blob').Blob
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, [byte[]]$blob)
+    Write-Host "HasPrivateKey (read back through JEA session): $($cert.HasPrivateKey)"
+}
+
+# Also exercise the actual module functions through the session, not just raw registry access:
+Invoke-Command -Session $jeaSession -ScriptBlock { Get-KeyfactorLdapCertificates -StoreName 'NTDS\My' }
+
+Remove-PSSession $jeaSession
+#>
 
 # ============================================================================
 # STEP 6 - LDAPS listener pickup behavior. From a SEPARATE machine (not this DC), check what

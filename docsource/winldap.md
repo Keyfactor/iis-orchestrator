@@ -10,15 +10,18 @@ Writing into that registry-backed store uses only the built-in .NET certificate 
 
 ## Requirements
 
-**This release is local-agent-only.** The Universal Orchestrator must run as a local agent installed directly on the Domain Controller, using the `|LocalMachine` Client Machine naming convention (see [Client Machine Instructions](#note-regarding-client-machine)) - remote WinRM/JEA connections are not supported yet.
+WinLDAP supports both connection models used elsewhere in this extension:
 
-This is a narrower restriction than the technical design requires - each Domain Controller is managed independently with no fan-out to other nodes, so there is no WinRM double-hop concern the way there is for `WinAdfs`. The restriction instead reflects two things specific to Domain Controllers as Tier-0 assets:
+* **Local agent**, using the `|LocalMachine` Client Machine naming convention (see [Client Machine Instructions](#note-regarding-client-machine)) - the orchestrator runs directly on the Domain Controller and accesses the registry/certificate stores in-process.
+* **Remote WinRM** (optionally through a JEA endpoint), or **SSH** (when the orchestrator itself runs in a Linux container/host) - connecting to the Domain Controller from a centrally installed orchestrator, following the same `WinRM Protocol`/`WinRM Port`/`JEA Endpoint Name` configuration used by `WinSQL` and the other store types. See the **Just Enough Administration (JEA) Setup and Configuration** section in the main README for the general setup walkthrough; install the `Keyfactor.WinCert.LDAP` module (in addition to `Keyfactor.WinCert.Common`) on the Domain Controller to use JEA with WinLDAP.
 
-* Many hardened Active Directory environments disable inbound WinRM to DCs as a blanket policy, regardless of payload, so remote management may not be usable there anyway.
-* Whether a JEA virtual account's permissions are sufficient to write to `HKLM\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates` has not been validated on a real hardened DC. Rather than ship and support a remote/JEA path that may silently fail on that permission boundary, this release requires the orchestrator to run as a local agent - the same account the Universal Orchestrator service itself runs as, which needs write access to that registry hive.
+Each Domain Controller is managed independently with no fan-out to other nodes (unlike `WinAdfs`'s farm model), so there is no WinRM double-hop concern - every operation this store type performs touches only the one DC already connected to.
 
-Remote WinRM/JEA support may be added in a future release once that permission question has been validated in a lab environment. Until then, configuring a WinLDAP store with a remote Client Machine value is not supported.
+**Before relying on remote WinRM/JEA for WinLDAP in production, validate the following against your own environment** - these are Domain-Controller-specific considerations that don't apply to this extension's other store types:
+
+* Domain Controllers are Tier-0 assets, and many hardened Active Directory environments disable inbound WinRM to DCs as a blanket policy regardless of payload. Confirm with your AD/security team whether remote management is even permitted before configuring it.
+* Whether a JEA virtual account or gMSA has sufficient rights to write to `HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates` (the registry-backed store the LDAPS listener reads from) has not been lab-validated by Keyfactor as of this writing. Run `Get-KeyfactorDiagnostics` through the JEA session and perform a full Add/Remove round-trip against a disposable test certificate on a lab Domain Controller first (see `docs/winldap-ntds-validation.ps1` and `docs/winldap-module-validation.ps1` in the repository).
 
 ## Certificate Store Configuration
 
-When creating a Certificate Store for WinLDAP, the Store Path is fixed to `NTDS\My`, identifying the NTDS service certificate store rather than the ordinary Personal store. The Client Machine value must use the `<hostname>|LocalMachine` convention.
+When creating a Certificate Store for WinLDAP, the Store Path is fixed to `NTDS\My`, identifying the NTDS service certificate store rather than the ordinary Personal store. The Client Machine value is either the Domain Controller's hostname/IP (for remote WinRM/SSH) or `<hostname>|LocalMachine` (for a local agent).

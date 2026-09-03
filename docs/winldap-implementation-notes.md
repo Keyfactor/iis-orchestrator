@@ -21,12 +21,13 @@ new Keyfactor Universal Orchestrator store type, following the same architecture
 - **Each Domain Controller is its own independent certificate store** (like `WinCert`), not a farm
   fan-out model like `WinAdfs`'s `AdfsCertificateRotationManager` - every DC's LDAPS certificate has
   its own unique Subject/SAN.
-- **Local-agent (`|LocalMachine`) only for this release** - see "Resolved during lab validation"
-  below for why. This was originally designed to also support remote WinRM/JEA (WinLDAP has no
-  farm fan-out, unlike `WinAdfs`, so there's no double-hop concern in principle - the
-  implementation still never calls `ActiveDirectory`-module cmdlets or anything else that would
-  reach a second machine, keeping that door open), but was narrowed to local-only pending
-  lab-validation of JEA-account registry ACLs on a hardened DC.
+- **Both local-agent (`|LocalMachine`) and remote WinRM/JEA/SSH are supported**, following the same
+  unconditional pattern as `WinSQL` (see "Reversed on 2026-09-03" below) - WinLDAP has no farm
+  fan-out, unlike `WinAdfs`, so there's no double-hop concern in principle, and the implementation
+  never calls `ActiveDirectory`-module cmdlets or anything else that would reach a second machine.
+  This was briefly narrowed to local-only pending lab-validation of JEA-account registry ACLs on a
+  hardened DC, then reversed at the requester's direction after discussion with stakeholders - that
+  ACL question remains genuinely unverified and is tracked in "Remaining unverified assumptions."
 - **Inventory and Remove are scoped strictly to the NTDS service store** (the single source of
   truth), not a two-location model. The Personal-store copy created during Add is treated as an
   internal staging detail, surfaced only as a diagnostic warning on mismatch, never as inventory data.
@@ -54,8 +55,10 @@ condensed, durable version of that reasoning.
   - `Private/Get-NtdsServiceStoreCertificate.ps1`, `Set-NtdsServiceStoreCertificate.ps1`,
     `Remove-NtdsServiceStoreCertificate.ps1`, `Test-LdapsCertificateEligibility.ps1` - the NTDS-store
     read/write/delete functions operate directly on the registry (see "Resolved during lab
-    validation" below); no certutil.exe dependency and no RoleCapabilities/.psrc file, since this
-    release is local-agent-only.
+    validation" below); no certutil.exe dependency.
+  - `RoleCapabilities/Keyfactor.WinCert.LDAP.psrc` - JEA role capability, mirroring
+    `Keyfactor.WinCert.SQL.psrc` (no `VisibleExternalCommands` needed, since the registry/`.NET`
+    mechanism uses no external processes).
   - `Keyfactor.WinCert.LDAP.psm1` - module loader/exports
 - `docsource/winldap.md` - short store-type overview (stitched into the generated `README.md`)
 - `docs/winldap-implementation-notes.md` (this file) and `docs/winldap-ntds-validation.ps1`
@@ -150,6 +153,42 @@ prompted a scope change, discussed and agreed with the requester:
    The `RoleCapabilities/Keyfactor.WinCert.LDAP.psrc` JEA role-capability file was deleted as a
    result - it documented the now-dead certutil mechanism and an out-of-scope JEA path.
 
+## Reversed on 2026-09-03
+
+After discussing with peers, the requester asked to restore remote WinRM/JEA/SSH support, following
+the exact pattern already used by `WinSQL` and the other store types (including the Linux-container-
+via-SSH connection model). This reverses point 5 above. **It does not resolve the underlying
+registry-ACL question** - that risk is still unverified and is restored to "Remaining unverified
+assumptions" below rather than being dropped.
+
+What changed to restore this:
+- Removed the `IsLocalMachine` fail-fast guards from `Management.cs`/`Inventory.cs` - confirmed by
+  reading `WinSQL`'s equivalent files that they have **no** such guard; they construct `PSHelper`
+  with whatever protocol/JEA settings came from job properties and proceed unconditionally, so
+  WinLDAP now matches that precedent exactly.
+- Re-created `RoleCapabilities/Keyfactor.WinCert.LDAP.psrc`, mirroring `Keyfactor.WinCert.SQL.psrc`
+  (`ModulesToImport`, `VisibleFunctions`, the shared generic `VisibleCmdlets` list). Its
+  `VisibleExternalCommands` is empty, unlike SQL's (which needs `icacls.exe`) - WinLDAP's NTDS
+  mechanism is pure registry + `X509Certificate2`, no external processes.
+- Confirmed `IISU/PSHelper.cs` already generically supports local/WinRM/SSH/JEA for any store type
+  (`ClientMachineName` setter for locality detection, the local+JEA ambiguity guard, the SSH-vs-WinRM
+  branch in `InitializeRemoteSession()`, and the hard JEA-over-SSH rejection) - **no changes needed**
+  to `PSHelper.cs`, `JobProperties.cs`, or `integration-manifest.json`; WinLDAP's manifest entry
+  already declared the same `WinRM Protocol`/`Port`/`JEAEndpointName` properties as `WinSQL`.
+- Updated the shared `docsource/content.md` (the generic JEA setup/troubleshooting doc stitched into
+  the generated README for every store type - not `docsource/wincert.md`, which is a short,
+  unrelated cert-verification doc) to add WinLDAP to the module table, the RoleCapabilities
+  combination table, the JEA Module Requirements table, and the Security/Permission Considerations
+  registry-permission list, plus a new "Important Notes and Limitations" bullet flagging the
+  DC/Tier-0-specific caveat (blanket WinRM-disable policies, the unverified JEA-account ACL question)
+  and recommending `Get-KeyfactorDiagnostics` + a real Add/Remove round-trip before production use.
+- Updated `IISU/PowerShell/Build/KeyfactorWinCert.pssc`'s comments (not its active `RoleDefinitions`)
+  to list `Keyfactor.WinCert.LDAP` as an available capability and example combination - left the
+  active default example (Common+IIS+SQL) unchanged, since WinLDAP is DC-specific and most `.pssc`
+  deployments target non-DC servers.
+- Restored `docsource/winldap.md`'s Requirements section to describe both connection models, with
+  the Tier-0 caveats framed as "validate before production" rather than a blanket prohibition.
+
 ## Remaining unverified assumptions - must be lab-validated
 
 1. Whether the LDAPS listener picks up a newly-written NTDS-store certificate immediately, only
@@ -162,13 +201,19 @@ prompted a scope change, discussed and agreed with the requester:
 4. Whether the eligibility validator's rules (`Test-LdapsCertificateEligibility.ps1`) - Server-Auth
    EKU tolerance when absent, forest-root-domain SAN as an alternative to the DC's own FQDN - match
    real AD DS selection behavior closely enough to avoid false rejections.
-5. **Deferred, not part of this release**: whether a JEA virtual account has sufficient ACLs to
-   write to the NTDS registry hive. Revisit only if remote WinRM/JEA support is reconsidered for a
-   future release.
+5. **Active again as of 2026-09-03** (see "Reversed on 2026-09-03" above): whether a JEA virtual
+   account or gMSA has sufficient ACLs to write to
+   `HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates`. This is the single
+   most important open item now that remote/JEA support has been restored - it has not been
+   lab-validated, and shipping WinLDAP's JEA support without validating it means a customer could
+   configure a JEA endpoint that silently fails on this specific permission boundary.
 
 ## Next step
 
 Run the rewritten `docs/winldap-ntds-validation.ps1` interactively, section by section, against a
 disposable test certificate on a lab Domain Controller. It walks through items 1-3 above directly;
-item 4 is called out in its comments for separate follow-up. Update this file with findings once
-that's done.
+item 4 is called out in its comments for separate follow-up. For item 5, stand up a real JEA
+endpoint per `docsource/content.md`'s setup steps (installing `Keyfactor.WinCert.LDAP` alongside
+`Keyfactor.WinCert.Common`), then run `Get-KeyfactorDiagnostics` through it and the JEA section of
+`docs/winldap-ntds-validation.ps1`/`docs/winldap-module-validation.ps1` to get a real answer. Update
+this file with findings once that's done.

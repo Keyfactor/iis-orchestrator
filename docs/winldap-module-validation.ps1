@@ -11,6 +11,11 @@ Add-KeyfactorLdapsCertificate, Get-KeyfactorLdapCertificates, Remove-KeyfactorLd
 including the eligibility check, PFX load, Personal-store staging, and the NTDS write/read/delete.
 This is the closest you can get to testing "the extension" without wiring it into Command.
 
+Steps 0-4 below test the LOCAL-AGENT path (functions running in-process on the DC). See the "JEA
+VARIANT" section after Step 4 for the equivalent remote-via-JEA test, which is the one that actually
+answers whether a JEA virtual account/gMSA has sufficient ACLs on the NTDS registry hive - see
+docs/winldap-implementation-notes.md, "Remaining unverified assumptions" #5.
+
 Prerequisites: run elevated (local Administrator, or whatever account the Universal Orchestrator's
 Windows service will run as) directly on the test DC.
 #>
@@ -79,6 +84,54 @@ Write-Host "`nTest certificate thumbprint for comparison: $($testCert.Thumbprint
 Write-Host "`n=== STEP 4: Remove-KeyfactorLdapsCertificate (run when ready) ===" -ForegroundColor Yellow
 Write-Host "  Remove-KeyfactorLdapsCertificate -Thumbprint '$($testCert.Thumbprint)' -StoreName 'NTDS\My'"
 # Remove-KeyfactorLdapsCertificate -Thumbprint $testCert.Thumbprint -StoreName 'NTDS\My'
+
+# ============================================================================
+# JEA VARIANT - repeat Steps 1-4 through a real JEA session instead of in-process, to test the
+# actual open question: does the JEA run-as account (virtual account or gMSA) have sufficient
+# ACLs to write to the NTDS registry hive? Run this from a SEPARATE machine (not this DC), once
+# you've registered a JEA endpoint here per docsource/content.md, with Keyfactor.WinCert.LDAP
+# installed alongside Keyfactor.WinCert.Common and added to the endpoint's RoleDefinitions.
+# ============================================================================
+<#
+$cred = Get-Credential   # account in the JEA endpoint's RoleDefinitions
+$jeaSession = New-PSSession -ComputerName '<this-dc>' -ConfigurationName '<your-jea-endpoint-name>' -Credential $cred
+
+# Confirm identity/group-membership/JEA health first - this is usually the fastest way to see why
+# a permission-related failure happened, if one does.
+Invoke-Command -Session $jeaSession -ScriptBlock { Get-KeyfactorDiagnostics } -InformationAction Continue
+
+# Re-run the same Add/Get/Remove sequence as Steps 1-4 above, but through the JEA session. Build a
+# fresh PFX first, since the earlier $base64Cert's certificate may already have been removed above.
+#
+# IMPORTANT: Test-LdapsCertificateEligibility.ps1 runs INSIDE the JEA session, i.e. on the target DC
+# ('<this-dc>'), and checks the certificate's Subject/SAN against THAT machine's own $env:COMPUTERNAME/
+# $env:USERDNSDOMAIN - not this script's local machine. Set $targetDcFqdn to the actual target DC's
+# FQDN below, or the Add call will fail eligibility with a FQDN-mismatch error that has nothing to do
+# with the JEA/ACL question you're actually testing.
+$targetDcFqdn = '<this-dc-fqdn>'   # e.g. 'dc01.contoso.com' - must match the DC behind $jeaSession
+$jeaTestCert = New-SelfSignedCertificate -Subject "CN=$targetDcFqdn" `
+    -DnsName @($targetDcFqdn) -KeyUsage KeyEncipherment, DigitalSignature `
+    -CertStoreLocation "Cert:\LocalMachine\My" -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.1") `
+    -KeyExportPolicy Exportable
+$jeaPfxPassword = 'Test1234!'
+$jeaBase64Cert = [System.Convert]::ToBase64String($jeaTestCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $jeaPfxPassword))
+Remove-Item "Cert:\LocalMachine\My\$($jeaTestCert.Thumbprint)" -Force
+
+Invoke-Command -Session $jeaSession -ScriptBlock {
+    param($Base64Cert, $Password)
+    Add-KeyfactorLdapsCertificate -Base64Cert $Base64Cert -PrivateKeyPassword $Password -StoreName 'NTDS\My' -RestartService $false
+} -ArgumentList $jeaBase64Cert, $jeaPfxPassword
+
+Invoke-Command -Session $jeaSession -ScriptBlock { Get-KeyfactorLdapCertificates -StoreName 'NTDS\My' }
+
+Invoke-Command -Session $jeaSession -ScriptBlock {
+    param($Thumbprint)
+    Remove-KeyfactorLdapsCertificate -Thumbprint $Thumbprint -StoreName 'NTDS\My'
+} -ArgumentList $jeaTestCert.Thumbprint
+
+Remove-Item "Cert:\LocalMachine\My\$($jeaTestCert.Thumbprint)" -Force -ErrorAction SilentlyContinue
+Remove-PSSession $jeaSession
+#>
 
 # ============================================================================
 # CLEANUP - removes the Personal-store copy and the temp cert (Remove-KeyfactorLdapsCertificate
