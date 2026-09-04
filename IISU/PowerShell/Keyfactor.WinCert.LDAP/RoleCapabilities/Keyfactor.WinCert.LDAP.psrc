@@ -20,20 +20,21 @@
 #
 # DOUBLE-HOP NOTE (see docsource/winldap.md):
 #   Every VisibleFunctions entry below does all of its work using only local resources on the
-#   target Domain Controller (local registry via certutil, local X.509 APIs, local $env: variables).
-#   None of them call Active Directory-module cmdlets or anything else that would require this JEA
+#   target Domain Controller (local registry, local X.509 APIs, local $env: variables). None of
+#   them call Active Directory-module cmdlets or anything else that would require this JEA
 #   session's identity to authenticate outward to a second machine. This is a hard design
 #   requirement, not an incidental property - see Test-LdapsCertificateEligibility.ps1 for the most
 #   safety-critical instance of this rule.
 #
-# PERMISSIONS NOTE (UNVERIFIED - see docsource/winldap.md):
-#   It has not been confirmed whether a JEA virtual account with local-Administrator-equivalent
-#   rights (this repo's existing JEA model) is sufficient to write to
+# PERMISSIONS NOTE (UNVERIFIED - see docsource/winldap.md and docs/winldap-implementation-notes.md):
+#   It has not been confirmed whether a JEA virtual account (or gMSA) with local-Administrator-
+#   equivalent rights is sufficient to write to
 #   HKLM\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates. This must be validated on
-#   a lab Domain Controller before this JEA configuration is relied upon in production.
+#   a lab Domain Controller before this JEA configuration is relied upon in production - run
+#   Get-KeyfactorDiagnostics and a full Add/Remove round-trip through the JEA session first.
 #
 @{
-    GUID        = 'f3a1c8e5-6b2d-4f9a-9c3e-7d5b1a8e4c2f'
+    GUID        = '22b59d48-ce9e-40e7-b9ea-23f4b396fcbc'
     Author      = 'Keyfactor'
     Description = 'Role capabilities for Keyfactor Windows Certificate Store AD DS (NTDS) LDAPS operations (inventory, add, remove)'
 
@@ -63,9 +64,9 @@
         'Write-Information'
     )
 
-    # certutil.exe is invoked via .NET ProcessStartInfo (Invoke-CertUtilNtdsStore.ps1), matching the
-    # existing Add-KeyfactorCertificate.ps1 pattern in Keyfactor.WinCert.Common, and therefore does
-    # NOT need to be listed here.
+    # No external commands needed - the NTDS service store is read/written/deleted directly via
+    # the registry and System.Security.Cryptography.X509Certificates.X509Certificate2, not
+    # certutil.exe or any other external process.
     VisibleExternalCommands = @()
 
     # No variables need to be pre-defined for the orchestrator.

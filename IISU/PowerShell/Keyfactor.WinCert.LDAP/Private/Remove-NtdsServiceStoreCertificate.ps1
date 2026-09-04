@@ -13,10 +13,10 @@ function Remove-NtdsServiceStoreCertificate {
     documented trade-off (see docsource/winldap.md), symmetric with Get-KeyfactorLdapCertificates
     only reading from the service store.
 
-    IMPORTANT OPERATIONAL RISK (see docsource/winldap.md validation checklist): removing the
-    certificate the LDAPS listener is currently using may cause LDAPS (port 636) to stop responding,
-    fall back to another eligible certificate, or require a service restart to notice the removal -
-    this has not been verified against a live DC and should be treated as high-risk until it has.
+    IMPORTANT OPERATIONAL RISK (see docsource/winldap.md): removing the certificate the LDAPS
+    listener is currently using may cause LDAPS (port 636) to stop responding, fall back to another
+    eligible certificate, or require a service restart to notice the removal - this has not been
+    verified against a live DC and should be treated as high-risk until it has.
     #>
     [CmdletBinding()]
     param (
@@ -30,23 +30,28 @@ function Remove-NtdsServiceStoreCertificate {
         [string]$Thumbprint
     )
 
-    $cleanThumbprint = $Thumbprint -replace '[^a-fA-F0-9]', ''
+    $cleanThumbprint = ($Thumbprint -replace '[^a-fA-F0-9]', '').ToUpper()
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\$ServiceName\SystemCertificates\$StoreName\Certificates\$cleanThumbprint"
+
+    try {
+        if (-not (Test-Path $regPath)) {
+            return [PSCustomObject]@{
+                Success      = $false
+                ErrorMessage = "Certificate '$cleanThumbprint' was not found in the '$ServiceName\$StoreName' service store."
+            }
+        }
 
     $result = Invoke-CertUtilNtdsStore -Arguments @('-service', '-delstore', "$ServiceName\$StoreName", $cleanThumbprint)
 
-    if (-not $result.Started) {
         return [PSCustomObject]@{
-            Success  = $false
-            ExitCode = -1
-            StdOut   = ""
-            StdErr   = $result.StdErr
+            Success      = $true
+            ErrorMessage = ""
         }
     }
-
-    return [PSCustomObject]@{
-        Success  = ($result.ExitCode -eq 0)
-        ExitCode = $result.ExitCode
-        StdOut   = $result.StdOut
-        StdErr   = $result.StdErr
+    catch {
+        return [PSCustomObject]@{
+            Success      = $false
+            ErrorMessage = "Failed to remove certificate '$cleanThumbprint' from the '$ServiceName\$StoreName' registry store: $($_.Exception.Message)"
+        }
     }
 }

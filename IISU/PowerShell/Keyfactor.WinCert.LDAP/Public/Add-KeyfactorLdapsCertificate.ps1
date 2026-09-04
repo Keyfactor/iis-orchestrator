@@ -5,6 +5,7 @@
 # 700   Error    LoadPfx          PFX payload could not be decoded or password was incorrect
 # 701   Error    Eligibility      Certificate failed the LDAPS eligibility check (Test-LdapsCertificateEligibility)
 # 702   Error    StagePersonal    Staging into the Personal (My) store failed - see Details.StageResult for the underlying Add-KeyfactorCertificate result
+# 704   Error    RereadPersonal   Could not re-read the just-staged certificate back from Cert:\LocalMachine\My
 # 703   Error    WriteNtdsStore   Writing the certificate into the NTDS service store failed
 # 710   Error    InvalidStoreName StoreName was not in '<ServiceName>\<StoreName>' form
 # 799   Error    CatchAll         Unexpected/unhandled exception
@@ -30,11 +31,10 @@ function Add-KeyfactorLdapsCertificate {
          as a warning, not a failure, since the certificate was already successfully deployed to both
          stores at that point.
 
-    UNVERIFIED items (see docsource/winldap.md validation checklist) - do not treat this function's
-    current behavior as final until lab-validated: the exact certutil service-store syntax (see
-    Invoke-CertUtilNtdsStore.ps1), whether the ACLs on the NTDS registry hive actually permit writes
-    from a JEA virtual account with local-Administrator-equivalent rights, and whether the LDAPS
-    listener actually picks up the new certificate without a restart.
+    This release is local-agent-only (see docsource/winldap.md) - the ACLs on the NTDS registry
+    hive have not been validated for a remote/JEA identity, and whether the LDAPS listener picks up
+    the new certificate without a restart has not been lab-validated either. Treat this function's
+    current behavior as pre-production until that validation is complete.
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -115,21 +115,34 @@ function Add-KeyfactorLdapsCertificate {
                 -Details @{ Thumbprint = $thumbprint; StageResult = $stageResult }
         }
 
+        # --- Step: RereadPersonal ---------------------------------------------
+        # An X509Certificate2 object constructed directly from PFX bytes (like $cert above) does NOT
+        # reliably carry its CERT_KEY_PROV_INFO_PROP_ID property when exported, even when loaded with
+        # PersistKeySet/MachineKeySet - verified empirically: only a certificate object obtained by
+        # reading it back FROM an actual certificate store (e.g. via the Cert: provider) carries that
+        # property, which is what lets the NTDS-store copy resolve HasPrivateKey. So the certificate
+        # used for the NTDS write below must be re-read from Cert:\LocalMachine\My after staging, not
+        # the original in-memory $cert.
+        try {
+            $stagedCert = Get-Item "Cert:\LocalMachine\My\$thumbprint" -ErrorAction Stop
+        }
+        catch {
+            $msg = "Certificate '$thumbprint' was staged into Cert:\LocalMachine\My but could not be re-read back from it: $($_.Exception.Message)"
+            Write-Error $msg
+            return New-KeyfactorResult -Status Error -Code 704 -Step RereadPersonal `
+                -ErrorMessage $msg `
+                -Details @{ Thumbprint = $thumbprint }
+        }
+
         # --- Step: WriteNtdsStore ---------------------------------------------
         Write-Information "Writing certificate '$thumbprint' into the '$serviceName\$leafStoreName' service store"
-        $writeResult = Set-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName $leafStoreName -RawCertificateBytes $cert.RawData
+        $writeResult = Set-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName $leafStoreName -Certificate $stagedCert
 
         if (-not $writeResult.Success) {
-            $msg = "certutil exited with code $($writeResult.ExitCode) while writing certificate '$thumbprint' into the '$serviceName\$leafStoreName' service store. StdErr: $($writeResult.StdErr) StdOut: $($writeResult.StdOut)"
-            Write-Error $msg
+            Write-Error $writeResult.ErrorMessage
             return New-KeyfactorResult -Status Error -Code 703 -Step WriteNtdsStore `
-                -ErrorMessage $msg `
-                -Details @{
-                    Thumbprint = $thumbprint
-                    ExitCode   = $writeResult.ExitCode
-                    StdOut     = $writeResult.StdOut
-                    StdErr     = $writeResult.StdErr
-                }
+                -ErrorMessage $writeResult.ErrorMessage `
+                -Details @{ Thumbprint = $thumbprint }
         }
 
         # --- Step: RestartService (optional, non-fatal) -----------------------
@@ -152,7 +165,7 @@ function Add-KeyfactorLdapsCertificate {
         Write-Information "The thumbprint '$thumbprint' was added to the '$serviceName\$leafStoreName' service store."
 
         return New-KeyfactorResult -Status Success -Code 0 -Step ImportNtdsStore `
-            -Message (if ($restartWarning) { $restartWarning } else { "Certificate '$thumbprint' added to the '$serviceName\$leafStoreName' service store." }) `
+            -Message $(if ($restartWarning) { $restartWarning } else { "Certificate '$thumbprint' added to the '$serviceName\$leafStoreName' service store." }) `
             -Details @{ Thumbprint = $thumbprint }
     }
     catch {

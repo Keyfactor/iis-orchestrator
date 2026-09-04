@@ -2,9 +2,17 @@
 WinLDAP / NTDS service store — lab validation script.
 
 Run this INTERACTIVELY, step by step (not as a single unattended script), on a disposable/test
-Domain Controller only. It exercises the exact certutil syntax and store-write behavior the
-Keyfactor.WinCert.LDAP PowerShell module assumes, WITHOUT going through the orchestrator, so you can
-confirm or correct the assumptions documented in that module before trusting it.
+Domain Controller only. It exercises the exact registry read/write/delete mechanism the
+Keyfactor.WinCert.LDAP PowerShell module uses (see Set/Get/Remove-NtdsServiceStoreCertificate.ps1),
+WITHOUT going through the orchestrator, so you can confirm the remaining unverified assumptions
+before trusting it.
+
+certutil.exe is NOT used here - an earlier version of this script tried
+`certutil -addstore -service NTDS My`, which fails with ERROR_INVALID_PARAMETER because certutil's
+-addstore/-delstore verbs never supported -service in the first place (confirmed via
+`certutil -addstore -?`/`-delstore -?`; only the read-only -store verb documents it). The NTDS\My
+store is registry-backed, and this script now writes/reads/deletes that registry data directly,
+matching what the module does.
 
 See docs/winldap-implementation-notes.md for the full list of assumptions this is validating and
 why each one matters.
@@ -13,8 +21,11 @@ It intentionally does NOT delete anything by default - each step tells you what 
 run the "cleanup" section at the end once you're done, and only against a test certificate you
 created for this purpose.
 
-Prerequisites: run elevated (local Administrator) directly on the test DC, either interactively or
-via a real remote WinRM/JEA session if that's the connectivity model you want to validate.
+Prerequisites: run elevated (local Administrator) directly on the test DC for Steps 0-4 and 6-8.
+Step 5 covers remote WinRM/JEA, which WinLDAP now supports (see docsource/winldap.md) - the single
+most important open question for that path is whether a JEA virtual account/gMSA actually has
+write access to the NTDS registry hive, which Step 5 tests directly. Run it before relying on JEA
+for WinLDAP in production.
 #>
 
 # ============================================================================
@@ -39,63 +50,105 @@ $certPath = Join-Path $env:TEMP "winldap-test.cer"
 Write-Host "Exported public cert bytes to: $certPath" -ForegroundColor Cyan
 
 # ============================================================================
-# STEP 1 - Confirm the NTDS service store is even reachable via certutil -store -service.
-# Keyfactor.WinCert.LDAP\Private\Get-NtdsServiceStoreCertificate.ps1 assumes this exact syntax.
-# Note whatever the store currently contains BEFORE you add anything.
+# STEP 1 - Confirm the NTDS service store registry path is reachable, and note whatever it
+# currently contains BEFORE you add anything.
+# Keyfactor.WinCert.LDAP\Private\Get-NtdsServiceStoreCertificate.ps1 reads exactly this path.
 # ============================================================================
+$ntdsMyCertsPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates"
+
 Write-Host "`n=== STEP 1: enumerate the current NTDS\My service store ===" -ForegroundColor Yellow
-certutil -store -service NTDS My
+Get-ChildItem $ntdsMyCertsPath -ErrorAction SilentlyContinue | ForEach-Object {
+    $blob = (Get-ItemProperty -Path $_.PSPath -Name 'Blob' -ErrorAction SilentlyContinue).Blob
+    if ($blob) {
+        $existing = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, [byte[]]$blob)
+        Write-Host "  $($_.PSChildName)  Subject=$($existing.Subject)  HasPrivateKey=$($existing.HasPrivateKey)"
+    }
+}
 
 # ============================================================================
-# STEP 2 - Confirm the -addstore -service syntax actually writes the test cert.
-# Keyfactor.WinCert.LDAP\Private\Set-NtdsServiceStoreCertificate.ps1 assumes this exact syntax.
+# STEP 2 - Confirm the registry write mechanism actually writes the test cert.
+# Keyfactor.WinCert.LDAP\Private\Set-NtdsServiceStoreCertificate.ps1 does exactly this: export the
+# certificate as a SerializedCert blob and write it as the "Blob" value under a subkey named by the
+# certificate's uppercase SHA1 thumbprint.
 # ============================================================================
 Write-Host "`n=== STEP 2: add the test cert to the NTDS\My service store ===" -ForegroundColor Yellow
-certutil -f -addstore -service NTDS My $certPath
-Write-Host "`nExit code: $LASTEXITCODE (0 = success expected)" -ForegroundColor Yellow
+$testCertRegPath = Join-Path $ntdsMyCertsPath $testCert.Thumbprint.ToUpper()
+$testCertBlob = $testCert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::SerializedCert)
+
+New-Item -Path $testCertRegPath -Force | Out-Null
+Set-ItemProperty -Path $testCertRegPath -Name 'Blob' -Value $testCertBlob -Type Binary
+Write-Host "Wrote $($testCertBlob.Length) bytes to $testCertRegPath\Blob" -ForegroundColor Yellow
 
 Write-Host "`n=== STEP 2b: re-enumerate to confirm it's there ===" -ForegroundColor Yellow
-certutil -store -service NTDS My
+Get-ChildItem $ntdsMyCertsPath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty PSChildName
 
 # ============================================================================
 # STEP 3 - THE MOST IMPORTANT CHECK: does the NTDS-store copy resolve HasPrivateKey = true?
-# Add-KeyfactorLdapsCertificate assumes Windows resolves the private-key association via
+# Set-NtdsServiceStoreCertificate assumes Windows resolves the private-key association via
 # CAPI/CNG machine-key-container matching, independent of which logical store lists the cert -
-# i.e. it does NOT re-import the PFX into the service store, only the public certificate. If this
-# assumption is wrong, HasPrivateKey below will show False and the design needs to change to
-# import a PFX (not just a .cer) into the service store instead.
+# i.e. it does NOT re-import the PFX into the service store, only a SerializedCert export
+# (which carries a reference to the key container, not the key material itself). If this
+# assumption is wrong, HasPrivateKey below will show False and the design needs to change.
 # ============================================================================
 Write-Host "`n=== STEP 3: confirm private key association in the service store (CRITICAL) ===" -ForegroundColor Red
-certutil -store -service NTDS My $testCert.Thumbprint
-
-# Look for a line indicating the private key / key container in the output above.
-# Also check via the raw registry to see what's actually stored:
-Write-Host "`nRaw registry check:" -ForegroundColor Red
-Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates" -ErrorAction SilentlyContinue
+$readBackBlob = (Get-ItemProperty -Path $testCertRegPath -Name 'Blob').Blob
+$readBackCert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, [byte[]]$readBackBlob)
+Write-Host "Thumbprint:    $($readBackCert.Thumbprint)" -ForegroundColor Red
+Write-Host "HasPrivateKey: $($readBackCert.HasPrivateKey)" -ForegroundColor Red
 
 # ============================================================================
-# STEP 4 - Confirm removal syntax.
-# Keyfactor.WinCert.LDAP\Private\Remove-NtdsServiceStoreCertificate.ps1 assumes this exact syntax.
+# STEP 4 - Confirm removal.
+# Keyfactor.WinCert.LDAP\Private\Remove-NtdsServiceStoreCertificate.ps1 does exactly this: delete
+# the thumbprint subkey.
 # Do NOT run this yet if you want to continue to Steps 5-7 first (removal is the last thing to test).
 # ============================================================================
-Write-Host "`n=== STEP 4: (holding off - see bottom of script for the delstore command) ===" -ForegroundColor Yellow
+Write-Host "`n=== STEP 4: (holding off - see bottom of script for the Remove-Item command) ===" -ForegroundColor Yellow
 
 # ============================================================================
-# STEP 5 - Permissions check: was Step 2 run as local Administrator, or as a lower-privileged
-# JEA virtual account? If you have a JEA endpoint configured (per Keyfactor.WinCert.LDAP.psrc),
-# repeat Steps 1-3 by invoking through that JEA session instead of an interactive elevated prompt,
-# to confirm the JEA identity actually has write access to this registry hive. Example:
+# STEP 5 - THE CRUX QUESTION FOR REMOTE/JEA: does a JEA virtual account or gMSA actually have
+# write access to the NTDS registry hive? This has NOT been lab-validated as of this writing (see
+# docs/winldap-implementation-notes.md) - run this from a SEPARATE machine (not this DC) once you
+# have registered a JEA endpoint on this DC per docsource/content.md's setup steps, with
+# Keyfactor.WinCert.LDAP installed alongside Keyfactor.WinCert.Common under
+# C:\Program Files\WindowsPowerShell\Modules\ and Keyfactor.WinCert.LDAP added to the endpoint's
+# RoleDefinitions.
 #
-#   $session = New-PSSession -ComputerName <this-dc> -ConfigurationName <your-jea-endpoint-name>
-#   Invoke-Command -Session $session -ScriptBlock {
-#       certutil -store -service NTDS My
-#   }
-#
-# If this fails with access-denied while the elevated/local-Administrator run above succeeded,
-# that confirms the JEA-remote design needs a different RunAs identity or an explicit ACL grant on
-# the registry hive before it can be relied upon.
+# Replace <this-dc> and <your-jea-endpoint-name> below, then run interactively.
 # ============================================================================
-Write-Host "`n=== STEP 5: see script comments - repeat via a real JEA session to check permissions ===" -ForegroundColor Yellow
+Write-Host "`n=== STEP 5: validate JEA registry-write access (run from a separate machine) ===" -ForegroundColor Red
+<#
+$cred = Get-Credential   # account that is a member of the JEA endpoint's RoleDefinitions
+$jeaSession = New-PSSession -ComputerName '<this-dc>' -ConfigurationName '<your-jea-endpoint-name>' -Credential $cred
+
+# Confirm identity, group memberships, and JEA/WinRM health first.
+Invoke-Command -Session $jeaSession -ScriptBlock { Get-KeyfactorDiagnostics } -InformationAction Continue
+
+# THE ACTUAL TEST: attempt a real write to the NTDS registry hive through the JEA session, using
+# the same mechanism Set-NtdsServiceStoreCertificate.ps1 uses. If the run-as account's ACLs are
+# insufficient, this will fail here with an access-denied error - that's the answer to the open
+# question, not a bug in the script.
+Invoke-Command -Session $jeaSession -ScriptBlock {
+    param($Thumbprint, $Blob)
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates\$Thumbprint"
+    New-Item -Path $regPath -Force | Out-Null
+    Set-ItemProperty -Path $regPath -Name 'Blob' -Value $Blob -Type Binary
+    Write-Host "JEA session successfully wrote to $regPath"
+} -ArgumentList $testCert.Thumbprint.ToUpper(), $testCertBlob
+
+# Read it back through the session to confirm HasPrivateKey survives the round trip remotely too.
+Invoke-Command -Session $jeaSession -ScriptBlock {
+    param($Thumbprint)
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates\$Thumbprint"
+    $blob = (Get-ItemProperty -Path $regPath -Name 'Blob').Blob
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, [byte[]]$blob)
+    Write-Host "HasPrivateKey (read back through JEA session): $($cert.HasPrivateKey)"
+}
+
+# Also exercise the actual module functions through the session, not just raw registry access:
+Invoke-Command -Session $jeaSession -ScriptBlock { Get-KeyfactorLdapCertificates -StoreName 'NTDS\My' }
+
+Remove-PSSession $jeaSession
+#>
 
 # ============================================================================
 # STEP 6 - LDAPS listener pickup behavior. From a SEPARATE machine (not this DC), check what
@@ -126,7 +179,7 @@ Write-Host "`n=== STEP 7: (manual) Restart-Service -Name NTDS -Force -- only run
 # until a restart? Only do this on a test DC where an LDAPS outage is acceptable.
 # ============================================================================
 Write-Host "`n=== STEP 8: (manual, only when ready) remove the active cert and observe port 636 ===" -ForegroundColor Red
-# certutil -delstore -service NTDS My $($testCert.Thumbprint)
+# Remove-Item -Path (Join-Path $ntdsMyCertsPath $testCert.Thumbprint.ToUpper()) -Force -Recurse
 
 # ============================================================================
 # CLEANUP - run this once you're done, to remove all traces of the test certificate.
@@ -135,7 +188,8 @@ function Remove-WinLdapTestArtifacts {
     param($Thumbprint, $CerPath)
 
     Write-Host "`n=== CLEANUP ===" -ForegroundColor Green
-    certutil -delstore -service NTDS My $Thumbprint 2>$null
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates\$($Thumbprint.ToUpper())"
+    Remove-Item -Path $regPath -Force -Recurse -ErrorAction SilentlyContinue
     Remove-Item "Cert:\LocalMachine\My\$Thumbprint" -Force -ErrorAction SilentlyContinue
     Remove-Item $CerPath -Force -ErrorAction SilentlyContinue
     Write-Host "Removed test certificate ($Thumbprint) from NTDS\My, LocalMachine\My, and deleted the temp .cer file." -ForegroundColor Green

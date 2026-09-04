@@ -37,6 +37,7 @@ The Windows Certificate Orchestrator Extension is a multi-purpose integration th
 * WinCert - Certificates defined by path set for the Certificate Store
 * WinIIS - IIS Bound certificates
 * WinSQL - Certificates that are bound to the specified SQL Instances
+* WinLDAP - Manages the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller
 
 By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
 For a complete list of local machine cert stores you can execute the PowerShell command:
@@ -173,13 +174,14 @@ Before configuring JEA on a target server, ensure the following:
 
 ### Keyfactor PowerShell Module Overview
 
-The WinCert extension ships three PowerShell modules. Each module contains a `RoleCapabilities` subfolder with a `.psrc` file that defines which functions are visible in a JEA session.
+The WinCert extension ships four PowerShell modules. Each module contains a `RoleCapabilities` subfolder with a `.psrc` file that defines which functions are visible in a JEA session.
 
 | Module | Store Types Supported | Purpose |
 |---|---|---|
-| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
+| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL, WinLDAP | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
 | `Keyfactor.WinCert.IIS` | WinIIS | IIS site binding management (get, create, remove bindings). |
 | `Keyfactor.WinCert.SQL` | WinSQL | SQL Server certificate binding management (get, bind, unbind). |
+| `Keyfactor.WinCert.LDAP` | WinLDAP | AD DS (NTDS) LDAPS certificate management on a Domain Controller (get, add, remove). Only install on Domain Controllers. |
 
 Install only the modules needed for the store types you manage on that server. For example, a server that only hosts IIS certificates needs `Keyfactor.WinCert.Common` and `Keyfactor.WinCert.IIS`.
 
@@ -196,6 +198,7 @@ PowerShell\
   Keyfactor.WinCert.Common\       ← Module: common certificate operations
   Keyfactor.WinCert.IIS\          ← Module: IIS binding management
   Keyfactor.WinCert.SQL\          ← Module: SQL Server binding management
+  Keyfactor.WinCert.LDAP\         ← Module: AD DS (NTDS) LDAPS certificate management
   Build\
     KeyfactorWinCert.pssc          ← JEA Session Configuration file
 ```
@@ -228,6 +231,11 @@ Copy-Item -Path "$sourcePath\Keyfactor.WinCert.IIS" `
 # Install the SQL module if this server hosts SQL Server certificate stores (WinSQL)
 Copy-Item -Path "$sourcePath\Keyfactor.WinCert.SQL" `
           -Destination "$moduleBase\Keyfactor.WinCert.SQL" `
+          -Recurse -Force
+
+# Install the LDAP module ONLY on Domain Controllers hosting the LDAPS certificate (WinLDAP)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.LDAP" `
+          -Destination "$moduleBase\Keyfactor.WinCert.LDAP" `
           -Recurse -Force
 ```
 
@@ -330,6 +338,7 @@ Only list the `RoleCapabilities` whose corresponding modules are installed on th
 | WinIIS only or WinCert + WinIIS | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS'` |
 | WinSQL only or WinCert + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL'` |
 | WinCert + WinIIS + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL'` |
+| WinLDAP only (on a Domain Controller) | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.LDAP'` |
 
 **Transcript Logging (Optional):**
 
@@ -566,6 +575,7 @@ Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' |
 * **Module updates require re-copying files, not re-registration.** When the WinCert extension is upgraded, copy the updated module folders to the target server's `C:\Program Files\WindowsPowerShell\Modules\` directory. WinRM does not need to be restarted for module-only updates.
 * **The JEA run-as account needs certificate store permissions.** Whether using a virtual account or a gMSA, the run-as account must have permission to read and write to the Windows certificate stores, access private keys, and (for IIS) manage IIS bindings. Virtual accounts are local administrators by default, so this is typically not a concern in development. For production gMSA accounts, explicitly grant the necessary permissions.
 * **ADFS stores (WinADFS) do not support JEA.** The WinADFS store type requires specific ADFS module cmdlets that cannot be constrained within a JEA session. WinADFS stores must use a standard WinRM connection.
+* **WinLDAP targets Domain Controllers, which are Tier-0 assets.** Many hardened Active Directory environments block inbound WinRM to DCs by policy regardless of payload - confirm with your AD/security team before assuming remote WinRM/JEA is even permitted. Separately, whether a JEA virtual account or gMSA has sufficient rights to write to `HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates` (the registry-backed store the LDAPS listener reads from) has not been lab-validated by Keyfactor as of this writing. Before relying on JEA for WinLDAP in production, run `Get-KeyfactorDiagnostics` through the JEA session and perform a full Add/Remove round-trip against a disposable test certificate on a lab Domain Controller to confirm the run-as account's permissions are sufficient.
 
 </details>
 
@@ -583,6 +593,7 @@ In addition to PowerShell, IISU requires additional PowerShell modules to be ins
 | `Keyfactor.WinCert.Common` | All store types — must always be installed |
 | `Keyfactor.WinCert.IIS` | WinIIS stores |
 | `Keyfactor.WinCert.SQL` | WinSQL stores |
+| `Keyfactor.WinCert.LDAP` | WinLDAP stores (Domain Controllers only) |
 
 In standard (non-JEA) WinRM and local-machine modes, the orchestrator automatically loads these modules from its own deployment at runtime — no pre-installation on the target server is required. JEA mode is the only mode that requires the modules to be pre-installed on the target server. See the **Just Enough Administration (JEA) Setup and Configuration** section for complete installation and setup instructions.
 
@@ -607,6 +618,7 @@ For customers wishing to use something other than the local administrator accoun
     -    Execute certreq commands.    -	Execute certreq commands.    *	Execute certreq commands.
     -    Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    *	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
     -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    *	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
+    -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates) when performing WinLDAP (AD DS / NTDS LDAPS) certificate operations on a Domain Controller. This has not been lab-validated for a JEA virtual/gMSA account - see the WinLDAP-specific note under Important Notes and Limitations above.
 
 ### Using Crypto Service Providers (CSP)
 When adding or reenrolling certificates, you may specify an optional CSP to be used when generating and storing the private keys.  This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed.
@@ -1550,18 +1562,25 @@ the Keyfactor Command Portal
 
 WinLDAP is a store type designed for managing the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller. It automates the certificate renewal workflow administrators traditionally perform by hand: importing the new certificate into the Domain Controller's Personal ("My") certificate store, then registering it into the NTDS-service-specific certificate store (registry-backed at `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates`) that the LDAPS listener (port 636) reads from.
 
+Writing into that registry-backed store uses only the built-in .NET certificate APIs and ordinary registry access already available on every Domain Controller - no `certutil.exe` calls, and no new executables or DLLs are installed on the DC to do it.
+
 * NOTE: Each Domain Controller is managed as its own independent Certificate Store, since every DC's LDAPS certificate has a unique Subject/SAN matching that DC's own FQDN. WinLDAP does not fan a single certificate out to multiple DCs the way WinAdfs fans a shared certificate out to ADFS farm nodes.
 * NOTE: Inventory and Remove are scoped strictly to the NTDS service store, which is treated as the single source of truth. The Personal-store copy created during Add is an internal staging detail and is not separately visible in Inventory, nor removed by Remove.
-* NOTE: Several implementation details of this store type - the exact `certutil` syntax used to read/write the NTDS service store, the permissions required to write that registry hive, and how quickly the LDAPS listener picks up a new certificate - have not yet been validated against a live Domain Controller. Treat this store type as pre-production until that validation is complete.
+* NOTE: How quickly the LDAPS listener picks up a newly written certificate, and what happens on port 636 if the currently active certificate is removed, have not yet been validated against a live Domain Controller. Treat this store type as pre-production until that validation is complete.
 
 #### Windows LDAPS (NTDS) Certificate Requirements
 
-Unlike WinAdfs, WinLDAP does **not** require the Universal Orchestrator to run as a local agent installed directly on the Domain Controller. Because each Domain Controller is managed independently (no fan-out to other nodes), every operation this store type performs touches only the one machine it is already connected to - there is no second network hop, and therefore no WinRM double-hop concern. You may choose either:
+WinLDAP supports both connection models used elsewhere in this extension:
 
-* **Local agent**, using the `|LocalMachine` Client Machine naming convention (see [Client Machine Instructions](#note-regarding-client-machine)), or
-* **Remote WinRM**, connecting to the Domain Controller from a centrally installed orchestrator, optionally through a JEA endpoint.
+* **Local agent**, using the `|LocalMachine` Client Machine naming convention (see [Client Machine Instructions](#note-regarding-client-machine)) - the orchestrator runs directly on the Domain Controller and accesses the registry/certificate stores in-process.
+* **Remote WinRM** (optionally through a JEA endpoint), or **SSH** (when the orchestrator itself runs in a Linux container/host) - connecting to the Domain Controller from a centrally installed orchestrator, following the same `WinRM Protocol`/`WinRM Port`/`JEA Endpoint Name` configuration used by `WinSQL` and the other store types. See the **Just Enough Administration (JEA) Setup and Configuration** section in the main README for the general setup walkthrough; install the `Keyfactor.WinCert.LDAP` module (in addition to `Keyfactor.WinCert.Common`) on the Domain Controller to use JEA with WinLDAP.
 
-Domain Controllers are Tier-0 assets, and many hardened Active Directory environments disable inbound WinRM to DCs as a blanket policy regardless of payload. That is a customer security-posture decision to make independently of this store type's own technical support for remote management.
+Each Domain Controller is managed independently with no fan-out to other nodes (unlike `WinAdfs`'s farm model), so there is no WinRM double-hop concern - every operation this store type performs touches only the one DC already connected to.
+
+**Before relying on remote WinRM/JEA for WinLDAP in production, validate the following against your own environment** - these are Domain-Controller-specific considerations that don't apply to this extension's other store types:
+
+* Domain Controllers are Tier-0 assets, and many hardened Active Directory environments disable inbound WinRM to DCs as a blanket policy regardless of payload. Confirm with your AD/security team whether remote management is even permitted before configuring it.
+* Whether a JEA virtual account or gMSA has sufficient rights to write to `HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates` (the registry-backed store the LDAPS listener reads from) has not been lab-validated by Keyfactor as of this writing. Run `Get-KeyfactorDiagnostics` through the JEA session and perform a full Add/Remove round-trip against a disposable test certificate on a lab Domain Controller first (see `docs/winldap-ntds-validation.ps1` and `docs/winldap-module-validation.ps1` in the repository).
 
 #### Supported Operations
 
@@ -2135,7 +2154,7 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 <details><summary>Windows LDAPS (NTDS) Certificate (WinLDAP)</summary>
 
-When creating a Certificate Store for WinLDAP, the Store Path is fixed to `NTDS\My`, identifying the NTDS service certificate store rather than the ordinary Personal store. The Client Machine value is either the Domain Controller's hostname (for remote WinRM) or `<hostname>|LocalMachine` (for a local agent).
+When creating a Certificate Store for WinLDAP, the Store Path is fixed to `NTDS\My`, identifying the NTDS service certificate store rather than the ordinary Personal store. The Client Machine value is either the Domain Controller's hostname/IP (for remote WinRM/SSH) or `<hostname>|LocalMachine` (for a local agent).
 
 ### Store Creation
 
