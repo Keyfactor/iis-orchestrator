@@ -5,8 +5,8 @@ function Remove-NtdsServiceStoreCertificate {
     thumbprint.
 
     .DESCRIPTION
-    UNVERIFIED - MUST BE LAB-VALIDATED. See Invoke-CertUtilNtdsStore.ps1 for the certutil argument
-    shape this assumes ("-delstore -service <ServiceName> <StoreName> <Thumbprint>").
+    See Invoke-CertUtilNtdsStore.ps1 for the certutil argument shape used here
+    ("-service -delstore <ServiceName>\<StoreName> <Thumbprint>").
 
     This only removes the certificate from the service store - it deliberately does NOT touch the
     Personal ("My") store copy created by Add-KeyfactorLdapsCertificate's staging step. This is a
@@ -32,7 +32,7 @@ function Remove-NtdsServiceStoreCertificate {
 
     $cleanThumbprint = $Thumbprint -replace '[^a-fA-F0-9]', ''
 
-    $result = Invoke-CertUtilNtdsStore -Arguments @('-delstore', '-service', $ServiceName, $StoreName, $cleanThumbprint)
+    $result = Invoke-CertUtilNtdsStore -Arguments @('-service', '-delstore', "$ServiceName\$StoreName", $cleanThumbprint)
 
     if (-not $result.Started) {
         return [PSCustomObject]@{

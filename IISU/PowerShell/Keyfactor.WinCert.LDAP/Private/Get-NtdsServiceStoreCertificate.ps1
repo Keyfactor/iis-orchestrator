@@ -33,7 +33,7 @@ function Get-NtdsServiceStoreCertificate {
         [string]$StoreName
     )
 
-    $result = Invoke-CertUtilNtdsStore -Arguments @('-store', '-service', $ServiceName, $StoreName)
+    $result = Invoke-CertUtilNtdsStore -Arguments @('-service', '-store', "$ServiceName\$StoreName")
 
     if (-not $result.Started) {
         Write-Error "Unable to launch certutil.exe to enumerate the '$ServiceName\$StoreName' service store: $($result.StdErr)"

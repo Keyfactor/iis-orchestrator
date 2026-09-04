@@ -4,8 +4,8 @@ function Set-NtdsServiceStoreCertificate {
     Writes a certificate into a Windows service-specific certificate store (e.g. NTDS\My).
 
     .DESCRIPTION
-    UNVERIFIED - MUST BE LAB-VALIDATED. See Invoke-CertUtilNtdsStore.ps1 for the certutil argument
-    shape this assumes ("-addstore -service <ServiceName> <StoreName> <CertFile>").
+    See Invoke-CertUtilNtdsStore.ps1 for the certutil argument shape used here
+    ("-service -addstore <ServiceName>\<StoreName> <CertFile>").
 
     Only the certificate's public bytes are written here (a .cer, not a .pfx) - the private key
     itself is not re-imported. This assumes Windows resolves a certificate's private-key association
@@ -34,7 +34,7 @@ function Set-NtdsServiceStoreCertificate {
     try {
         [System.IO.File]::WriteAllBytes($tempCerFile, $RawCertificateBytes)
 
-        $result = Invoke-CertUtilNtdsStore -Arguments @('-f', '-addstore', '-service', $ServiceName, $StoreName, $tempCerFile)
+        $result = Invoke-CertUtilNtdsStore -Arguments @('-f', '-service', '-addstore', "$ServiceName\$StoreName", $tempCerFile)
 
         if (-not $result.Started) {
             return [PSCustomObject]@{

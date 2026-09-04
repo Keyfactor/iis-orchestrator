@@ -203,7 +203,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap
             }
             catch (Exception ex)
             {
-                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{LogHandler.FlattenException(ex)}'";
+                var failureMessage = $"Management job {_operationType} failed on Store '{_storePath}' on server '{_clientMachineName}' with error: '{ex.Message}'";
                 _logger.LogWarning(failureMessage);
 
                 return new JobResult

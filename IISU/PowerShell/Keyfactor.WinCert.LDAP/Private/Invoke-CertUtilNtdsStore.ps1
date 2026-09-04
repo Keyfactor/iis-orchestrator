@@ -5,18 +5,18 @@ function Invoke-CertUtilNtdsStore {
     store) and returns its stdout/stderr/exit code.
 
     .DESCRIPTION
-    UNVERIFIED - MUST BE LAB-VALIDATED ON A REAL DOMAIN CONTROLLER BEFORE THIS SHIPS.
-    certutil.exe has a long-documented "-service" switch for targeting service-specific certificate
-    stores (used historically for NTDS, RPC, MSMQ, etc.), separate from the plain "-store"/
-    "-addstore"/"-delstore" verbs that target the ordinary LocalMachine store. This function assumes
-    the argument shape is:
-        certutil [-f] -store    -service <ServiceName> <StoreName> [<Thumbprint>]
-        certutil [-f] -addstore -service <ServiceName> <StoreName> <CertFile>
-        certutil [-f] -delstore -service <ServiceName> <StoreName> <Thumbprint>
-    This exact ordering/casing has NOT been confirmed against a live NTDS service store in this
-    session. If lab testing shows a different argument shape, only this function and its callers'
-    argument-building should need to change - the callers (Get/Set/Remove-NtdsServiceStoreCertificate)
-    treat this as an opaque "run certutil, get text back" boundary.
+    certutil.exe's "-service" switch is a store-LOCATION option (like -enterprise, -user or
+    -grouppolicy), not a verb parameter that takes the service name as its own argument. It must
+    appear among the leading options, and the service store is then named as a SINGLE
+    "<ServiceName>\<StoreName>" token in the store-name position:
+        certutil [-f] -service -store    NTDS\My [<Thumbprint>]
+        certutil [-f] -service -addstore NTDS\My <CertFile>
+        certutil [-f] -service -delstore NTDS\My <Thumbprint>
+    Passing the service name and store name as two separate positional arguments makes certutil see
+    an extra parameter and fail with 0x80070057 (ERROR_INVALID_PARAMETER).
+
+    The callers (Get/Set/Remove-NtdsServiceStoreCertificate) treat this as an opaque "run certutil,
+    get text back" boundary.
 
     Invoked via .NET ProcessStartInfo (not the PowerShell pipeline), matching the existing
     Add-KeyfactorCertificate.ps1 pattern in Keyfactor.WinCert.Common - this means certutil.exe does
