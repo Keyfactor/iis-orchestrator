@@ -31,10 +31,11 @@ function Add-KeyfactorLdapsCertificate {
          as a warning, not a failure, since the certificate was already successfully deployed to both
          stores at that point.
 
-    This release is local-agent-only (see docsource/winldap.md) - the ACLs on the NTDS registry
-    hive have not been validated for a remote/JEA identity, and whether the LDAPS listener picks up
-    the new certificate without a restart has not been lab-validated either. Treat this function's
-    current behavior as pre-production until that validation is complete.
+    Supports both local-agent and remote WinRM/JEA/SSH execution (see docsource/winldap.md), but the
+    ACLs on the NTDS registry hive have not been validated for a JEA identity specifically, and
+    whether the LDAPS listener picks up the new certificate without a restart has not been
+    lab-validated either. Treat this function's current behavior as pre-production until that
+    validation is complete.
     #>
     param (
         [Parameter(Mandatory = $true)]

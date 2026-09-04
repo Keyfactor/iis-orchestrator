@@ -5,8 +5,8 @@ function Remove-NtdsServiceStoreCertificate {
     thumbprint.
 
     .DESCRIPTION
-    See Invoke-CertUtilNtdsStore.ps1 for the certutil argument shape used here
-    ("-service -delstore <ServiceName>\<StoreName> <Thumbprint>").
+    Removes the registry subkey directly - see Set-NtdsServiceStoreCertificate.ps1 for the registry
+    layout this assumes (one subkey per certificate, named by its uppercase SHA1 thumbprint).
 
     This only removes the certificate from the service store - it deliberately does NOT touch the
     Personal ("My") store copy created by Add-KeyfactorLdapsCertificate's staging step. This is a
@@ -41,7 +41,7 @@ function Remove-NtdsServiceStoreCertificate {
             }
         }
 
-    $result = Invoke-CertUtilNtdsStore -Arguments @('-service', '-delstore', "$ServiceName\$StoreName", $cleanThumbprint)
+        Remove-Item -Path $regPath -Recurse -Force
 
         return [PSCustomObject]@{
             Success      = $true

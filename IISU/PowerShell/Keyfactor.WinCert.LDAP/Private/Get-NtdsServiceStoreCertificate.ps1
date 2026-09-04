@@ -24,7 +24,7 @@ function Get-NtdsServiceStoreCertificate {
         [string]$StoreName
     )
 
-    $result = Invoke-CertUtilNtdsStore -Arguments @('-service', '-store', "$ServiceName\$StoreName")
+    $certsKeyPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\$ServiceName\SystemCertificates\$StoreName\Certificates"
 
     if (-not (Test-Path $certsKeyPath)) {
         Write-Information "No certificates found in the '$ServiceName\$StoreName' service store."

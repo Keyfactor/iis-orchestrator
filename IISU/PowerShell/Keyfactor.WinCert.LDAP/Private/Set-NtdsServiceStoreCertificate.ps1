@@ -4,18 +4,19 @@ function Set-NtdsServiceStoreCertificate {
     Writes a certificate into a Windows service-specific certificate store (e.g. NTDS\My).
 
     .DESCRIPTION
-    See Invoke-CertUtilNtdsStore.ps1 for the certutil argument shape used here
-    ("-service -addstore <ServiceName>\<StoreName> <CertFile>").
+    Writes directly to the registry rather than shelling out to certutil.exe - certutil's
+    -addstore/-delstore verbs never supported -service in the first place (confirmed via
+    `certutil -addstore -?`/`-delstore -?`; only the read-only -store verb documents it), so a
+    registry-based implementation is used for all three operations (Get/Set/Remove) instead.
 
-    Only the certificate's public bytes are written here (a .cer, not a .pfx) - the private key
-    itself is not re-imported. This assumes Windows resolves a certificate's private-key association
-    via CAPI/CNG machine-key-container matching (thumbprint/key match), independent of which logical
-    store lists the certificate object - the same assumption already relied upon implicitly by every
-    other store type in this repo that can bind one imported certificate into more than one place
-    (e.g. IIS binding a cert already staged in the machine store). This must be confirmed for the
-    NTDS store specifically by reading back HasPrivateKey on the NTDS-store copy in lab testing (see
-    docsource/winldap.md validation checklist) - if it does not hold, this function will need to
-    import the PFX directly into the service store instead of just the public certificate.
+    Mirrors what Windows itself stores under this key: one subkey per certificate, named by its
+    uppercase SHA1 thumbprint, holding a "Blob" REG_BINARY value that is exactly an
+    [X509Certificate2]::Export([X509ContentType]::SerializedCert) blob - see
+    Get-NtdsServiceStoreCertificate.ps1 for the read side of this same layout.
+
+    The full certificate object (including its private-key association, when present) is written
+    here via SerializedCert - unlike a plain -addstore .cer import, this preserves HasPrivateKey on
+    the NTDS-store copy without relying on CAPI/CNG key-container matching across stores.
     #>
     [CmdletBinding()]
     param (
@@ -26,35 +27,27 @@ function Set-NtdsServiceStoreCertificate {
         [string]$StoreName,
 
         [Parameter(Mandatory = $true)]
-        [byte[]]$RawCertificateBytes
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
     )
 
-    $tempCerFile = [System.IO.Path]::GetTempFileName() + ".cer"
+    $thumbprint = $Certificate.Thumbprint.ToUpper()
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Cryptography\Services\$ServiceName\SystemCertificates\$StoreName\Certificates\$thumbprint"
 
     try {
-        [System.IO.File]::WriteAllBytes($tempCerFile, $RawCertificateBytes)
+        $blob = $Certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::SerializedCert)
 
-        $result = Invoke-CertUtilNtdsStore -Arguments @('-f', '-service', '-addstore', "$ServiceName\$StoreName", $tempCerFile)
-
-        if (-not $result.Started) {
-            return [PSCustomObject]@{
-                Success  = $false
-                ExitCode = -1
-                StdOut   = ""
-                StdErr   = $result.StdErr
-            }
-        }
+        New-Item -Path $regPath -Force | Out-Null
+        Set-ItemProperty -Path $regPath -Name 'Blob' -Value $blob -Type Binary
 
         return [PSCustomObject]@{
-            Success  = ($result.ExitCode -eq 0)
-            ExitCode = $result.ExitCode
-            StdOut   = $result.StdOut
-            StdErr   = $result.StdErr
+            Success      = $true
+            ErrorMessage = ""
         }
     }
-    finally {
-        if (Test-Path $tempCerFile) {
-            Remove-Item $tempCerFile -Force -ErrorAction SilentlyContinue
+    catch {
+        return [PSCustomObject]@{
+            Success      = $false
+            ErrorMessage = "Failed to write certificate '$thumbprint' into the '$ServiceName\$StoreName' registry store: $($_.Exception.Message)"
         }
     }
 }
