@@ -30,7 +30,11 @@ function Get-KeyfactorLdapCertificates {
     $serviceName = $parts[0]
     $leafStoreName = $parts[1]
 
-    $items = Get-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName $leafStoreName
+    # @(...) wrapping is required here: PowerShell unwraps a single-element array to a bare
+    # PSCustomObject when it crosses a function-return boundary, which would silently break the
+    # ".Count -gt 0" check below (and the Personal-store cross-check's -notcontains lookup) whenever
+    # the NTDS store holds exactly one certificate.
+    $items = @(Get-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName $leafStoreName)
 
     # Best-effort diagnostic cross-check against Personal - never affects the returned inventory.
     try {
