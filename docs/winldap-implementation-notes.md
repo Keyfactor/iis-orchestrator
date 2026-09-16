@@ -28,9 +28,14 @@ new Keyfactor Universal Orchestrator store type, following the same architecture
   This was briefly narrowed to local-only pending lab-validation of JEA-account registry ACLs on a
   hardened DC, then reversed at the requester's direction after discussion with stakeholders - that
   ACL question remains genuinely unverified and is tracked in "Remaining unverified assumptions."
-- **Inventory and Remove are scoped strictly to the NTDS service store** (the single source of
-  truth), not a two-location model. The Personal-store copy created during Add is treated as an
-  internal staging detail, surfaced only as a diagnostic warning on mismatch, never as inventory data.
+- **Inventory is scoped strictly to the NTDS service store** (the single source of truth for what's
+  "in" this store); the Personal-store copy created during Add is treated as an internal staging
+  detail there, surfaced only as a diagnostic warning on mismatch, never as inventory data. **Remove
+  is not scoped that way** - see "Resolved during lab validation (2026-09-16)" below: it removes the
+  certificate from both the NTDS store and the Personal store, because lab testing showed the
+  Personal-store copy has to go too for LDAPS to actually stop using the certificate. This was the
+  original design (a symmetric "Remove only touches NTDS, like Inventory only reads NTDS" rule) and
+  it did not hold up under testing.
 - **Add sequence**: fail-fast eligibility check (Server-Auth EKU + FQDN/domain SAN match, derived
   only from local `$env:` variables - never a directory query, to guarantee no double-hop) → stage
   into `LocalMachine\My` via the existing, unmodified `Add-KeyfactorCertificate` → explicitly write
@@ -189,31 +194,80 @@ What changed to restore this:
 - Restored `docsource/winldap.md`'s Requirements section to describe both connection models, with
   the Tier-0 caveats framed as "validate before production" rather than a blanket prohibition.
 
+## Resolved during lab validation (2026-09-16)
+
+**Removing only the NTDS-store registry entry does not stop LDAPS from using the certificate - the
+Personal-store copy has to be removed too, and no service restart is required once it is.**
+
+Sequence of tests run on a live Domain Controller, using the store type's actual Remove logic (not
+just the raw registry mechanism):
+
+1. Ran Remove (as it existed before this fix): NTDS registry entry deleted successfully, confirmed
+   by re-running Inventory (correctly returned no certificates - the code was working exactly as
+   designed). The Personal-store (`Cert:\LocalMachine\My`) copy was left in place, per the original
+   design.
+2. Connected via `ldp.exe` against port 636 - the certificate was still being presented and the
+   connection still succeeded.
+3. Restarted the NTDS service (`Restart-Service NTDS -Force`) with the Personal-store copy still in
+   place, then retried `ldp.exe` - **still connected using the same certificate**. This rules out
+   simple Schannel/lsass in-memory caching as the sole explanation (the leading hypothesis going
+   into this test - restarting the service should have forced a fresh read of whatever store LDAPS
+   actually consults, if the NTDS-store removal alone were sufficient).
+4. Manually removed the certificate from `Cert:\LocalMachine\My`, with **no service restart** -
+   `ldp.exe` immediately could no longer connect using that certificate.
+
+This confirms LDAPS's certificate resolution depends on presence in the Personal store, not solely
+on the NTDS-service-store registry entry - contrary to the original design's assumption that the
+NTDS store was the definitive, sufficient location to control. `Remove-KeyfactorLdapsCertificate.ps1`
+now removes from both stores in one call (NTDS store first, then Personal via the existing,
+unmodified `Remove-KeyfactorCertificate` from `Keyfactor.WinCert.Common`); a failure to remove from
+Personal is now a hard error (code 730), not a silently-incomplete success, since leaving it behind
+reproduces exactly the bug found here. A "certificate not found in Personal" result (e.g. it was
+already removed by other means) is treated as success, not an error, since the end state is already
+what Remove is trying to achieve.
+
+**New caveat introduced by this fix, not previously applicable**: `Cert:\LocalMachine\My` is a
+general-purpose store shared by other services on the same Domain Controller (WinRM HTTPS, RDP,
+etc.). WinLDAP's Remove has no visibility into whether the certificate it's deleting from Personal
+is also relied upon by one of those other services - it will remove it regardless. This is
+documented in `docsource/winldap.md` and in the function's own docstring; it has not been mitigated
+(e.g. with a "check other known consumers first" step, the way `Remove-KeyfactorIISCertificateIfUnused`
+checks for other IIS bindings before deleting a certificate) - that would require WinLDAP to have
+awareness of other store types' state on the same machine, which is out of scope for now. Flag this
+to customers whose DCs reuse the same certificate for multiple purposes.
+
 ## Remaining unverified assumptions - must be lab-validated
 
 1. Whether the LDAPS listener picks up a newly-written NTDS-store certificate immediately, only
-   after `Restart-Service NTDS`, or only after a reboot.
+   after `Restart-Service NTDS`, or only after a reboot. (Note: this is about **Add**, i.e. how fast
+   a *new* certificate becomes active - separate from the Remove-behavior question resolved above,
+   which was about what it takes to make LDAPS stop using an *old* one.)
 2. Whether AD DS's own built-in automatic Personal-store certificate detection could later overwrite
    what WinLDAP wrote directly to the NTDS store, since the certificate also remains staged in
    Personal.
-3. The operational effect of **removing** the certificate currently active on port 636 (stops
-   responding vs. falls back vs. needs a restart to notice).
+3. ~~The operational effect of removing the certificate currently active on port 636.~~ **Resolved
+   above (2026-09-16)**: removing from the NTDS store alone (with or without an NTDS restart) is not
+   sufficient; the Personal-store copy must also be removed, and no restart is needed once it is.
 4. Whether the eligibility validator's rules (`Test-LdapsCertificateEligibility.ps1`) - Server-Auth
    EKU tolerance when absent, forest-root-domain SAN as an alternative to the DC's own FQDN - match
    real AD DS selection behavior closely enough to avoid false rejections.
-5. **Active again as of 2026-09-03** (see "Reversed on 2026-09-03" above): whether a JEA virtual
+5. **Active as of 2026-09-03** (see "Reversed on 2026-09-03" above): whether a JEA virtual
    account or gMSA has sufficient ACLs to write to
    `HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates`. This is the single
    most important open item now that remote/JEA support has been restored - it has not been
    lab-validated, and shipping WinLDAP's JEA support without validating it means a customer could
-   configure a JEA endpoint that silently fails on this specific permission boundary.
+   configure a JEA endpoint that silently fails on this specific permission boundary. Note: the
+   Personal-store removal added in this fix requires the same account to also have delete rights on
+   `Cert:\LocalMachine\My` for the *removed* certificate's private key material - worth confirming
+   alongside the NTDS-hive ACL check, not just assuming it follows the same permission level.
 
 ## Next step
 
-Run the rewritten `docs/winldap-ntds-validation.ps1` interactively, section by section, against a
-disposable test certificate on a lab Domain Controller. It walks through items 1-3 above directly;
-item 4 is called out in its comments for separate follow-up. For item 5, stand up a real JEA
-endpoint per `docsource/content.md`'s setup steps (installing `Keyfactor.WinCert.LDAP` alongside
-`Keyfactor.WinCert.Common`), then run `Get-KeyfactorDiagnostics` through it and the JEA section of
-`docs/winldap-ntds-validation.ps1`/`docs/winldap-module-validation.ps1` to get a real answer. Update
-this file with findings once that's done.
+Run `docs/winldap-module-validation.ps1`'s Step 4 (Remove) again against the rewritten
+`Remove-KeyfactorLdapsCertificate`, and re-confirm via `ldp.exe`/`openssl s_client` from a separate
+machine that LDAPS actually stops presenting the certificate immediately, with no restart - that
+closes the loop on item 3 above using the *fixed* code, not just the raw registry mechanism that
+diagnosed the problem. For item 5 (and the new Personal-store ACL question it raises), stand up a
+real JEA endpoint per `docsource/content.md`'s setup steps (installing `Keyfactor.WinCert.LDAP`
+alongside `Keyfactor.WinCert.Common`), then run `Get-KeyfactorDiagnostics` through it and the JEA
+section of `docs/winldap-module-validation.ps1`. Update this file with findings once that's done.

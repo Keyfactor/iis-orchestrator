@@ -8,15 +8,16 @@ function Remove-NtdsServiceStoreCertificate {
     Removes the registry subkey directly - see Set-NtdsServiceStoreCertificate.ps1 for the registry
     layout this assumes (one subkey per certificate, named by its uppercase SHA1 thumbprint).
 
-    This only removes the certificate from the service store - it deliberately does NOT touch the
-    Personal ("My") store copy created by Add-KeyfactorLdapsCertificate's staging step. This is a
-    documented trade-off (see docsource/winldap.md), symmetric with Get-KeyfactorLdapCertificates
-    only reading from the service store.
+    This only removes the certificate from the service store - it does NOT touch the Personal ("My")
+    store copy created by Add-KeyfactorLdapsCertificate's staging step. That second removal is
+    handled by the caller, Remove-KeyfactorLdapsCertificate.ps1 (Public), which lab testing showed is
+    actually required for the LDAPS listener to stop presenting the certificate - see that file's
+    .DESCRIPTION for details. This function stays scoped to the service store only, symmetric with
+    Get-KeyfactorLdapCertificates reading only from the service store.
 
     IMPORTANT OPERATIONAL RISK (see docsource/winldap.md): removing the certificate the LDAPS
-    listener is currently using may cause LDAPS (port 636) to stop responding, fall back to another
-    eligible certificate, or require a service restart to notice the removal - this has not been
-    verified against a live DC and should be treated as high-risk until it has.
+    listener is currently using is disruptive by design - once both stores are cleared, LDAPS will
+    no longer be able to present this certificate at all.
     #>
     [CmdletBinding()]
     param (

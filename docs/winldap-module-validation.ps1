@@ -79,7 +79,11 @@ Write-Host "`nTest certificate thumbprint for comparison: $($testCert.Thumbprint
 
 # ============================================================================
 # STEP 4 - Remove. Only run once you're done - if this cert became the one LDAPS is actively
-# presenting, removing it carries real operational risk (see docsource/winldap.md).
+# presenting, removing it carries real operational risk (see docsource/winldap.md). As of the
+# 2026-09-16 lab finding, this now removes the certificate from BOTH the NTDS store AND
+# Cert:\LocalMachine\My in one call - leaving the Personal-store copy in place was confirmed to let
+# LDAPS keep presenting the certificate even after an NTDS service restart. After running this,
+# re-check port 636 from a separate machine to confirm LDAPS actually stopped presenting it.
 # ============================================================================
 Write-Host "`n=== STEP 4: Remove-KeyfactorLdapsCertificate (run when ready) ===" -ForegroundColor Yellow
 Write-Host "  Remove-KeyfactorLdapsCertificate -Thumbprint '$($testCert.Thumbprint)' -StoreName 'NTDS\My'"
@@ -134,13 +138,15 @@ Remove-PSSession $jeaSession
 #>
 
 # ============================================================================
-# CLEANUP - removes the Personal-store copy and the temp cert (Remove-KeyfactorLdapsCertificate
-# above only removes the NTDS-store copy, by design - see docsource/winldap.md).
+# CLEANUP - safety-net only. As of the 2026-09-16 fix, Remove-KeyfactorLdapsCertificate (Step 4)
+# already removes the Personal-store copy itself, so this should normally find nothing left to do.
+# Still useful if Step 4 was never run, failed partway, or you're cleaning up the JEA variant's
+# separate test certificate above.
 # ============================================================================
 function Remove-WinLdapModuleTestArtifacts {
     param($Thumbprint)
     Remove-Item "Cert:\LocalMachine\My\$Thumbprint" -Force -ErrorAction SilentlyContinue
-    Write-Host "Removed '$Thumbprint' from Cert:\LocalMachine\My." -ForegroundColor Green
+    Write-Host "Removed '$Thumbprint' from Cert:\LocalMachine\My (if it was still there)." -ForegroundColor Green
 }
 
 Write-Host "`nWhen finished, run:" -ForegroundColor Green
