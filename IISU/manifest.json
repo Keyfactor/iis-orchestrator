@@ -52,6 +52,10 @@
       "CertStores.WinLDAP.Management": {
         "assemblypath": "WindowsCertStore.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap.Management"
+      },
+      "CertStores.WinLDAP.ReEnrollment": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap.ReEnrollment"
       }
     }
   }

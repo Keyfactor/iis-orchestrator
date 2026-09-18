@@ -36,7 +36,7 @@
 @{
     GUID        = '22b59d48-ce9e-40e7-b9ea-23f4b396fcbc'
     Author      = 'Keyfactor'
-    Description = 'Role capabilities for Keyfactor Windows Certificate Store AD DS (NTDS) LDAPS operations (inventory, add, remove)'
+    Description = 'Role capabilities for Keyfactor Windows Certificate Store AD DS (NTDS) LDAPS operations (inventory, add, remove, reenrollment)'
 
     # Import both modules so their functions are pre-loaded and run as trusted code.
     # Both modules MUST be installed under C:\Program Files\WindowsPowerShell\Modules\ so that
@@ -45,10 +45,16 @@
 
     # Functions the orchestrator is allowed to invoke in this JEA session.
     # Test-KeyfactorAdminRights is included for potential future use when admin checks are required.
+    # Register-KeyfactorLdapsCertificate is the ReEnrollment (ODKG) completion step - the CSR
+    # generation (New-KeyfactorODKGEnrollment) and signed-certificate import
+    # (Import-KeyfactorSignedCertificate) it depends on are Common-module functions already
+    # whitelisted in Keyfactor.WinCert.Common.psrc, which a WinLDAP JEA endpoint's RoleDefinitions
+    # must combine with this file per docsource/content.md's setup table.
     VisibleFunctions = @(
         'Get-KeyfactorLdapCertificates',
         'Add-KeyfactorLdapsCertificate',
         'Remove-KeyfactorLdapsCertificate',
+        'Register-KeyfactorLdapsCertificate',
         'Test-KeyfactorAdminRights'
     )
 

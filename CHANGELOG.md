@@ -1,6 +1,7 @@
 Unreleased
 
 * Added WinLDAP store type for managing the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller - automates staging the certificate into the Personal store and registering it into the NTDS service certificate store that the LDAPS listener uses. Supports both local-agent and remote WinRM/JEA/SSH connections, following the same pattern as WinSQL. The NTDS service store is read from/written to/removed from directly via the registry (an `X509Certificate2` `SerializedCert` export, matching what Windows itself stores there) rather than via certutil.exe, since certutil's `-addstore`/`-delstore` verbs turned out not to support service-specific stores at all. Domain Controllers are Tier-0 assets - see docsource/winldap.md for DC-specific caveats (including an unverified question about JEA virtual-account registry permissions) to validate before relying on remote/JEA management in production.
+* Added Reenrollment (On-Device Key Generation / ODKG) support for WinLDAP, matching WinCert/IISU/WinSql. The private key is generated locally on the Domain Controller via `certreq`; only the CSR is sent to Command. The signed certificate is staged into the Personal store and then registered into the NTDS service certificate store the same way a normal Add is, including the same LDAPS eligibility check.
 
 4.0.0
 

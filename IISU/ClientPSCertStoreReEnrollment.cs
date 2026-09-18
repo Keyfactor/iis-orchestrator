@@ -30,6 +30,8 @@ using Keyfactor.Orchestrators.Extensions.Interfaces;
 using System.Linq;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 using System.Numerics;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -130,8 +132,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                         if (myCert == null) { throw new Exception("Command was unable to sign the CSR."); }
 
-                        // Import the certificate
-                        string thumbprint = ImportCertificate(myCert.RawData, storePath);
+                        // Import the certificate. WinLDAP's storePath ("NTDS\My") is not a real
+                        // Cert: provider path - Import-KeyfactorSignedCertificate expects one, so
+                        // WinLDAP always imports into the Personal ("My") store first, matching
+                        // Add-KeyfactorLdapsCertificate's own staging step. The WinLdap case below
+                        // then registers that same certificate into the NTDS service store.
+                        string importStoreName = bindingType == CertStoreBindingTypeENUM.WinLdap ? "My" : storePath;
+                        string thumbprint = ImportCertificate(myCert.RawData, importStoreName);
 
                         // If there is binding, bind it to the correct store type
                         if (thumbprint != null)
@@ -220,13 +227,45 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                     break;
 
                                 case CertStoreBindingTypeENUM.None:
-                                    
+
                                     jobResult = new JobResult
                                     {
                                         Result = OrchestratorJobStatusJobResult.Success,
                                         JobHistoryId = config.JobHistoryId,
                                         FailureMessage = ""
                                     };
+
+                                    break;
+
+                                case CertStoreBindingTypeENUM.WinLdap:
+                                    // Certificate is already in Cert:\LocalMachine\My at this point
+                                    // (see importStoreName above) - register it into the NTDS
+                                    // service store (storePath, e.g. "NTDS\My"), the same
+                                    // eligibility-checked write Add-KeyfactorLdapsCertificate does.
+                                    ResultObject registerResult = WinLdapBinding.RegisterCertificate(_psHelper, thumbprint, storePath);
+
+                                    if (!registerResult.IsSuccess)
+                                    {
+                                        string detail = !string.IsNullOrEmpty(registerResult.ErrorMessage)
+                                            ? registerResult.ErrorMessage
+                                            : registerResult.Message;
+
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = $"Registering the re-enrolled certificate into the NTDS service store '{storePath}' failed at step '{registerResult.Step}' (code {registerResult.Code}): {detail}"
+                                        };
+                                    }
+                                    else
+                                    {
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = ""
+                                        };
+                                    }
 
                                     break;
                             }

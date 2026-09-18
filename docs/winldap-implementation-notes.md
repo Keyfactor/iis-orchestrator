@@ -348,3 +348,126 @@ stand up a real JEA endpoint per `docsource/content.md`'s setup steps (installin
 `Keyfactor.WinCert.LDAP` alongside `Keyfactor.WinCert.Common`), then run `Get-KeyfactorDiagnostics`
 through it and the JEA section of `docs/winldap-module-validation.ps1`. Update this file with
 findings once that's done.
+
+## Plan: ODKG (ReEnrollment) support for WinLDAP (2026-09-18)
+
+Goal: bring WinLDAP to parity with `WinCert`/`WinIIS`/`WinSQL`, which all support ReEnrollment
+("On-Device Key Generation" / ODKG - the private key is generated locally via `certreq`, only a CSR
+leaves the machine, Command signs it and returns just the certificate).
+
+### Key finding that shapes this design
+
+The shared `ClientPSCertStoreReEnrollment.PerformReEnrollment` (`IISU/ClientPSCertStoreReEnrollment.cs`)
+does two things unconditionally, regardless of `CertStoreBindingTypeENUM`:
+1. `CreateCSR` → PowerShell `New-KeyfactorODKGEnrollment` (Common) - fully generic (subjectText,
+   providerName, keyType, keySize, SAN via `certreq -new` with `MachineKeySet=True`). **No changes
+   needed** - reused unmodified.
+2. After Command signs the CSR, `ImportCertificate(myCert.RawData, storePath)` → PowerShell
+   `Import-KeyfactorSignedCertificate` (Common), which does `Set-Location "Cert:\LocalMachine\$StoreName"`
+   then `Import-Certificate`. This works for `WinCert`/`WinIIS`/`WinSQL` because their `storePath`
+   is always a real `Cert:` provider path (`My`, `WebHosting`, etc.). **It would fail for WinLDAP**
+   if called with the literal `storePath` value (`"NTDS\My"`), which is not a real `Cert:` provider
+   path - this is the exact same limitation that required building `Get/Set/Remove-NtdsServiceStoreCertificate`
+   for Add/Remove instead of reusing `X509Store` directly.
+
+Only *after* that import does the binding-type-specific `switch` run (`WinIIS` → bind to a site,
+`WinSQL` → bind to a SQL instance, `None` → nothing further). WinLDAP needs a new case here that
+mirrors what `Add-KeyfactorLdapsCertificate` already does after its own Personal-store staging step:
+re-read the cert from Personal (needed for reliable `HasPrivateKey` resolution - see
+`Add-KeyfactorLdapsCertificate.ps1`'s `RereadPersonal` step), run the same eligibility check Add
+uses, then write it into the NTDS registry store.
+
+### Design
+
+- `ImportCertificate`'s call site changes from `ImportCertificate(myCert.RawData, storePath)` to
+  `ImportCertificate(myCert.RawData, bindingType == CertStoreBindingTypeENUM.WinLdap ? "My" : storePath)`
+  - the only change to the *existing*, already-shipped import step, and it's a no-op for the three
+  existing store types (their `storePath` already *is* what gets passed today).
+- New `CertStoreBindingTypeENUM.WinLdap` value (`WinCertJobTypeBase.cs`).
+- New `case CertStoreBindingTypeENUM.WinLdap:` in the post-import switch, calling a new static
+  helper `WinLdapBinding.RegisterCertificate(PSHelper, thumbprint, storePath)`, mirroring
+  `WinSqlBinding.BindSQLCertificate`'s role exactly (a thin C# wrapper around one PowerShell call,
+  parsing the `ResultObject`).
+- New Public PowerShell function `Register-KeyfactorLdapsCertificate` (`Keyfactor.WinCert.LDAP`
+  module) that takes `Thumbprint` + `StoreName` (`"NTDS\My"`), and:
+  1. Re-reads the certificate from `Cert:\LocalMachine\My` by thumbprint (same pattern as
+     `Add-KeyfactorLdapsCertificate`'s `RereadPersonal` step).
+  2. Runs `Test-LdapsCertificateEligibility` on it (defense in depth - the CSR's Subject/SAN come
+     from whatever Command/the certificate template configured, with no guarantee it matches this
+     DC's FQDN or carries the Server-Auth EKU, same risk Add already guards against).
+  3. Writes it into the NTDS registry store via the existing, unmodified
+     `Set-NtdsServiceStoreCertificate`.
+  4. Returns a `New-KeyfactorResult`-shaped result the same way `Add-KeyfactorLdapsCertificate` does.
+  - No restart step: matches `WinSql`'s own ReEnrollment precedent, which hardcodes
+    `RestartService = false` in its binding call rather than plumbing the property through - the
+    existing code doesn't treat restart-after-reenrollment as needed, and this follows that
+    established choice rather than introducing a new one.
+  - All three of the underlying pieces this reuses (`Test-LdapsCertificateEligibility`,
+    `Set-NtdsServiceStoreCertificate`, the re-read-from-Personal pattern) already exist - this is a
+    new orchestration function, not new low-level mechanism.
+- New `IISU/ImplementedStoreTypes/WinLDAP/ReEnrollment.cs`, mirroring `WinSQL`/`WinIIS`'s
+  three-line pattern exactly (`new ClientPSCertStoreReEnrollment(...).PerformReEnrollment(config,
+  submitReenrollmentUpdate, CertStoreBindingTypeENUM.WinLdap)`).
+- `integration-manifest.json`: flip `WinLDAP`'s `SupportedOperations.Enrollment` from `false` to
+  `true`. **No EntryParameters changes needed** - `ProviderName` is already declared (matching
+  `WinCert`/`WinSql`'s own EntryParameters, all `RequiredWhen` flags `false`), and `subjectText`/
+  `keyType`/`keySize`/SAN are populated by Command's generic ODKG enrollment flow, not by
+  per-store-type `EntryParameters` (confirmed by grepping the manifest - only `WinIIS` declares
+  extra `OnReenrollment: true` parameters, and only because IIS binding genuinely needs extra
+  site/port info during reenrollment that WinLDAP has no equivalent of).
+- `IISU/manifest.json`: add `CertStores.WinLDAP.ReEnrollment` → `Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap.ReEnrollment`.
+- `Keyfactor.WinCert.LDAP.psrc`: add `Register-KeyfactorLdapsCertificate` to `VisibleFunctions`. No
+  other JEA changes needed - it only touches local resources (Personal store, NTDS registry,
+  `$env:` variables via the reused eligibility check), consistent with the existing no-double-hop
+  requirement.
+- Docs: `docsource/winldap.md` (note ODKG support, matching `wincert.md`/`winsql.md`'s wording),
+  `CHANGELOG.md`.
+
+### New unverified assumption this introduces
+
+Whether a certificate that arrives via the ODKG path (key born locally via `certreq`, cert is bare
+signed bytes with no PFX ever involved) resolves `HasPrivateKey = true` once copied into the NTDS
+registry store, the same way the PFX-based Add flow's re-read-from-Personal technique was confirmed
+to work. The re-read-from-an-actual-store technique itself is the same either way, so this is
+expected to hold, but it is a different code path (no PFX, no `PersistKeySet`/`MachineKeySet`
+import flags at all - `certreq -new`'s `MachineKeySet=True` in the INF is what puts the key in the
+machine key store instead) and has not been lab-tested. Add to the validation checklist.
+
+### Explicitly not changed
+
+`New-KeyfactorODKGEnrollment.ps1`, `Import-KeyfactorSignedCertificate.ps1` (Common - both fully
+reused, CSR generation is store-type-agnostic), `SANBuilder.cs`, `PSHelper.cs`.
+
+### Implementation status
+
+Implemented as planned above:
+- `WinCertJobTypeBase.cs`: added `CertStoreBindingTypeENUM.WinLdap`.
+- New `IISU/ImplementedStoreTypes/WinLDAP/ReEnrollment.cs` (three-line delegate, matches `WinSQL`).
+- New `IISU/ImplementedStoreTypes/WinLDAP/WinLdapBinding.cs` (static helper, matches `WinSqlBinding`/
+  `WinIISBinding`'s role, but returns a `ResultObject` rather than a bare `bool` for richer failure
+  messages in the job history).
+- New Public PowerShell function `Register-KeyfactorLdapsCertificate` (`Keyfactor.WinCert.LDAP`
+  module) - reuses `Test-LdapsCertificateEligibility` and `Set-NtdsServiceStoreCertificate`
+  unmodified; added to the module's `.psm1` exports and the `.psrc`'s `VisibleFunctions`.
+- `ClientPSCertStoreReEnrollment.cs`: the `ImportCertificate` call site now redirects to `"My"` for
+  `CertStoreBindingTypeENUM.WinLdap` instead of the literal `storePath`, and a new `WinLdap` switch
+  case calls `WinLdapBinding.RegisterCertificate` with the real `storePath` (`"NTDS\My"`) afterward.
+- `integration-manifest.json`: `WinLDAP`'s `SupportedOperations.Enrollment` flipped to `true`. No
+  `EntryParameters` changes, as planned.
+- `IISU/manifest.json`: added `CertStores.WinLDAP.ReEnrollment`.
+- `docsource/winldap.md`: added ODKG support notes.
+
+Full solution rebuild: 0 errors. Unit tests: same single pre-existing, unrelated
+`AdfsUnitTests.Test_AdfsInventory` failure as every prior change in this file - not a regression.
+PowerShell files parse cleanly and the module imports/exports `Register-KeyfactorLdapsCertificate`
+correctly. The underlying pieces this reuses (`Test-LdapsCertificateEligibility`,
+`Set-NtdsServiceStoreCertificate`) were already smoke-tested in earlier work; `Register-KeyfactorLdapsCertificate`
+itself was not independently live-tested in this session (would require writing to this dev
+machine's real `Cert:\LocalMachine\My`, which was avoided deliberately, consistent with earlier
+sessions' handling of this same constraint).
+
+**Not yet validated on a live DC - add to the checklist**: a full ReEnrollment job end-to-end
+through Command against a real Domain Controller, confirming (a) `certreq`'s locally-generated key
+resolves `HasPrivateKey = true` once the resulting certificate is copied into the NTDS registry
+store (the new unverified assumption noted above), and (b) the LDAPS listener actually picks up the
+re-enrolled certificate the same way it does for a normal Add.

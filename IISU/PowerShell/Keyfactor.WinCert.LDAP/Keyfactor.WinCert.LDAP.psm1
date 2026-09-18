@@ -20,11 +20,13 @@ if (-not (Get-Command 'New-KeyfactorResult' -ErrorAction SilentlyContinue)) {
 . "$PSScriptRoot\Public\Get-KeyfactorLdapCertificates.ps1"
 . "$PSScriptRoot\Public\Add-KeyfactorLdapsCertificate.ps1"
 . "$PSScriptRoot\Public\Remove-KeyfactorLdapsCertificate.ps1"
+. "$PSScriptRoot\Public\Register-KeyfactorLdapsCertificate.ps1"
 
 # Export only public functions for non-JEA use.
 # In JEA sessions, VisibleFunctions in the .psrc is the actual access control mechanism.
 Export-ModuleMember -Function @(
     'Get-KeyfactorLdapCertificates',
     'Add-KeyfactorLdapsCertificate',
-    'Remove-KeyfactorLdapsCertificate'
+    'Remove-KeyfactorLdapsCertificate',
+    'Register-KeyfactorLdapsCertificate'
 )
