@@ -1560,7 +1560,7 @@ the Keyfactor Command Portal
 
 <details><summary>Click to expand details</summary>
 
-WinLDAP is a store type designed for managing the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller. It automates the certificate renewal workflow administrators traditionally perform by hand: importing the new certificate into the Domain Controller's Personal ("My") certificate store, then registering it into the NTDS-service-specific certificate store (registry-backed at `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates`) that the LDAPS listener (port 636) reads from.
+WinLDAP is a store type designed for managing the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller. It automates the certificate renewal workflow administrators traditionally perform by hand: importing the new certificate into the Domain Controller's Personal ("My") certificate store, then registering it into the NTDS-service-specific certificate store (registry-backed at `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates`) that the LDAPS listener (port 636) reads from. It supports Inventory, Add, Remove, and Reenrollment (On-Device Key Generation / ODKG) of certificates, matching the job types supported by `WinCert`, `IISU`, and `WinSql`.
 
 Writing into that registry-backed store uses only the built-in .NET certificate APIs and ordinary registry access already available on every Domain Controller - no `certutil.exe` calls, and no new executables or DLLs are installed on the DC to do it.
 
@@ -1568,6 +1568,7 @@ Writing into that registry-backed store uses only the built-in .NET certificate 
 * NOTE: Inventory is scoped strictly to the NTDS service store, which is treated as the single source of truth for what certificate is in use; the Personal-store copy created during Add is an internal staging detail and is not separately visible in Inventory. Remove, however, removes the certificate from **both** the NTDS service store and the Personal store - lab testing on a live Domain Controller confirmed that leaving the Personal-store copy in place allows the LDAPS listener to keep presenting the certificate after Remove runs, even after restarting the NTDS service. Because the Personal store is a general-purpose store, removing a certificate from it here will also affect any other service on the same Domain Controller that happens to use the same certificate (e.g. WinRM HTTPS, RDP) - WinLDAP has no visibility into other consumers of that store.
 * NOTE: How quickly the LDAPS listener picks up a newly written certificate has not yet been validated against a live Domain Controller. Treat this store type as pre-production until that validation is complete.
 * NOTE: When Keyfactor Command renews a certificate already present in this store, the Add job cleans up the certificate it's replacing (from both the NTDS service store and the Personal store) after the new certificate is successfully deployed - it does not wait for a separate Remove job. Without this, lab testing showed the superseded certificate is left behind indefinitely (both stores keep accumulating one certificate per renewal, and Inventory returns all of them, not just the current one). If that cleanup step itself fails, the job reports a Warning rather than a Failure, since the new certificate is already in place and serving LDAPS at that point - check the job history message for the superseded thumbprint if manual cleanup is needed.
+* NOTE: Reenrollment (ODKG) generates the private key locally on the Domain Controller (via `certreq`) and only sends a Certificate Signing Request to Keyfactor Command - the key never leaves the machine. Once Command signs it, the certificate is staged into the Personal store and then registered into the NTDS service store the same way a normal Add does, including the same LDAPS eligibility check (Server Authentication EKU, Subject/SAN matching this DC's FQDN). Unlike Add, Reenrollment does not offer a restart-the-NTDS-service option and does not clean up a previous certificate - this matches `WinSql`'s own Reenrollment behavior, not something specific to WinLDAP. This has not yet been validated end-to-end against a live Domain Controller.
 
 #### Windows LDAPS (NTDS) Certificate Requirements
 
@@ -1590,7 +1591,7 @@ Each Domain Controller is managed independently with no fan-out to other nodes (
 | Add          | ✅ Checked |
 | Remove       | ✅ Checked |
 | Discovery    | 🔲 Unchecked |
-| Reenrollment | 🔲 Unchecked |
+| Reenrollment | ✅ Checked |
 | Create       | 🔲 Unchecked |
 
 #### Store Type Creation
@@ -1634,7 +1635,7 @@ the Keyfactor Command Portal
    | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
    | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
    | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
-   | Supports Reenrollment | 🔲 Unchecked | Indicates that the Store Type supports Reenrollment |
+   | Supports Reenrollment | ✅ Checked | Indicates that the Store Type supports Reenrollment |
    | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
    | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
    | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |

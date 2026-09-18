@@ -573,7 +573,7 @@ curl -s -X POST "https://${KEYFACTOR_HOSTNAME}/${KEYFACTOR_API_PATH}/Certificate
     "Add": true,
     "Create": false,
     "Discovery": false,
-    "Enrollment": false,
+    "Enrollment": true,
     "Remove": true
   },
   "Properties": [
