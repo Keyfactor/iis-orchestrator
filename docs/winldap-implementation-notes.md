@@ -41,7 +41,9 @@ new Keyfactor Universal Orchestrator store type, following the same architecture
   into `LocalMachine\My` via the existing, unmodified `Add-KeyfactorCertificate` → explicitly write
   the same certificate into the NTDS service store (does not wait for/rely on AD DS's own ~10-minute
   auto-detection) → optional, off-by-default `Restart-Service NTDS` to force LDAPS to pick it up
-  immediately.
+  immediately → if this Add is a renewal (Command populated `JobProperties["RenewalThumbprint"]`),
+  remove the superseded certificate from both stores - see "Resolved during lab validation
+  (2026-09-18)" below.
 - **Add/Remove only for the initial release** - no ReEnrollment or Discovery, matching the
   constrained-scope precedent set by `WinAdfs`.
 
@@ -236,6 +238,68 @@ checks for other IIS bindings before deleting a certificate) - that would requir
 awareness of other store types' state on the same machine, which is out of scope for now. Flag this
 to customers whose DCs reuse the same certificate for multiple purposes.
 
+## Resolved during lab validation (2026-09-18)
+
+**Renewing (replacing) the certificate left the old one behind in both stores indefinitely, and
+Inventory returned both.**
+
+Observed while testing a renewal on a live Domain Controller: after adding a new certificate to
+supersede an existing one, `Get-ChildItem`-equivalent enumeration of the NTDS registry store showed
+*two* certificate subkeys (old and new), and Inventory correctly reflected that - it returned both
+as separate inventory items, since both are genuinely present in the store this store type reads
+from. A separate check of what LDAPS (port 636) actually presents confirmed it was serving the *new*
+certificate, not the old one, so the NTDS store's "most recent"/certificate-selection behavior isn't
+the problem - the old certificate simply was never removed by the Add operation, only added-alongside.
+
+Root cause: `Management.cs`'s Add path never read or acted on a superseded-certificate signal. This
+codebase already has a precedent for this in two different store types, neither of which WinLDAP was
+using:
+- `WinSql`'s `Management.cs` reads `config.JobProperties["RenewalThumbprint"]` (populated by Command
+  when an Add job is actually a renewal of an existing entry, not a first-time Add) and uses it as a
+  gate before rebinding - though notably it does NOT itself remove the *old* certificate from the
+  underlying Windows store, only updates SQL's own registry pointer.
+- `WinIIS`'s `Management.cs` calls `RemoveIISCertificate` (→ `Remove-KeyfactorIISCertificateIfUnused`)
+  after a successful bind of the new certificate, passing the old certificate's thumbprint (encoded
+  in `config.JobCertificate.Alias`) - genuinely removing the old certificate from the store, but only
+  if no other IIS site binding still references it.
+
+**Fix**: `Management.cs`'s `AddCertificate` now reads `config.JobProperties["RenewalThumbprint"]`
+(matching `WinSql`'s property-name convention, since WinLDAP has no alias-encoding scheme comparable
+to `WinIIS`'s) and, once the new certificate has been successfully added to both stores, calls the
+existing `RemoveCertificate` on the superseded thumbprint - removing it from both the NTDS store and
+the Personal store, using the exact same removal logic as a normal Remove job (see "Resolved during
+lab validation (2026-09-16)" above). A cleanup failure is reported as a `Warning`, not a `Failure` -
+the new certificate is already deployed and serving LDAPS at that point, so failing the whole job
+would misrepresent a successful renewal as a failed one; the warning message names the superseded
+thumbprint so it can be cleaned up manually if needed.
+
+Unlike `WinIIS`, this does **not** check whether the superseded certificate is "still in use
+elsewhere" first - there's no generic way for WinLDAP to know whether some *other*, unrelated service
+on the same DC (WinRM HTTPS, RDP, etc.) still depends on that same certificate being in the Personal
+store. This is the same shared-store risk already documented for plain Remove above, now also
+applicable to renewal-triggered cleanup - not a new risk, just a new trigger for the existing one.
+
+**Implementation note**: this fix required restructuring `Management.cs`'s session lifecycle.
+Previously, `AddCertificate` and `RemoveCertificate` each opened and closed their own `PSHelper`
+session (`using (_psHelper) { _psHelper.Initialize(); ...; _psHelper.Terminate(); }`), which was fine
+when Add and Remove were only ever called as separate, mutually exclusive jobs. Calling
+`RemoveCertificate` from *inside* `AddCertificate` for renewal cleanup would have meant
+re-`Initialize()`-ing a `PSHelper` immediately after its own `Dispose()` within the same job - almost
+certainly harmless (`Initialize()` unconditionally creates a fresh `PowerShell` object regardless of
+prior state) but an untested code path not worth relying on for DC-facing code, and wasteful (a
+second full WinRM/JEA handshake for one job). Instead, `ProcessJob` now opens the `PSHelper` session
+once and keeps it open for the whole `switch` statement, matching `WinSql`'s actual top-level
+pattern; `AddCertificate`/`RemoveCertificate` now assume the session is already open and just call
+`_psHelper.ExecutePowerShell(...)` directly. Confirmed via full solution rebuild and unit test run
+(same pre-existing, unrelated `AdfsUnitTests.Test_AdfsInventory` failure as before - not a
+regression) that this refactor didn't change any other behavior.
+
+**Not yet re-validated on a live DC**: the renewal cleanup path itself (only the raw registry
+find/remove mechanism and the standalone Remove path have been lab-tested so far). Run a full
+renewal through `Management.cs`/Command (or a `docs/winldap-module-validation.ps1`-style manual
+Add-with-`RenewalThumbprint` call) and confirm the old certificate is actually gone from both stores
+afterward, with only the new certificate returned by Inventory.
+
 ## Remaining unverified assumptions - must be lab-validated
 
 1. Whether the LDAPS listener picks up a newly-written NTDS-store certificate immediately, only
@@ -261,13 +325,26 @@ to customers whose DCs reuse the same certificate for multiple purposes.
    `Cert:\LocalMachine\My` for the *removed* certificate's private key material - worth confirming
    alongside the NTDS-hive ACL check, not just assuming it follows the same permission level.
 
+**Confirmed, not just by analogy**: whether `RenewalThumbprint` is a store-type-specific `WinSql`
+convention or a general Command renewal-job behavior was an open question as of 2026-09-18 (see
+above) - confirmed by the requester (Keyfactor) that Command's renewal process generally sends
+`RenewalThumbprint` containing the old certificate whenever it renews a certificate already present
+in a store, independent of store type. This is standard Command behavior, not something specific to
+`WinSql` that had to be separately verified for `WinLDAP`. The remaining validation gap is narrower
+than originally scoped: confirm the *end-to-end* renewal flow works against a live DC (see "Next
+step" below), not whether Command sends the property at all.
+
 ## Next step
 
 Run `docs/winldap-module-validation.ps1`'s Step 4 (Remove) again against the rewritten
 `Remove-KeyfactorLdapsCertificate`, and re-confirm via `ldp.exe`/`openssl s_client` from a separate
 machine that LDAPS actually stops presenting the certificate immediately, with no restart - that
 closes the loop on item 3 above using the *fixed* code, not just the raw registry mechanism that
-diagnosed the problem. For item 5 (and the new Personal-store ACL question it raises), stand up a
-real JEA endpoint per `docsource/content.md`'s setup steps (installing `Keyfactor.WinCert.LDAP`
-alongside `Keyfactor.WinCert.Common`), then run `Get-KeyfactorDiagnostics` through it and the JEA
-section of `docs/winldap-module-validation.ps1`. Update this file with findings once that's done.
+diagnosed the problem. Also run a renewal end-to-end through actual Keyfactor Command against a live
+DC and confirm Inventory returns only the new certificate afterward, and that the superseded
+certificate is actually gone from both the NTDS store and Personal. For item 5 (and the new
+Personal-store ACL question it raises),
+stand up a real JEA endpoint per `docsource/content.md`'s setup steps (installing
+`Keyfactor.WinCert.LDAP` alongside `Keyfactor.WinCert.Common`), then run `Get-KeyfactorDiagnostics`
+through it and the JEA section of `docs/winldap-module-validation.ps1`. Update this file with
+findings once that's done.
