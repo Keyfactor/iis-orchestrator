@@ -79,7 +79,7 @@ function Register-KeyfactorLdapsCertificate {
         }
 
         # --- Step: WriteNtdsStore ---------------------------------------------
-        $writeResult = Set-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName $leafStoreName -RawCertificateBytes $cert.RawData
+        $writeResult = Set-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName $leafStoreName -Certificate $cert
 
         if (-not $writeResult.Success) {
             $msg = "Failed to write certificate '$Thumbprint' into the '$serviceName\$leafStoreName' service store: $($writeResult.ErrorMessage)"

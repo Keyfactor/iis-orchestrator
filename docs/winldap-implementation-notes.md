@@ -471,3 +471,34 @@ through Command against a real Domain Controller, confirming (a) `certreq`'s loc
 resolves `HasPrivateKey = true` once the resulting certificate is copied into the NTDS registry
 store (the new unverified assumption noted above), and (b) the LDAPS listener actually picks up the
 re-enrolled certificate the same way it does for a normal Add.
+
+### Resolved during lab validation (2026-09-18, later)
+
+**First live ODKG test against a real DC**: CSR generation, signing, and import into Personal all
+worked correctly - the failure was in the new `WinLdap`-specific step. Error surfaced through
+Command:
+
+```
+Registering the re-enrolled certificate into the NTDS service store 'NTDS\My' failed at step
+'CatchAll' (code -1): PowerShell execution errors: Unexpected error in
+Register-KeyfactorLdapsCertificate: A parameter cannot be found that matches parameter name
+'RawCertificateBytes'.
+```
+
+Root cause: `Register-KeyfactorLdapsCertificate.ps1` was written against a stale, pre-lab-rewrite
+signature of `Set-NtdsServiceStoreCertificate` (`-RawCertificateBytes <byte[]>`). The actual,
+currently-shipping signature (rewritten during the September 1 lab validation - see "Resolved
+during lab validation (2026-09-01)" above) is `-Certificate <X509Certificate2>`; it does its own
+`SerializedCert` export internally rather than taking pre-exported bytes.
+`Add-KeyfactorLdapsCertificate.ps1` already called it correctly
+(`-Certificate $stagedCert`) - `Register-KeyfactorLdapsCertificate.ps1` was the one function that
+didn't, because it was written after that rewrite without re-checking the file it was calling into.
+
+Fix: changed the call to `Set-NtdsServiceStoreCertificate -ServiceName $serviceName -StoreName
+$leafStoreName -Certificate $cert` (the certificate object already re-read from Personal two steps
+earlier in the same function - no new logic needed, just the correct parameter). Confirmed
+`Test-LdapsCertificateEligibility`'s signature (`-Certificate <X509Certificate2>`) was NOT affected
+by the same drift - it already matched.
+
+Full solution rebuild: 0 errors. Same pre-existing `AdfsUnitTests.Test_AdfsInventory` failure, not a
+regression. Not yet re-tested against a live DC after this fix - that's the immediate next step.
