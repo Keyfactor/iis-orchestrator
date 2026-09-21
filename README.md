@@ -37,6 +37,7 @@ The Windows Certificate Orchestrator Extension is a multi-purpose integration th
 * WinCert - Certificates defined by path set for the Certificate Store
 * WinIIS - IIS Bound certificates
 * WinSQL - Certificates that are bound to the specified SQL Instances
+* WinLDAP - Manages the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller
 
 By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
 For a complete list of local machine cert stores you can execute the PowerShell command:
@@ -71,11 +72,12 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note: If Looking to use GMSA Accounts to run the Service Keyfactor Command 10.2 or greater is required for No Value checkbox to work**
 
-The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
+The Windows Certificate Universal Orchestrator extension implements 5 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
 - [Windows Certificate](#WinCert)
 - [IIS Bound Certificate](#IISU)
 - [WinSql](#WinSql)
 - [ADFS Rotation Manager](#WinAdfs)
+- [Windows LDAPS (NTDS) Certificate](#WinLDAP)
 
 ## Compatibility
 
@@ -172,13 +174,14 @@ Before configuring JEA on a target server, ensure the following:
 
 ### Keyfactor PowerShell Module Overview
 
-The WinCert extension ships three PowerShell modules. Each module contains a `RoleCapabilities` subfolder with a `.psrc` file that defines which functions are visible in a JEA session.
+The WinCert extension ships four PowerShell modules. Each module contains a `RoleCapabilities` subfolder with a `.psrc` file that defines which functions are visible in a JEA session.
 
 | Module | Store Types Supported | Purpose |
 |---|---|---|
-| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
+| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL, WinLDAP | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
 | `Keyfactor.WinCert.IIS` | WinIIS | IIS site binding management (get, create, remove bindings). |
 | `Keyfactor.WinCert.SQL` | WinSQL | SQL Server certificate binding management (get, bind, unbind). |
+| `Keyfactor.WinCert.LDAP` | WinLDAP | AD DS (NTDS) LDAPS certificate management on a Domain Controller (get, add, remove). Only install on Domain Controllers. |
 
 Install only the modules needed for the store types you manage on that server. For example, a server that only hosts IIS certificates needs `Keyfactor.WinCert.Common` and `Keyfactor.WinCert.IIS`.
 
@@ -195,6 +198,7 @@ PowerShell\
   Keyfactor.WinCert.Common\       ← Module: common certificate operations
   Keyfactor.WinCert.IIS\          ← Module: IIS binding management
   Keyfactor.WinCert.SQL\          ← Module: SQL Server binding management
+  Keyfactor.WinCert.LDAP\         ← Module: AD DS (NTDS) LDAPS certificate management
   Build\
     KeyfactorWinCert.pssc          ← JEA Session Configuration file
 ```
@@ -227,6 +231,11 @@ Copy-Item -Path "$sourcePath\Keyfactor.WinCert.IIS" `
 # Install the SQL module if this server hosts SQL Server certificate stores (WinSQL)
 Copy-Item -Path "$sourcePath\Keyfactor.WinCert.SQL" `
           -Destination "$moduleBase\Keyfactor.WinCert.SQL" `
+          -Recurse -Force
+
+# Install the LDAP module ONLY on Domain Controllers hosting the LDAPS certificate (WinLDAP)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.LDAP" `
+          -Destination "$moduleBase\Keyfactor.WinCert.LDAP" `
           -Recurse -Force
 ```
 
@@ -329,6 +338,7 @@ Only list the `RoleCapabilities` whose corresponding modules are installed on th
 | WinIIS only or WinCert + WinIIS | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS'` |
 | WinSQL only or WinCert + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL'` |
 | WinCert + WinIIS + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL'` |
+| WinLDAP only (on a Domain Controller) | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.LDAP'` |
 
 **Transcript Logging (Optional):**
 
@@ -565,6 +575,7 @@ Get-ChildItem 'C:\ProgramData\Keyfactor\JEA\Transcripts\' |
 * **Module updates require re-copying files, not re-registration.** When the WinCert extension is upgraded, copy the updated module folders to the target server's `C:\Program Files\WindowsPowerShell\Modules\` directory. WinRM does not need to be restarted for module-only updates.
 * **The JEA run-as account needs certificate store permissions.** Whether using a virtual account or a gMSA, the run-as account must have permission to read and write to the Windows certificate stores, access private keys, and (for IIS) manage IIS bindings. Virtual accounts are local administrators by default, so this is typically not a concern in development. For production gMSA accounts, explicitly grant the necessary permissions.
 * **ADFS stores (WinADFS) do not support JEA.** The WinADFS store type requires specific ADFS module cmdlets that cannot be constrained within a JEA session. WinADFS stores must use a standard WinRM connection.
+* **WinLDAP targets Domain Controllers, which are Tier-0 assets.** Many hardened Active Directory environments block inbound WinRM to DCs by policy regardless of payload - confirm with your AD/security team before assuming remote WinRM/JEA is even permitted. Separately, whether a JEA virtual account or gMSA has sufficient rights to write to `HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates` (the registry-backed store the LDAPS listener reads from) has not been lab-validated by Keyfactor as of this writing. Before relying on JEA for WinLDAP in production, run `Get-KeyfactorDiagnostics` through the JEA session and perform a full Add/Remove round-trip against a disposable test certificate on a lab Domain Controller to confirm the run-as account's permissions are sufficient.
 
 </details>
 
@@ -582,6 +593,7 @@ In addition to PowerShell, IISU requires additional PowerShell modules to be ins
 | `Keyfactor.WinCert.Common` | All store types — must always be installed |
 | `Keyfactor.WinCert.IIS` | WinIIS stores |
 | `Keyfactor.WinCert.SQL` | WinSQL stores |
+| `Keyfactor.WinCert.LDAP` | WinLDAP stores (Domain Controllers only) |
 
 In standard (non-JEA) WinRM and local-machine modes, the orchestrator automatically loads these modules from its own deployment at runtime — no pre-installation on the target server is required. JEA mode is the only mode that requires the modules to be pre-installed on the target server. See the **Just Enough Administration (JEA) Setup and Configuration** section for complete installation and setup instructions.
 
@@ -606,6 +618,7 @@ For customers wishing to use something other than the local administrator accoun
     -    Execute certreq commands.    -	Execute certreq commands.    *	Execute certreq commands.
     -    Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    *	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
     -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    *	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
+    -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates) when performing WinLDAP (AD DS / NTDS LDAPS) certificate operations on a Domain Controller. This has not been lab-validated for a JEA virtual/gMSA account - see the WinLDAP-specific note under Important Notes and Limitations above.
 
 ### Using Crypto Service Providers (CSP)
 When adding or reenrolling certificates, you may specify an optional CSP to be used when generating and storing the private keys.  This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed.
@@ -633,7 +646,7 @@ Below is a brief summary of the CSPs and their support for RSA and ECC algorithm
 
 To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your use-case. This only needs to happen _once_ per Keyfactor Command instance.
 
-The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types.
+The Windows Certificate Universal Orchestrator extension implements 5 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types.
 
 ### WinCert
 
@@ -1543,6 +1556,205 @@ the Keyfactor Command Portal
    </details>
 </details>
 
+### WinLDAP
+
+<details><summary>Click to expand details</summary>
+
+WinLDAP is a store type designed for managing the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller. It automates the certificate renewal workflow administrators traditionally perform by hand: importing the new certificate into the Domain Controller's Personal ("My") certificate store, then registering it into the NTDS-service-specific certificate store (registry-backed at `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates\My\Certificates`) that the LDAPS listener (port 636) reads from. It supports Inventory, Add, Remove, and Reenrollment (On-Device Key Generation / ODKG) of certificates, matching the job types supported by `WinCert`, `IISU`, and `WinSql`.
+
+Writing into that registry-backed store uses only the built-in .NET certificate APIs and ordinary registry access already available on every Domain Controller - no `certutil.exe` calls, and no new executables or DLLs are installed on the DC to do it.
+
+* NOTE: Each Domain Controller is managed as its own independent Certificate Store, since every DC's LDAPS certificate has a unique Subject/SAN matching that DC's own FQDN. WinLDAP does not fan a single certificate out to multiple DCs the way WinAdfs fans a shared certificate out to ADFS farm nodes.
+* NOTE: Inventory is scoped strictly to the NTDS service store, which is treated as the single source of truth for what certificate is in use; the Personal-store copy created during Add is an internal staging detail and is not separately visible in Inventory. Remove, however, removes the certificate from **both** the NTDS service store and the Personal store - lab testing on a live Domain Controller confirmed that leaving the Personal-store copy in place allows the LDAPS listener to keep presenting the certificate after Remove runs, even after restarting the NTDS service. Because the Personal store is a general-purpose store, removing a certificate from it here will also affect any other service on the same Domain Controller that happens to use the same certificate (e.g. WinRM HTTPS, RDP) - WinLDAP has no visibility into other consumers of that store.
+* NOTE: How quickly the LDAPS listener picks up a newly written certificate has not yet been validated against a live Domain Controller. Treat this store type as pre-production until that validation is complete.
+* NOTE: When Keyfactor Command renews a certificate already present in this store, the Add job cleans up the certificate it's replacing (from both the NTDS service store and the Personal store) after the new certificate is successfully deployed - it does not wait for a separate Remove job. Without this, lab testing showed the superseded certificate is left behind indefinitely (both stores keep accumulating one certificate per renewal, and Inventory returns all of them, not just the current one). If that cleanup step itself fails, the job reports a Warning rather than a Failure, since the new certificate is already in place and serving LDAPS at that point - check the job history message for the superseded thumbprint if manual cleanup is needed.
+* NOTE: Reenrollment (ODKG) generates the private key locally on the Domain Controller (via `certreq`) and only sends a Certificate Signing Request to Keyfactor Command - the key never leaves the machine. Once Command signs it, the certificate is staged into the Personal store and then registered into the NTDS service store the same way a normal Add does, including the same LDAPS eligibility check (Server Authentication EKU, Subject/SAN matching this DC's FQDN). Unlike Add, Reenrollment does not offer a restart-the-NTDS-service option and does not clean up a previous certificate - this matches `WinSql`'s own Reenrollment behavior, not something specific to WinLDAP. This has not yet been validated end-to-end against a live Domain Controller.
+
+#### Windows LDAPS (NTDS) Certificate Requirements
+
+WinLDAP supports both connection models used elsewhere in this extension:
+
+* **Local agent**, using the `|LocalMachine` Client Machine naming convention (see [Client Machine Instructions](#note-regarding-client-machine)) - the orchestrator runs directly on the Domain Controller and accesses the registry/certificate stores in-process.
+* **Remote WinRM** (optionally through a JEA endpoint), or **SSH** (when the orchestrator itself runs in a Linux container/host) - connecting to the Domain Controller from a centrally installed orchestrator, following the same `WinRM Protocol`/`WinRM Port`/`JEA Endpoint Name` configuration used by `WinSQL` and the other store types. See the **Just Enough Administration (JEA) Setup and Configuration** section in the main README for the general setup walkthrough; install the `Keyfactor.WinCert.LDAP` module (in addition to `Keyfactor.WinCert.Common`) on the Domain Controller to use JEA with WinLDAP.
+
+Each Domain Controller is managed independently with no fan-out to other nodes (unlike `WinAdfs`'s farm model), so there is no WinRM double-hop concern - every operation this store type performs touches only the one DC already connected to.
+
+**Before relying on remote WinRM/JEA for WinLDAP in production, validate the following against your own environment** - these are Domain-Controller-specific considerations that don't apply to this extension's other store types:
+
+* Domain Controllers are Tier-0 assets, and many hardened Active Directory environments disable inbound WinRM to DCs as a blanket policy regardless of payload. Confirm with your AD/security team whether remote management is even permitted before configuring it.
+* Whether a JEA virtual account or gMSA has sufficient rights to write to `HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates` (the registry-backed store the LDAPS listener reads from) has not been lab-validated by Keyfactor as of this writing. Run `Get-KeyfactorDiagnostics` through the JEA session and perform a full Add/Remove round-trip against a disposable test certificate on a lab Domain Controller first (see `docs/winldap-ntds-validation.ps1` and `docs/winldap-module-validation.ps1` in the repository).
+
+#### Supported Operations
+
+| Operation    | Is Supported |
+|--------------|--------------|
+| Add          | ✅ Checked |
+| Remove       | ✅ Checked |
+| Discovery    | 🔲 Unchecked |
+| Reenrollment | ✅ Checked |
+| Create       | 🔲 Unchecked |
+
+#### Store Type Creation
+
+##### Using kfutil:
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
+For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+
+   <details><summary>Click to expand WinLDAP kfutil details</summary>
+
+   ##### Using online definition from GitHub:
+   This will reach out to GitHub and pull the latest store-type definition
+   ```shell
+   # Windows LDAPS (NTDS) Certificate
+   kfutil store-types create WinLDAP
+   ```
+
+   ##### Offline creation using integration-manifest file:
+   If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+   You would first download the [integration-manifest.json](./integration-manifest.json) and then run the following command
+   in your offline environment.
+   ```shell
+   kfutil store-types create --from-file integration-manifest.json
+   ```
+   </details>
+
+#### Manual Creation
+Below are instructions on how to create the WinLDAP store type manually in
+the Keyfactor Command Portal
+
+   <details><summary>Click to expand manual WinLDAP details</summary>
+
+   Create a store type called `WinLDAP` with the attributes in the tables below:
+
+   ##### Basic Tab
+   | Attribute | Value | Description |
+   | --------- | ----- | ----- |
+   | Name | Windows LDAPS (NTDS) Certificate | Display name for the store type (may be customized) |
+   | Short Name | WinLDAP | Short display name for the store type |
+   | Capability | WinLDAP | Store type name orchestrator will register with. Check the box to allow entry of value |
+   | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
+   | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | ✅ Checked | Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
+   | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
+   | Blueprint Allowed | 🔲 Unchecked | Determines if store type may be included in an Orchestrator blueprint |
+   | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
+   | Requires Store Password | 🔲 Unchecked | Enables users to optionally specify a store password when defining a Certificate Store. |
+   | Supports Entry Password | 🔲 Unchecked | Determines if an individual entry within a store can have a password. |
+
+   The Basic tab should look like this:
+
+   ![WinLDAP Basic Tab](docsource/images/WinLDAP-basic-store-type-dialog.svg)
+
+   ##### Advanced Tab
+   | Attribute | Value | Description |
+   | --------- | ----- | ----- |
+   | Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias. |
+   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. |
+   | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
+
+   The Advanced tab should look like this:
+
+   ![WinLDAP Advanced Tab](docsource/images/WinLDAP-advanced-store-type-dialog.svg)
+
+   > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
+
+   ##### Custom Fields Tab
+   Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed. The following custom fields should be added to the store type:
+
+   | Name | Display Name | Description | Type | Default Value/Options | Required |
+   | ---- | ------------ | ---- | --------------------- | -------- | ----------- |
+   | spnwithport | SPN With Port | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. | Bool | false | 🔲 Unchecked |
+   | WinRM Protocol | WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. | MultipleChoice | https,http,ssh | ✅ Checked |
+   | WinRM Port | WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. | String | 5986 | ✅ Checked |
+   | ServerUsername | Server Username | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) | Secret |  | 🔲 Unchecked |
+   | ServerPassword | Server Password | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) | Secret |  | 🔲 Unchecked |
+   | ServerUseSsl | Use SSL | Determine whether the server uses SSL or not (This field is automatically created) | Bool | true | ✅ Checked |
+   | RestartService | Restart NTDS Service After Cert Installed | Boolean value (true or false) indicating whether to restart the NTDS service after installing the certificate, so the LDAPS listener picks it up immediately. Restarting NTDS briefly takes AD DS offline on this Domain Controller (via Restartable AD DS). If false, the LDAPS listener will pick up the certificate on its own schedule, or not until NTDS is next restarted. | Bool | false | ✅ Checked |
+   | JEAEndpointName | JEA End Point Name | Name of the JEA endpoint to use for the session (This field is automatically created) | String |  | 🔲 Unchecked |
+
+   The Custom Fields tab should look like this:
+
+   ![WinLDAP Custom Fields Tab](docsource/images/WinLDAP-custom-fields-store-type-dialog.svg)
+
+   ###### SPN With Port
+   Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+
+   ![WinLDAP Custom Field - spnwithport](docsource/images/WinLDAP-custom-field-spnwithport-dialog.svg)
+   ![WinLDAP Custom Field - spnwithport](docsource/images/WinLDAP-custom-field-spnwithport-validation-options-dialog.svg)
+
+
+   ###### WinRM Protocol
+   Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
+
+   ![WinLDAP Custom Field - WinRM Protocol](docsource/images/WinLDAP-custom-field-WinRM Protocol-dialog.svg)
+   ![WinLDAP Custom Field - WinRM Protocol](docsource/images/WinLDAP-custom-field-WinRM Protocol-validation-options-dialog.svg)
+
+
+   ###### WinRM Port
+   String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
+
+   ![WinLDAP Custom Field - WinRM Port](docsource/images/WinLDAP-custom-field-WinRM Port-dialog.svg)
+   ![WinLDAP Custom Field - WinRM Port](docsource/images/WinLDAP-custom-field-WinRM Port-validation-options-dialog.svg)
+
+
+   ###### Server Username
+   Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created)
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+   ###### Server Password
+   Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+   ###### Use SSL
+   Determine whether the server uses SSL or not (This field is automatically created)
+
+   ![WinLDAP Custom Field - ServerUseSsl](docsource/images/WinLDAP-custom-field-ServerUseSsl-dialog.svg)
+   ![WinLDAP Custom Field - ServerUseSsl](docsource/images/WinLDAP-custom-field-ServerUseSsl-validation-options-dialog.svg)
+
+
+   ###### Restart NTDS Service After Cert Installed
+   Boolean value (true or false) indicating whether to restart the NTDS service after installing the certificate, so the LDAPS listener picks it up immediately. Restarting NTDS briefly takes AD DS offline on this Domain Controller (via Restartable AD DS). If false, the LDAPS listener will pick up the certificate on its own schedule, or not until NTDS is next restarted.
+
+   ![WinLDAP Custom Field - RestartService](docsource/images/WinLDAP-custom-field-RestartService-dialog.svg)
+   ![WinLDAP Custom Field - RestartService](docsource/images/WinLDAP-custom-field-RestartService-validation-options-dialog.svg)
+
+
+   ###### JEA End Point Name
+   Name of the JEA endpoint to use for the session (This field is automatically created)
+
+   ![WinLDAP Custom Field - JEAEndpointName](docsource/images/WinLDAP-custom-field-JEAEndpointName-dialog.svg)
+   ![WinLDAP Custom Field - JEAEndpointName](docsource/images/WinLDAP-custom-field-JEAEndpointName-validation-options-dialog.svg)
+
+
+   ##### Entry Parameters Tab
+
+   | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
+   | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
+   | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+
+   The Entry Parameters tab should look like this:
+
+   ![WinLDAP Entry Parameters Tab](docsource/images/WinLDAP-entry-parameters-store-type-dialog.svg)
+   ##### Crypto Provider Name
+   Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
+
+   ![WinLDAP Entry Parameter - ProviderName](docsource/images/WinLDAP-entry-parameters-store-type-dialog-ProviderName.svg)
+   ![WinLDAP Entry Parameter - ProviderName](docsource/images/WinLDAP-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
+
+
+   </details>
+</details>
+
 
 ## Installation
 
@@ -1586,7 +1798,7 @@ the Keyfactor Command Portal
 
 ## Defining Certificate Stores
 
-The Windows Certificate Universal Orchestrator extension implements 4 Certificate Store Types, each of which implements different functionality. Refer to the individual instructions below for each Certificate Store Type that you deemed necessary for your use case from the installation section.
+The Windows Certificate Universal Orchestrator extension implements 5 Certificate Store Types, each of which implements different functionality. Refer to the individual instructions below for each Certificate Store Type that you deemed necessary for your use case from the installation section.
 
 <details><summary>Windows Certificate (WinCert)</summary>
 
@@ -1919,6 +2131,98 @@ When creating a Certificate Store for WinADFS, the Client Machine name must be s
 
     ```shell
     kfutil stores import csv --store-type-name WinAdfs --file WinAdfs.csv
+    ```
+
+</details>
+
+#### PAM Provider Eligible Fields
+<details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
+
+If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+
+Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
+> Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
+
+</details>
+
+> The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+</details>
+
+<details><summary>Windows LDAPS (NTDS) Certificate (WinLDAP)</summary>
+
+When creating a Certificate Store for WinLDAP, the Store Path is fixed to `NTDS\My`, identifying the NTDS service certificate store rather than the ordinary Personal store. The Client Machine value is either the Domain Controller's hostname/IP (for remote WinRM/SSH) or `<hostname>|LocalMachine` (for a local agent).
+
+### Store Creation
+
+#### Manually with the Command UI
+
+<details><summary>Click to expand details</summary>
+
+1. **Navigate to the _Certificate Stores_ page in Keyfactor Command.**
+
+    Log into Keyfactor Command, toggle the _Locations_ dropdown, and click _Certificate Stores_.
+
+2. **Add a Certificate Store.**
+
+    Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | Category | Select "Windows LDAPS (NTDS) Certificate" or the customized certificate store name from the previous step. |
+   | Container | Optional container to associate certificate store with. |
+   | Client Machine | Hostname of the Domain Controller whose AD DS (NTDS) LDAPS certificate is to be managed. This can be a remote hostname (a WinRM/JEA session will be established using the credentials specified in the Server Username and Server Password fields), or the local agent may be installed directly on the Domain Controller using the LocalMachine moniker. Unlike WinAdfs, WinLDAP does not require local-agent-only operation: each Domain Controller is managed as its own independent store with no fan-out to other nodes, so there is no WinRM double-hop concern. For more information, see [Client Machine](#note-regarding-client-machine). |
+   | Store Path | Fixed string value 'NTDS\My' identifying the registry-backed AD DS (NTDS) service certificate store that the LDAPS listener (port 636) reads from - distinct from the Personal ('My') store. Certificate staging into the Personal store is handled internally by the Add operation and is not separately visible here. |
+   | Orchestrator | Select an approved orchestrator capable of managing `WinLDAP` certificates. Specifically, one with the `WinLDAP` capability. |
+   | spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
+   | WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. |
+   | WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. |
+   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+   | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | RestartService | Boolean value (true or false) indicating whether to restart the NTDS service after installing the certificate, so the LDAPS listener picks it up immediately. Restarting NTDS briefly takes AD DS offline on this Domain Controller (via Restartable AD DS). If false, the LDAPS listener will pick up the certificate on its own schedule, or not until NTDS is next restarted. |
+   | JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
+
+</details>
+
+#### Using kfutil CLI
+
+<details><summary>Click to expand details</summary>
+
+1. **Generate a CSV template for the WinLDAP certificate store**
+
+    ```shell
+    kfutil stores import generate-template --store-type-name WinLDAP --outpath WinLDAP.csv
+    ```
+2. **Populate the generated CSV file**
+
+    Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | Category | Select "Windows LDAPS (NTDS) Certificate" or the customized certificate store name from the previous step. |
+   | Container | Optional container to associate certificate store with. |
+   | Client Machine | Hostname of the Domain Controller whose AD DS (NTDS) LDAPS certificate is to be managed. This can be a remote hostname (a WinRM/JEA session will be established using the credentials specified in the Server Username and Server Password fields), or the local agent may be installed directly on the Domain Controller using the LocalMachine moniker. Unlike WinAdfs, WinLDAP does not require local-agent-only operation: each Domain Controller is managed as its own independent store with no fan-out to other nodes, so there is no WinRM double-hop concern. For more information, see [Client Machine](#note-regarding-client-machine). |
+   | Store Path | Fixed string value 'NTDS\My' identifying the registry-backed AD DS (NTDS) service certificate store that the LDAPS listener (port 636) reads from - distinct from the Personal ('My') store. Certificate staging into the Personal store is handled internally by the Add operation and is not separately visible here. |
+   | Orchestrator | Select an approved orchestrator capable of managing `WinLDAP` certificates. Specifically, one with the `WinLDAP` capability. |
+   | Properties.spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
+   | Properties.WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. |
+   | Properties.WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. |
+   | Properties.ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+   | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | Properties.RestartService | Boolean value (true or false) indicating whether to restart the NTDS service after installing the certificate, so the LDAPS listener picks it up immediately. Restarting NTDS briefly takes AD DS offline on this Domain Controller (via Restartable AD DS). If false, the LDAPS listener will pick up the certificate on its own schedule, or not until NTDS is next restarted. |
+   | Properties.JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
+
+3. **Import the CSV file to create the certificate stores**
+
+    ```shell
+    kfutil stores import csv --store-type-name WinLDAP --file WinLDAP.csv
     ```
 
 </details>

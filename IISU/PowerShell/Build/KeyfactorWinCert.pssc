@@ -200,6 +200,9 @@
     #   'Keyfactor.WinCert.Common'  -- core certificate store operations (always include)
     #   'Keyfactor.WinCert.IIS'     -- IIS binding management
     #   'Keyfactor.WinCert.SQL'     -- SQL certificate management
+    #   'Keyfactor.WinCert.LDAP'    -- AD DS (NTDS) LDAPS certificate management (Domain Controllers
+    #                                  only - see docsource/winldap.md for Tier-0-specific caveats
+    #                                  before relying on this in production)
     #
     # gMSA CONNECTING IDENTITY PATTERN
     # ------------------------------------------------------------------
@@ -222,6 +225,7 @@
     #   WinCert + SQL:       @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL' }
     #   WinCert + IIS + SQL: @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
     #   WinCert only:        @{ RoleCapabilities = 'Keyfactor.WinCert.Common' }
+    #   WinLDAP (on a DC):   @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.LDAP' }
     RoleDefinitions = @{
         # LOW-PRIV SERVICE gMSA -- the connecting identity used by the Windows Service.
         # This account authenticates via Kerberos; no password is ever stored or passed.
