@@ -56,6 +56,18 @@
       "CertStores.WinLDAP.ReEnrollment": {
         "assemblypath": "WindowsCertStore.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap.ReEnrollment"
+      },
+      "CertStores.WinNetSH.Inventory": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinNetSH.Inventory"
+      },
+      "CertStores.WinNetSH.Management": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinNetSH.Management"
+      },
+      "CertStores.WinNetSH.ReEnrollment": {
+        "assemblypath": "WindowsCertStore.dll",
+        "TypeFullName": "Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinNetSH.ReEnrollment"
       }
     }
   }

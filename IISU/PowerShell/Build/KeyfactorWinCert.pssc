@@ -59,6 +59,7 @@
 #      Copy-Item -Path '.\Keyfactor.WinCert.Common' -Destination "$base\Keyfactor.WinCert.Common" -Recurse -Force
 #      Copy-Item -Path '.\Keyfactor.WinCert.IIS'    -Destination "$base\Keyfactor.WinCert.IIS"    -Recurse -Force
 #      Copy-Item -Path '.\Keyfactor.WinCert.SQL'    -Destination "$base\Keyfactor.WinCert.SQL"    -Recurse -Force
+#      Copy-Item -Path '.\Keyfactor.WinCert.NetSH'  -Destination "$base\Keyfactor.WinCert.NetSH"  -Recurse -Force
 #
 #    (Only install the modules needed for the store types you use on this endpoint.)
 #
@@ -117,6 +118,9 @@
 #
 #   # Test IIS inventory (requires Keyfactor.WinCert.IIS module installed)
 #   Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorIISBoundCertificates }
+#
+#   # Test NetSH inventory (requires Keyfactor.WinCert.NetSH module installed)
+#   Invoke-Command -Session $s -ScriptBlock { Get-KeyfactorNetSHBoundCertificates -StoreName 'My' }
 #
 #   Remove-PSSession $s
 #
@@ -203,6 +207,8 @@
     #   'Keyfactor.WinCert.LDAP'    -- AD DS (NTDS) LDAPS certificate management (Domain Controllers
     #                                  only - see docsource/winldap.md for Tier-0-specific caveats
     #                                  before relying on this in production)
+    #   'Keyfactor.WinCert.NetSH'   -- netsh http sslcert binding management (requires local
+    #                                  Administrator rights - see docsource/winnetsh.md)
     #
     # gMSA CONNECTING IDENTITY PATTERN
     # ------------------------------------------------------------------
@@ -226,6 +232,7 @@
     #   WinCert + IIS + SQL: @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL' }
     #   WinCert only:        @{ RoleCapabilities = 'Keyfactor.WinCert.Common' }
     #   WinLDAP (on a DC):   @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.LDAP' }
+    #   WinNetSH:            @{ RoleCapabilities = 'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.NetSH' }
     RoleDefinitions = @{
         # LOW-PRIV SERVICE gMSA -- the connecting identity used by the Windows Service.
         # This account authenticates via Kerberos; no password is ever stored or passed.

@@ -1,0 +1,63 @@
+#
+# Keyfactor.WinCert.NetSH.psrc
+# JEA Role Capability file for Keyfactor Windows Certificate Store (netsh http sslcert operations)
+#
+# INSTALL LOCATION:
+#   This file must live inside the module folder that PowerShell can discover:
+#     C:\Program Files\WindowsPowerShell\Modules\
+#       Keyfactor.WinCert.NetSH\
+#         RoleCapabilities\
+#           Keyfactor.WinCert.NetSH.psrc   <-- this file
+#
+#   PowerShell finds the role capability by name ('Keyfactor.WinCert.NetSH') by searching
+#   all modules in $env:PSModulePath for a RoleCapabilities subfolder with a matching .psrc.
+#
+# LANGUAGE MODE NOTE:
+#   The session configuration (KeyfactorWinCert.pssc) sets LanguageMode = 'ConstrainedLanguage'.
+#   Module code loaded from a trusted path ($env:PSModulePath) runs as FULLY TRUSTED and can
+#   use .NET APIs freely. The ConstrainedLanguage restriction only applies to caller scriptblocks
+#   sent by the orchestrator (e.g., param() blocks for parameter passing).
+#
+@{
+    GUID        = '9b6e2b3a-2b9f-4b3a-9c2c-6e7d3f6c4a1b'
+    Author      = 'Keyfactor'
+    Description = 'Role capabilities for Keyfactor Windows Certificate Store netsh http sslcert operations (inventory, add, remove, reenrollment)'
+
+    # Import both modules so their functions are pre-loaded and run as trusted code.
+    # Both modules MUST be installed under C:\Program Files\WindowsPowerShell\Modules\ so that
+    # PowerShell treats them as trusted (required for .NET API usage in ConstrainedLanguage sessions).
+    ModulesToImport = @('Keyfactor.WinCert.Common', 'Keyfactor.WinCert.NetSH')
+
+    # Functions the orchestrator is allowed to invoke in this JEA session.
+    # Test-KeyfactorAdminRights is used because binding/unbinding sslcert entries requires local
+    # Administrator rights on the target machine, the same as WinIIS.
+    VisibleFunctions = @(
+        'Get-KeyfactorNetSHBoundCertificates',
+        'New-KeyfactorNetSHBinding',
+        'Remove-KeyfactorNetSHBinding',
+        'Remove-KeyfactorNetSHCertificateIfUnused',
+        'Test-KeyfactorAdminRights'
+    )
+
+    # Cmdlets available to caller scriptblocks (param() wrappers sent by PSHelper).
+    # Module functions are trusted and can use any cmdlet internally regardless of this list.
+    VisibleCmdlets = @(
+        'ConvertTo-Json',
+        'ConvertFrom-Json',
+        'Write-Output',
+        'Write-Verbose',
+        'Write-Warning',
+        'Write-Error',
+        'Write-Information'
+    )
+
+    # netsh.exe is the only external command this module shells out to - there is no native
+    # PowerShell cmdlet for HTTP.sys SSL certificate bindings.
+    VisibleExternalCommands = @('C:\Windows\System32\netsh.exe')
+
+    # No variables need to be pre-defined for the orchestrator.
+    VisibleVariables = @()
+
+    # No aliases beyond what the module exports.
+    VisibleAliases = @()
+}
