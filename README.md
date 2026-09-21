@@ -38,6 +38,7 @@ The Windows Certificate Orchestrator Extension is a multi-purpose integration th
 * WinIIS - IIS Bound certificates
 * WinSQL - Certificates that are bound to the specified SQL Instances
 * WinLDAP - Manages the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller
+* WinNetSH - Certificates bound to HTTP.sys via `netsh http sslcert` (e.g. WinRM HTTPS listeners and other HTTP.sys-hosted services)
 
 By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
 For a complete list of local machine cert stores you can execute the PowerShell command:
@@ -72,12 +73,13 @@ In version 2.0 of the IIS Orchestrator, the certificate store type has been rena
 
 **Note: If Looking to use GMSA Accounts to run the Service Keyfactor Command 10.2 or greater is required for No Value checkbox to work**
 
-The Windows Certificate Universal Orchestrator extension implements 5 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
+The Windows Certificate Universal Orchestrator extension implements 6 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types. Descriptions of each are provided below.
 - [Windows Certificate](#WinCert)
 - [IIS Bound Certificate](#IISU)
 - [WinSql](#WinSql)
 - [ADFS Rotation Manager](#WinAdfs)
 - [Windows LDAPS (NTDS) Certificate](#WinLDAP)
+- [NetSH HTTP Bound Certificate](#WinNetSH)
 
 ## Compatibility
 
@@ -178,10 +180,11 @@ The WinCert extension ships four PowerShell modules. Each module contains a `Rol
 
 | Module | Store Types Supported | Purpose |
 |---|---|---|
-| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL, WinLDAP | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
+| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL, WinLDAP, WinNetSH | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
 | `Keyfactor.WinCert.IIS` | WinIIS | IIS site binding management (get, create, remove bindings). |
 | `Keyfactor.WinCert.SQL` | WinSQL | SQL Server certificate binding management (get, bind, unbind). |
 | `Keyfactor.WinCert.LDAP` | WinLDAP | AD DS (NTDS) LDAPS certificate management on a Domain Controller (get, add, remove). Only install on Domain Controllers. |
+| `Keyfactor.WinCert.NetSH` | WinNetSH | HTTP.sys `netsh http sslcert` binding management (get, bind, unbind). Requires local Administrator rights on the target server. |
 
 Install only the modules needed for the store types you manage on that server. For example, a server that only hosts IIS certificates needs `Keyfactor.WinCert.Common` and `Keyfactor.WinCert.IIS`.
 
@@ -199,6 +202,7 @@ PowerShell\
   Keyfactor.WinCert.IIS\          ← Module: IIS binding management
   Keyfactor.WinCert.SQL\          ← Module: SQL Server binding management
   Keyfactor.WinCert.LDAP\         ← Module: AD DS (NTDS) LDAPS certificate management
+  Keyfactor.WinCert.NetSH\        ← Module: netsh http sslcert binding management
   Build\
     KeyfactorWinCert.pssc          ← JEA Session Configuration file
 ```
@@ -236,6 +240,11 @@ Copy-Item -Path "$sourcePath\Keyfactor.WinCert.SQL" `
 # Install the LDAP module ONLY on Domain Controllers hosting the LDAPS certificate (WinLDAP)
 Copy-Item -Path "$sourcePath\Keyfactor.WinCert.LDAP" `
           -Destination "$moduleBase\Keyfactor.WinCert.LDAP" `
+          -Recurse -Force
+
+# Install the NetSH module if this server hosts netsh http sslcert certificate bindings (WinNetSH)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.NetSH" `
+          -Destination "$moduleBase\Keyfactor.WinCert.NetSH" `
           -Recurse -Force
 ```
 
@@ -339,6 +348,7 @@ Only list the `RoleCapabilities` whose corresponding modules are installed on th
 | WinSQL only or WinCert + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL'` |
 | WinCert + WinIIS + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL'` |
 | WinLDAP only (on a Domain Controller) | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.LDAP'` |
+| WinNetSH only | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.NetSH'` |
 
 **Transcript Logging (Optional):**
 
@@ -594,6 +604,7 @@ In addition to PowerShell, IISU requires additional PowerShell modules to be ins
 | `Keyfactor.WinCert.IIS` | WinIIS stores |
 | `Keyfactor.WinCert.SQL` | WinSQL stores |
 | `Keyfactor.WinCert.LDAP` | WinLDAP stores (Domain Controllers only) |
+| `Keyfactor.WinCert.NetSH` | WinNetSH stores |
 
 In standard (non-JEA) WinRM and local-machine modes, the orchestrator automatically loads these modules from its own deployment at runtime — no pre-installation on the target server is required. JEA mode is the only mode that requires the modules to be pre-installed on the target server. See the **Just Enough Administration (JEA) Setup and Configuration** section for complete installation and setup instructions.
 
@@ -619,6 +630,7 @@ For customers wishing to use something other than the local administrator accoun
     -    Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    *	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
     -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    *	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
     -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates) when performing WinLDAP (AD DS / NTDS LDAPS) certificate operations on a Domain Controller. This has not been lab-validated for a JEA virtual/gMSA account - see the WinLDAP-specific note under Important Notes and Limitations above.
+    -    Execute netsh.exe commands (`netsh http show/add/delete sslcert`) when performing WinNetSH certificate binding operations. This requires local Administrator rights on the target server, the same as WinIIS.
 
 ### Using Crypto Service Providers (CSP)
 When adding or reenrolling certificates, you may specify an optional CSP to be used when generating and storing the private keys.  This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed.
@@ -646,7 +658,7 @@ Below is a brief summary of the CSPs and their support for RSA and ECC algorithm
 
 To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your use-case. This only needs to happen _once_ per Keyfactor Command instance.
 
-The Windows Certificate Universal Orchestrator extension implements 5 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types.
+The Windows Certificate Universal Orchestrator extension implements 6 Certificate Store Types. Depending on your use case, you may elect to use one, or all of these Certificate Store Types.
 
 ### WinCert
 
@@ -1755,6 +1767,224 @@ the Keyfactor Command Portal
    </details>
 </details>
 
+### WinNetSH
+
+<details><summary>Click to expand details</summary>
+
+WinNetSH is a store type for managing SSL certificates bound to HTTP.sys via `netsh http sslcert` - the binding mechanism used by services that sit directly on top of HTTP.sys without their own certificate-binding UI or cmdlet, most commonly the WinRM HTTPS listener, but also any other HTTP.sys-hosted service configured this way. It supports Inventory, Add, Remove, and Reenrollment (On-Device Key Generation / ODKG) of certificates, matching the job types supported by `WinCert`, `IISU`, `WinSql`, and `WinLDAP`.
+
+There is no native PowerShell cmdlet for HTTP.sys SSL certificate bindings, so this store type shells out to `netsh.exe` and parses its text output, rather than using a `Cert:`/registry-based or managed-API approach the way the other store types do.
+
+* NOTE: A binding is identified by its `IP:Port` (or `Hostname:Port`, for an SNI binding) - there is no "site" concept the way there is for WinIIS. Inventory is scoped to bindings whose certificate store (`certstorename`) matches the Certificate Store's configured Store Path; a binding pointing at a different store is not returned.
+* NOTE: `netsh http add sslcert` requires an `AppId` (an arbitrary GUID identifying the owning application) but has no "update" verb, so renewing a certificate is implemented as delete-then-add against the same binding key. When the `AppId` entry parameter is left blank, this store type resolves one automatically: a renewal of an existing binding reuses that binding's current `AppId` (so it doesn't silently change), and a brand-new binding is given a freshly generated GUID. Either way, the `AppId` actually used is reported back in the job result message and in Inventory's `AppId` parameter - check there if an explicit `AppId` matters for the consuming service (some services validate their own `AppId` at startup).
+* NOTE: Unlike WinIIS, a binding change here takes effect immediately - `netsh http sslcert` has no associated service to restart.
+* NOTE: Remove removes both the `netsh http sslcert` binding and the certificate from the underlying Windows certificate store, but only removes the certificate if no other `sslcert` binding on the same machine still references it - the same "still in use elsewhere" check WinIIS performs before deleting a certificate.
+* NOTE: The exact text format of `netsh http show sslcert` has only been verified against one Windows version as of this writing (see `docs/winnetsh-implementation-notes.md`). Add/Remove/Inventory have been round-tripped successfully against real bindings on that machine, but JEA support specifically has not yet been lab-validated - confirm the JEA run-as account has sufficient rights to run `netsh http add/delete sslcert` before relying on this over a JEA endpoint in production. If Inventory or binding operations behave unexpectedly on a different OS version, run `netsh http show sslcert` directly on the target server and compare its output shape against what `Keyfactor.WinCert.NetSH`'s parser expects.
+
+#### NetSH HTTP Bound Certificate Requirements
+
+WinNetSH supports both connection models used elsewhere in this extension:
+
+* **Local agent**, using the `|LocalMachine` Client Machine naming convention (see [Client Machine Instructions](#note-regarding-client-machine)) - the orchestrator runs directly on the target server.
+* **Remote WinRM** (optionally through a JEA endpoint), or **SSH** (when the orchestrator itself runs in a Linux container/host) - connecting to the target server from a centrally installed orchestrator, following the same `WinRM Protocol`/`WinRM Port`/`JEA Endpoint Name` configuration used by the other store types. See the **Just Enough Administration (JEA) Setup and Configuration** section in the main README; install the `Keyfactor.WinCert.NetSH` module (in addition to `Keyfactor.WinCert.Common`) on the target server to use JEA with WinNetSH.
+
+Binding and unbinding `netsh http sslcert` entries requires local Administrator rights on the target server, the same as WinIIS - see **Security and Permission Considerations** in the main README.
+
+#### Supported Operations
+
+| Operation    | Is Supported |
+|--------------|--------------|
+| Add          | ✅ Checked |
+| Remove       | ✅ Checked |
+| Discovery    | 🔲 Unchecked |
+| Reenrollment | ✅ Checked |
+| Create       | 🔲 Unchecked |
+
+#### Store Type Creation
+
+##### Using kfutil:
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to create certificate store types.
+For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
+
+   <details><summary>Click to expand WinNetSH kfutil details</summary>
+
+   ##### Using online definition from GitHub:
+   This will reach out to GitHub and pull the latest store-type definition
+   ```shell
+   # NetSH HTTP Bound Certificate
+   kfutil store-types create WinNetSH
+   ```
+
+   ##### Offline creation using integration-manifest file:
+   If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+   You would first download the [integration-manifest.json](./integration-manifest.json) and then run the following command
+   in your offline environment.
+   ```shell
+   kfutil store-types create --from-file integration-manifest.json
+   ```
+   </details>
+
+#### Manual Creation
+Below are instructions on how to create the WinNetSH store type manually in
+the Keyfactor Command Portal
+
+   <details><summary>Click to expand manual WinNetSH details</summary>
+
+   Create a store type called `WinNetSH` with the attributes in the tables below:
+
+   ##### Basic Tab
+   | Attribute | Value | Description |
+   | --------- | ----- | ----- |
+   | Name | NetSH HTTP Bound Certificate | Display name for the store type (may be customized) |
+   | Short Name | WinNetSH | Short display name for the store type |
+   | Capability | WinNetSH | Store type name orchestrator will register with. Check the box to allow entry of value |
+   | Supports Add | ✅ Checked | Indicates that the Store Type supports Management Add |
+   | Supports Remove | ✅ Checked | Indicates that the Store Type supports Management Remove |
+   | Supports Discovery | 🔲 Unchecked | Indicates that the Store Type supports Discovery |
+   | Supports Reenrollment | ✅ Checked | Indicates that the Store Type supports Reenrollment |
+   | Supports Create | 🔲 Unchecked | Indicates that the Store Type supports store creation |
+   | Needs Server | ✅ Checked | Determines if a target server name is required when creating store |
+   | Blueprint Allowed | ✅ Checked | Determines if store type may be included in an Orchestrator blueprint |
+   | Uses PowerShell | 🔲 Unchecked | Determines if underlying implementation is PowerShell |
+   | Requires Store Password | 🔲 Unchecked | Enables users to optionally specify a store password when defining a Certificate Store. |
+   | Supports Entry Password | 🔲 Unchecked | Determines if an individual entry within a store can have a password. |
+
+   The Basic tab should look like this:
+
+   ![WinNetSH Basic Tab](docsource/images/WinNetSH-basic-store-type-dialog.svg)
+
+   ##### Advanced Tab
+   | Attribute | Value | Description |
+   | --------- | ----- | ----- |
+   | Supports Custom Alias | Forbidden | Determines if an individual entry within a store can have a custom Alias. |
+   | Private Key Handling | Required | This determines if Keyfactor can send the private key associated with a certificate to the store. |
+   | PFX Password Style | Default | 'Default' - PFX password is randomly generated, 'Custom' - PFX password may be specified when the enrollment job is created (Requires the Allow Custom Password application setting to be enabled.) |
+
+   The Advanced tab should look like this:
+
+   ![WinNetSH Advanced Tab](docsource/images/WinNetSH-advanced-store-type-dialog.svg)
+
+   > For Keyfactor **Command versions 24.4 and later**, a Certificate Format dropdown is available with PFX and PEM options. Ensure that **PFX** is selected, as this determines the format of new and renewed certificates sent to the Orchestrator during a Management job. Currently, all Keyfactor-supported Orchestrator extensions support only PFX.
+
+   ##### Custom Fields Tab
+   Custom fields operate at the certificate store level and are used to control how the orchestrator connects to the remote target server containing the certificate store to be managed. The following custom fields should be added to the store type:
+
+   | Name | Display Name | Description | Type | Default Value/Options | Required |
+   | ---- | ------------ | ---- | --------------------- | -------- | ----------- |
+   | spnwithport | SPN With Port | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. | Bool | false | 🔲 Unchecked |
+   | WinRM Protocol | WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. | MultipleChoice | https,http,ssh | ✅ Checked |
+   | WinRM Port | WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. | String | 5986 | ✅ Checked |
+   | ServerUsername | Server Username | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) | Secret |  | 🔲 Unchecked |
+   | ServerPassword | Server Password | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) | Secret |  | 🔲 Unchecked |
+   | ServerUseSsl | Use SSL | Determine whether the server uses SSL or not (This field is automatically created) | Bool | true | ✅ Checked |
+   | JEAEndpointName | JEA End Point Name | Name of the JEA endpoint to use for the session (This field is automatically created) | String |  | 🔲 Unchecked |
+
+   The Custom Fields tab should look like this:
+
+   ![WinNetSH Custom Fields Tab](docsource/images/WinNetSH-custom-fields-store-type-dialog.svg)
+
+   ###### SPN With Port
+   Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations.
+
+   ![WinNetSH Custom Field - spnwithport](docsource/images/WinNetSH-custom-field-spnwithport-dialog.svg)
+   ![WinNetSH Custom Field - spnwithport](docsource/images/WinNetSH-custom-field-spnwithport-validation-options-dialog.svg)
+
+
+   ###### WinRM Protocol
+   Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment.
+
+   ![WinNetSH Custom Field - WinRM Protocol](docsource/images/WinNetSH-custom-field-WinRM Protocol-dialog.svg)
+   ![WinNetSH Custom Field - WinRM Protocol](docsource/images/WinNetSH-custom-field-WinRM Protocol-validation-options-dialog.svg)
+
+
+   ###### WinRM Port
+   String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22.
+
+   ![WinNetSH Custom Field - WinRM Port](docsource/images/WinNetSH-custom-field-WinRM Port-dialog.svg)
+   ![WinNetSH Custom Field - WinRM Port](docsource/images/WinNetSH-custom-field-WinRM Port-validation-options-dialog.svg)
+
+
+   ###### Server Username
+   Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created)
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+   ###### Server Password
+   Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+   ###### Use SSL
+   Determine whether the server uses SSL or not (This field is automatically created)
+
+   ![WinNetSH Custom Field - ServerUseSsl](docsource/images/WinNetSH-custom-field-ServerUseSsl-dialog.svg)
+   ![WinNetSH Custom Field - ServerUseSsl](docsource/images/WinNetSH-custom-field-ServerUseSsl-validation-options-dialog.svg)
+
+
+   ###### JEA End Point Name
+   Name of the JEA endpoint to use for the session (This field is automatically created)
+
+   ![WinNetSH Custom Field - JEAEndpointName](docsource/images/WinNetSH-custom-field-JEAEndpointName-dialog.svg)
+   ![WinNetSH Custom Field - JEAEndpointName](docsource/images/WinNetSH-custom-field-JEAEndpointName-validation-options-dialog.svg)
+
+
+   ##### Entry Parameters Tab
+
+   | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
+   | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
+   | IPAddress | IP Address | String value specifying the IP address of the netsh http sslcert binding. Example: '0.0.0.0' for all IP addresses or '192.168.1.1' for a specific IP address. | String | 0.0.0.0 | 🔲 Unchecked | ✅ Checked | ✅ Checked | ✅ Checked |
+   | Port | Port | String value specifying the TCP port of the netsh http sslcert binding. Example: '443'. | String | 443 | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | HostName | Host Name | String value specifying the host name for an SNI-based binding (netsh 'hostnameport'). Leave blank for a classic IP:Port binding, or enter a specific hostname such as 'www.example.com' to bind by SNI hostname instead. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | AppId | Application ID | GUID identifying the application associated with this netsh http sslcert binding (netsh's 'appid' parameter). Leave blank to let this store type resolve one automatically: an existing binding at this IP/Port (or hostname/Port) keeps its current AppId when the certificate is renewed, and a brand-new binding is given a freshly generated GUID. Either way, the AppId actually used is reported back in the job result message and in Inventory results. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+
+   The Entry Parameters tab should look like this:
+
+   ![WinNetSH Entry Parameters Tab](docsource/images/WinNetSH-entry-parameters-store-type-dialog.svg)
+   ##### IP Address
+   String value specifying the IP address of the netsh http sslcert binding. Example: '0.0.0.0' for all IP addresses or '192.168.1.1' for a specific IP address.
+
+   ![WinNetSH Entry Parameter - IPAddress](docsource/images/WinNetSH-entry-parameters-store-type-dialog-IPAddress.svg)
+   ![WinNetSH Entry Parameter - IPAddress](docsource/images/WinNetSH-entry-parameters-store-type-dialog-IPAddress-validation-options.svg)
+
+
+   ##### Port
+   String value specifying the TCP port of the netsh http sslcert binding. Example: '443'.
+
+   ![WinNetSH Entry Parameter - Port](docsource/images/WinNetSH-entry-parameters-store-type-dialog-Port.svg)
+   ![WinNetSH Entry Parameter - Port](docsource/images/WinNetSH-entry-parameters-store-type-dialog-Port-validation-options.svg)
+
+
+   ##### Host Name
+   String value specifying the host name for an SNI-based binding (netsh 'hostnameport'). Leave blank for a classic IP:Port binding, or enter a specific hostname such as 'www.example.com' to bind by SNI hostname instead.
+
+   ![WinNetSH Entry Parameter - HostName](docsource/images/WinNetSH-entry-parameters-store-type-dialog-HostName.svg)
+   ![WinNetSH Entry Parameter - HostName](docsource/images/WinNetSH-entry-parameters-store-type-dialog-HostName-validation-options.svg)
+
+
+   ##### Application ID
+   GUID identifying the application associated with this netsh http sslcert binding (netsh's 'appid' parameter). Leave blank to let this store type resolve one automatically: an existing binding at this IP/Port (or hostname/Port) keeps its current AppId when the certificate is renewed, and a brand-new binding is given a freshly generated GUID. Either way, the AppId actually used is reported back in the job result message and in Inventory results.
+
+   ![WinNetSH Entry Parameter - AppId](docsource/images/WinNetSH-entry-parameters-store-type-dialog-AppId.svg)
+   ![WinNetSH Entry Parameter - AppId](docsource/images/WinNetSH-entry-parameters-store-type-dialog-AppId-validation-options.svg)
+
+
+   ##### Crypto Provider Name
+   Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'
+
+   ![WinNetSH Entry Parameter - ProviderName](docsource/images/WinNetSH-entry-parameters-store-type-dialog-ProviderName.svg)
+   ![WinNetSH Entry Parameter - ProviderName](docsource/images/WinNetSH-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
+
+
+   </details>
+</details>
+
 
 ## Installation
 
@@ -1798,7 +2028,7 @@ the Keyfactor Command Portal
 
 ## Defining Certificate Stores
 
-The Windows Certificate Universal Orchestrator extension implements 5 Certificate Store Types, each of which implements different functionality. Refer to the individual instructions below for each Certificate Store Type that you deemed necessary for your use case from the installation section.
+The Windows Certificate Universal Orchestrator extension implements 6 Certificate Store Types, each of which implements different functionality. Refer to the individual instructions below for each Certificate Store Type that you deemed necessary for your use case from the installation section.
 
 <details><summary>Windows Certificate (WinCert)</summary>
 
@@ -2223,6 +2453,98 @@ When creating a Certificate Store for WinLDAP, the Store Path is fixed to `NTDS\
 
     ```shell
     kfutil stores import csv --store-type-name WinLDAP --file WinLDAP.csv
+    ```
+
+</details>
+
+#### PAM Provider Eligible Fields
+<details><summary>Attributes eligible for retrieval by a PAM Provider on the Universal Orchestrator</summary>
+
+If a PAM provider was installed _on the Universal Orchestrator_ in the [Installation](#Installation) section, the following parameters can be configured for retrieval _on the Universal Orchestrator_.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+
+Please refer to the **Universal Orchestrator (remote)** usage section ([PAM providers on the Keyfactor Integration Catalog](https://keyfactor.github.io/integrations-catalog/content/pam)) for your selected PAM provider for instructions on how to load attributes orchestrator-side.
+> Any secret can be rendered by a PAM provider _installed on the Keyfactor Command server_. The above parameters are specific to attributes that can be fetched by an installed PAM provider running on the Universal Orchestrator server itself.
+
+</details>
+
+> The content in this section can be supplemented by the [official Command documentation](https://software.keyfactor.com/Core-OnPrem/Current/Content/ReferenceGuide/Certificate%20Stores.htm?Highlight=certificate%20store).
+
+</details>
+
+<details><summary>NetSH HTTP Bound Certificate (WinNetSH)</summary>
+
+When creating a Certificate Store for WinNetSH, the Store Path identifies the Windows certificate store (under `Cert:\LocalMachine`) that holds the bound certificates - typically `My` (the Personal store), matching netsh's `certstorename` parameter. The Client Machine value is either the target server's hostname/IP (for remote WinRM/SSH) or `<hostname>|LocalMachine` (for a local agent).
+
+Each binding is described by the `IPAddress`, `Port`, optional `HostName` (for an SNI binding), and optional `AppId` entry parameters - see the AppId note above for how `AppId` is resolved when left blank.
+
+### Store Creation
+
+#### Manually with the Command UI
+
+<details><summary>Click to expand details</summary>
+
+1. **Navigate to the _Certificate Stores_ page in Keyfactor Command.**
+
+    Log into Keyfactor Command, toggle the _Locations_ dropdown, and click _Certificate Stores_.
+
+2. **Add a Certificate Store.**
+
+    Click the Add button to add a new Certificate Store. Use the table below to populate the **Attributes** in the **Add** form.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | Category | Select "NetSH HTTP Bound Certificate" or the customized certificate store name from the previous step. |
+   | Container | Optional container to associate certificate store with. |
+   | Client Machine | Hostname of the Windows server whose netsh http sslcert bindings are to be managed. This can be a remote hostname (a WinRM/JEA session will be established using the credentials specified in the Server Username and Server Password fields), or the local agent may be installed directly on the target server using the LocalMachine moniker. |
+   | Store Path | Name of the Windows certificate store (under Cert:\LocalMachine) that holds the certificates bound via netsh http sslcert. Typically 'My' (the Personal store), matching netsh's 'certstorename' parameter. |
+   | Orchestrator | Select an approved orchestrator capable of managing `WinNetSH` certificates. Specifically, one with the `WinNetSH` capability. |
+   | spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
+   | WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. |
+   | WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. |
+   | ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+   | ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
+
+</details>
+
+#### Using kfutil CLI
+
+<details><summary>Click to expand details</summary>
+
+1. **Generate a CSV template for the WinNetSH certificate store**
+
+    ```shell
+    kfutil stores import generate-template --store-type-name WinNetSH --outpath WinNetSH.csv
+    ```
+2. **Populate the generated CSV file**
+
+    Open the CSV file, and reference the table below to populate parameters for each **Attribute**.
+
+   | Attribute | Description |
+   | --------- | ----------- |
+   | Category | Select "NetSH HTTP Bound Certificate" or the customized certificate store name from the previous step. |
+   | Container | Optional container to associate certificate store with. |
+   | Client Machine | Hostname of the Windows server whose netsh http sslcert bindings are to be managed. This can be a remote hostname (a WinRM/JEA session will be established using the credentials specified in the Server Username and Server Password fields), or the local agent may be installed directly on the target server using the LocalMachine moniker. |
+   | Store Path | Name of the Windows certificate store (under Cert:\LocalMachine) that holds the certificates bound via netsh http sslcert. Typically 'My' (the Personal store), matching netsh's 'certstorename' parameter. |
+   | Orchestrator | Select an approved orchestrator capable of managing `WinNetSH` certificates. Specifically, one with the `WinNetSH` capability. |
+   | Properties.spnwithport | Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations. |
+   | Properties.WinRM Protocol | Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment. |
+   | Properties.WinRM Port | String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22. |
+   | Properties.ServerUsername | Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\username'. (This field is automatically created) |
+   | Properties.ServerPassword | Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created) |
+   | Properties.ServerUseSsl | Determine whether the server uses SSL or not (This field is automatically created) |
+   | Properties.JEAEndpointName | Name of the JEA endpoint to use for the session (This field is automatically created) |
+
+3. **Import the CSV file to create the certificate stores**
+
+    ```shell
+    kfutil stores import csv --store-type-name WinNetSH --file WinNetSH.csv
     ```
 
 </details>

@@ -19,3 +19,6 @@ kfutil store-types create WinAdfs
 echo "Creating store type: WinLDAP"
 kfutil store-types create WinLDAP
 
+echo "Creating store type: WinNetSH"
+kfutil store-types create WinNetSH
+
