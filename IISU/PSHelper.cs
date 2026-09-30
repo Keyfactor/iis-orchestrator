@@ -264,7 +264,15 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         private void InitializeLocalSession()
         {
             _logger.LogTrace("Creating out-of-process Powershell Runspace.");
-            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, null, false);
+            var initScript = ScriptBlock.Create(@"
+    $env:PSModulePath = [string]::Join(';', @(
+        (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules'),
+        (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules'),
+        (Join-Path $env:windir 'System32\WindowsPowerShell\v1.0\Modules')
+    ))
+");
+
+            PowerShellProcessInstance psInstance = new PowerShellProcessInstance(new Version(5, 1), null, initScript, false);
             Runspace rs = RunspaceFactory.CreateOutOfProcessRunspace(new TypeTable(Array.Empty<string>()), psInstance);
             rs.Open();
             PS.Runspace = rs;
