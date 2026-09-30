@@ -1,3 +1,6 @@
+3.0.4
+* Added an initialize script when creating an out of process PowerShell instance.  This is necessary due to a known bug in the PowerShell SDK that leaks environmental variables which then causes subsequent PowerShell instances to use the leaked values.
+ 
 3.0.3
 * Updated the PowerShell SDK to 7.4.17 to address a vulnerability in the System.Security.Cryptography.XML package.
 
