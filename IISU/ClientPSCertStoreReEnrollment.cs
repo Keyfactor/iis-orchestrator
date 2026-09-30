@@ -30,6 +30,8 @@ using Keyfactor.Orchestrators.Extensions.Interfaces;
 using System.Linq;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 using System.Numerics;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -90,12 +92,11 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string protocol = jobProperties.WinRmProtocol;
                 string port = jobProperties.WinRmPort;
                 bool includePortInSPN = jobProperties.SpnPortFlag;
+                string jeaEndpoint = jobProperties?.JEAEndpointName ?? "";
                 string clientMachineName = config.CertificateStoreDetails.ClientMachine;
                 string storePath = config.CertificateStoreDetails.StorePath;
 
-                //_psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword);
-
-                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword);
+                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired: bindingType == CertStoreBindingTypeENUM.WinIIS);
                 _psHelper.Initialize();
 
                 using (_psHelper)
@@ -131,8 +132,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                         if (myCert == null) { throw new Exception("Command was unable to sign the CSR."); }
 
-                        // Import the certificate
-                        string thumbprint = ImportCertificate(myCert.RawData, storePath);
+                        // Import the certificate. WinLDAP's storePath ("NTDS\My") is not a real
+                        // Cert: provider path - Import-KeyfactorSignedCertificate expects one, so
+                        // WinLDAP always imports into the Personal ("My") store first, matching
+                        // Add-KeyfactorLdapsCertificate's own staging step. The WinLdap case below
+                        // then registers that same certificate into the NTDS service store.
+                        string importStoreName = bindingType == CertStoreBindingTypeENUM.WinLdap ? "My" : storePath;
+                        string thumbprint = ImportCertificate(myCert.RawData, importStoreName);
 
                         // If there is binding, bind it to the correct store type
                         if (thumbprint != null)
@@ -160,25 +166,25 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                             {
                                                 case "Success":
                                                     psResult = OrchestratorJobStatusJobResult.Success;
-                                                    _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned successfully with Code: {code}, on Step: {step}");
+                                                    _logger.LogDebug($"PowerShell function New-KeyfactorIISSiteBinding returned successfully with Code: {code}, on Step: {step}");
                                                     break;
                                                 case "Skipped":
                                                     psResult = OrchestratorJobStatusJobResult.Failure;
-                                                    failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} - message:\n {errorMessage}");
+                                                    failureMessage = ($"PowerShell function New-KeyfactorIISSiteBinding failed on step: {step} - message:\n {errorMessage}");
                                                     _logger.LogDebug(failureMessage);
                                                     break;
                                                 case "Warning":
                                                     psResult = OrchestratorJobStatusJobResult.Warning;
-                                                    _logger.LogDebug($"PowerShell function New-KFIISSiteBinding returned with a Warning on step: {step} with code: {code} - message: {message}");
+                                                    _logger.LogDebug($"PowerShell function New-KeyfactorIISSiteBinding returned with a Warning on step: {step} with code: {code} - message: {message}");
                                                     break;
                                                 case "Error":
                                                     psResult = OrchestratorJobStatusJobResult.Failure;
-                                                    failureMessage = ($"PowerShell function New-KFIISSiteBinding failed on step: {step} with code: {code} - message: {errorMessage}");
+                                                    failureMessage = ($"PowerShell function New-KeyfactorIISSiteBinding failed on step: {step} with code: {code} - message: {errorMessage}");
                                                     _logger.LogDebug(failureMessage);
                                                     break;
                                                 default:
                                                     psResult = OrchestratorJobStatusJobResult.Unknown;
-                                                    _logger.LogWarning("Unknown status returned from New-KFIISSiteBinding: " + status);
+                                                    _logger.LogWarning("Unknown status returned from New-KeyfactorIISSiteBinding: " + status);
                                                     break;
                                             }
                                         }
@@ -221,13 +227,45 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                     break;
 
                                 case CertStoreBindingTypeENUM.None:
-                                    
+
                                     jobResult = new JobResult
                                     {
                                         Result = OrchestratorJobStatusJobResult.Success,
                                         JobHistoryId = config.JobHistoryId,
                                         FailureMessage = ""
                                     };
+
+                                    break;
+
+                                case CertStoreBindingTypeENUM.WinLdap:
+                                    // Certificate is already in Cert:\LocalMachine\My at this point
+                                    // (see importStoreName above) - register it into the NTDS
+                                    // service store (storePath, e.g. "NTDS\My"), the same
+                                    // eligibility-checked write Add-KeyfactorLdapsCertificate does.
+                                    ResultObject registerResult = WinLdapBinding.RegisterCertificate(_psHelper, thumbprint, storePath);
+
+                                    if (!registerResult.IsSuccess)
+                                    {
+                                        string detail = !string.IsNullOrEmpty(registerResult.ErrorMessage)
+                                            ? registerResult.ErrorMessage
+                                            : registerResult.Message;
+
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = $"Registering the re-enrolled certificate into the NTDS service store '{storePath}' failed at step '{registerResult.Step}' (code {registerResult.Code}): {detail}"
+                                        };
+                                    }
+                                    else
+                                    {
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = ""
+                                        };
+                                    }
 
                                     break;
                             }
@@ -294,9 +332,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     { "keyLength", keySize },
                     { "SAN", SAN }
                 };
-                _logger.LogInformation("Attempting to execute PS function (New-CsrEnrollment)");
-                _results = _psHelper.ExecutePowerShell("New-CsrEnrollment", parameters);
-                _logger.LogInformation("Returned from executing PS function (New-CsrEnrollment)");
+                _logger.LogInformation("Attempting to execute PS function (New-KeyfactorODKGEnrollment)");
+                _results = _psHelper.ExecutePowerShell("New-KeyfactorODKGEnrollment", parameters);
+                _logger.LogInformation("Returned from executing PS function (New-KeyfactorODKGEnrollment)");
 
                 // This should return the CSR that was generated
                 if (_results == null || _results.Count == 0)
@@ -356,9 +394,9 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                     { "storeName", storeName }
                 };
 
-                _logger.LogTrace("Attempting to execute PS function (Import-SignedCertificate)");
-                _results = _psHelper.ExecutePowerShell("Import-SignedCertificate", parameters);
-                _logger.LogTrace("Returned from executing PS function (Import-SignedCertificate)");
+                _logger.LogTrace("Attempting to execute PS function (Import-KeyfactorSignedCertificate)");
+                _results = _psHelper.ExecutePowerShell("Import-KeyfactorSignedCertificate", parameters);
+                _logger.LogTrace("Returned from executing PS function (Import-KeyfactorSignedCertificate)");
 
                 // This should return the CSR that was generated
                 if (_results != null && _results.Count > 0)
@@ -399,7 +437,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             }
             else if (config.JobProperties != null &&
                 config.JobProperties.TryGetValue("SAN", out object legacySanValue) &&
-                !string.IsNullOrWhiteSpace(legacySanValue.ToString()))
+                    (legacySanValue is not null && !string.IsNullOrWhiteSpace(legacySanValue.ToString())))
             {
                 sanValue = legacySanValue.ToString().Trim();
                 sourceUsed = "config.JobProperties[\"SAN\"] (legacy)";

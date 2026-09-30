@@ -14,7 +14,7 @@ namespace WindowsCertStore.UnitTests
         {
             // Arrange
             var psHelper = new Keyfactor.Extensions.Orchestrator.WindowsCertStore.PSHelper();
-            string scriptsFolder = PSHelper.FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShellScripts");
+            string scriptsFolder = PSHelper.FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShell");
 
             // Act
             string scripts = psHelper.LoadAllScripts(scriptsFolder);

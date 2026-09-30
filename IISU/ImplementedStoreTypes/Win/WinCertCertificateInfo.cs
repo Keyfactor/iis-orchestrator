@@ -24,7 +24,6 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
         public string Issuer { get; set; }
         public string Thumbprint { get; set; }
         public bool HasPrivateKey { get; set; }
-        public string SAN { get; set; }
         public string ProviderName { get; set; }
         public string Base64Data { get; set; }
     }
