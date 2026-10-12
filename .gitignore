@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Local test credentials (never commit)
+local.runsettings
+
 # User-specific files
 *.rsuser
 *.suo
@@ -338,3 +341,8 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+
+# Azure test lab - local parameter files may contain real passwords;
+# only the committed *.parameters.json templates (with placeholder values)
+# should ever be tracked.
+azure-test-lab/**/*.local.json

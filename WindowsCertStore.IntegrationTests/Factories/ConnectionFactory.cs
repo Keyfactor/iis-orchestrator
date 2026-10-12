@@ -1,50 +1,74 @@
-﻿using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WindowsCertStore.IntegrationTests.Factories
 {
     internal class ConnectionFactory
     {
-        // Read the list of IP addresses from an environment variable
-        // Get the credential information from Azure Key Vault or another secure location
-        public static IEnumerable<object[]> GetConnection()
+        private static (string username, string password) GetCredentials()
         {
-            // 1. Build configuration to read from appsettings.json
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            string username = Environment.GetEnvironmentVariable("KEYFACTOR_TEST_USER") ?? string.Empty;
+            string password = Environment.GetEnvironmentVariable("KEYFACTOR_TEST_PASSWORD") ?? string.Empty;
 
-            var config = builder.Build();
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+                return (username, password);
 
-            // 2. Initialize VaultHelper with configuration
-            var vault = new VaultHelper(config);
-
-            // 3. Retrieve connection details from configuration
-            var json = File.ReadAllText("servers.json");
-            var machines = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(json);
-
-            foreach (var entry in machines)
+            try
             {
-                string machineName = entry["Machine"];
-                string username = vault.GetSecret("Username");
-                string password = vault.GetSecret("Password");
+                var config = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile("appsettings.json", optional: true)
+                    .Build();
 
-                yield return new object[]
-                {
-                    new ClientConnection
-                    {
-                        Machine = machineName,
-                        Username = username,
-                        PrivateKey = password
-                    }
-                };
+                var vault = new VaultHelper(config);
+                return (vault.GetSecret("Username"), vault.GetSecret("Password"));
+            }
+            catch
+            {
+                return (string.Empty, string.Empty);
             }
         }
+
+        private static IEnumerable<ClientConnection> LoadConnections()
+        {
+            var json = File.ReadAllText("servers.json");
+            var connections = JsonConvert.DeserializeObject<List<ClientConnection>>(json) ?? new();
+
+            var (username, password) = GetCredentials();
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                yield break;
+
+            foreach (var conn in connections)
+            {
+                if (string.IsNullOrEmpty(conn.Machine) || conn.Machine.StartsWith('{'))
+                    continue;
+
+                conn.Username = username;
+                conn.PrivateKey = password;
+                yield return conn;
+            }
+        }
+
+        public static IEnumerable<object[]> GetConnection() =>
+            LoadConnections().Select(c => new object[] { c });
+
+        public static IEnumerable<object[]> GetIISConnections() =>
+            LoadConnections()
+                .Where(c => c.StoreType.Equals("WinIIS", StringComparison.OrdinalIgnoreCase))
+                .Select(c => new object[] { c });
+
+        public static IEnumerable<object[]> GetSQLConnections() =>
+            LoadConnections()
+                .Where(c => c.StoreType.Equals("WinSQL", StringComparison.OrdinalIgnoreCase))
+                .Select(c => new object[] { c });
+
+        public static IEnumerable<object[]> GetWinCertConnections() =>
+            LoadConnections()
+                .Where(c => c.StoreType.Equals("WinCert", StringComparison.OrdinalIgnoreCase))
+                .Select(c => new object[] { c });
     }
 }

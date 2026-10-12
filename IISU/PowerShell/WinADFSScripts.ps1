@@ -531,13 +531,13 @@ function Grant-AdfsCertificatePermissions {
         
         # If no service account provided, try to get it
         if ([string]::IsNullOrWhiteSpace($ServiceAccountName)) {
-            Write-Verbose "  Service account not provided, attempting to detect..."
+            Write-Information "[VERBOSE]   Service account not provided, attempting to detect..."
             
             try {
                 # Try to get from ADFS properties
                 $adfsProps = Get-ADFSProperties -ErrorAction Stop
                 $ServiceAccountName = $adfsProps.ServiceAccountName
-                Write-Verbose "  Detected service account: $ServiceAccountName"
+                Write-Information "[VERBOSE]   Detected service account: $ServiceAccountName"
             }
             catch {
                 Write-Warning "Could not detect ADFS service account"
@@ -548,7 +548,7 @@ function Grant-AdfsCertificatePermissions {
                 try {
                     $service = Get-WmiObject Win32_Service -Filter "Name='adfssrv'" -ErrorAction Stop
                     $ServiceAccountName = $service.StartName
-                    Write-Verbose "  Detected from service: $ServiceAccountName"
+                    Write-Information "[VERBOSE]   Detected from service: $ServiceAccountName"
                 }
                 catch {
                     Write-Warning "Could not detect service account from Windows service"
@@ -572,7 +572,7 @@ function Grant-AdfsCertificatePermissions {
         # Check if service account is a built-in account (which doesn't need explicit permissions)
         $builtInAccounts = @('NT AUTHORITY\SYSTEM', 'NT AUTHORITY\NETWORK SERVICE', 'LocalSystem', 'SYSTEM')
         if ($builtInAccounts -contains $ServiceAccountName) {
-            Write-Verbose "  Service runs as built-in account ($ServiceAccountName) - explicit permissions not needed"
+            Write-Information "[VERBOSE]   Service runs as built-in account ($ServiceAccountName) - explicit permissions not needed"
             
             return [PSCustomObject]@{
                 Success = $true
@@ -583,7 +583,7 @@ function Grant-AdfsCertificatePermissions {
             }
         }
         
-        Write-Verbose "  Granting permissions to: $ServiceAccountName"
+        Write-Information "[VERBOSE]   Granting permissions to: $ServiceAccountName"
         
         # Get the private key
         $rsaCert = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
@@ -599,7 +599,7 @@ function Grant-AdfsCertificatePermissions {
             # Check if account already has permissions
             $existingRule = $acl.Access | Where-Object { $_.IdentityReference -eq $ServiceAccountName }
             if ($existingRule) {
-                Write-Verbose "  ✓ Service account already has permissions"
+                Write-Information "[VERBOSE]   ✓ Service account already has permissions"
                 return [PSCustomObject]@{
                     Success = $true
                     AlreadyGranted = $true
@@ -621,7 +621,7 @@ function Grant-AdfsCertificatePermissions {
             # Set the ACL
             Set-Acl -Path $privateKeyPath -AclObject $acl
             
-            Write-Verbose "  ✓ Permissions granted to $ServiceAccountName"
+            Write-Information "[VERBOSE]   ✓ Permissions granted to $ServiceAccountName"
             
             return [PSCustomObject]@{
                 Success = $true
@@ -662,7 +662,7 @@ function Grant-AdfsCertificatePermissionsOLD {
     )
     
     try {
-        Write-Verbose "Granting permissions to service account on $env:COMPUTERNAME..."
+        Write-Information "[VERBOSE] Granting permissions to service account on $env:COMPUTERNAME..."
         
         # Get the certificate
         $cert = Get-ChildItem -Path "Cert:\LocalMachine\My\$CertificateThumbprint" -ErrorAction Stop

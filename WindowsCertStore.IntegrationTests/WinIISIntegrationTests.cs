@@ -8,6 +8,7 @@ using WindowsCertStore.IntegrationTests.Factories;
 
 namespace WindowsCertStore.IntegrationTests
 {
+    [Trait("Category", "Integration")]
     public class WinIISIntegrationTests
     {
         private static (string thumbprint, string base64Pfx, string pfxPassword) CreateTestCertificate()
@@ -19,7 +20,7 @@ namespace WindowsCertStore.IntegrationTests
 
         private static ManagementJobConfiguration CreateManagementJobConfig(
             ClientConnection connection,
-            string thumbprint,
+            string? thumbprint,
             string base64Pfx,
             string pfxPassword,
             string alias,
@@ -81,7 +82,8 @@ namespace WindowsCertStore.IntegrationTests
             ["WinRm Port"] = "5985",
             ["ServerUsername"] = connection.Username,
             ["ServerPassword"] = connection.PrivateKey,
-            ["ServerUseSsl"] = "false"
+            ["ServerUseSsl"] = "false",
+            ["JEAEndpointName"] = connection.JEAEndpointName ?? ""
         });
 
         private static (bool found, string? alias) FindAliasByThumbprint(IEnumerable<CurrentInventoryItem> inventory, string thumbprint)
@@ -110,7 +112,7 @@ namespace WindowsCertStore.IntegrationTests
         }
 
         [Theory]
-        [MemberData(nameof(ConnectionFactory.GetConnection), MemberType = typeof(ConnectionFactory))]
+        [MemberData(nameof(ConnectionFactory.GetIISConnections), MemberType = typeof(ConnectionFactory))]
         public void WinIIS_Management_Add_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
         {
             var (thumbprint, base64Pfx, pfxPassword) = CreateTestCertificate();
@@ -157,7 +159,7 @@ namespace WindowsCertStore.IntegrationTests
         }
 
         [Theory]
-        [MemberData(nameof(ConnectionFactory.GetConnection), MemberType = typeof(ConnectionFactory))]
+        [MemberData(nameof(ConnectionFactory.GetIISConnections), MemberType = typeof(ConnectionFactory))]
         public void WinIIS_Management_Add_Inventory_Renewal_Inventory_Remove_EndToEnd_Test(ClientConnection connection)
         {
             var (thumbprint, base64Pfx, pfxPassword) = CreateTestCertificate();

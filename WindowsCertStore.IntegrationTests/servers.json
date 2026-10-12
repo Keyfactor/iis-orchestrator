@@ -1,3 +1,8 @@
 [
-  { "Machine": "{IPAddress}" }
+  { "Machine": "192.168.230.139", "StoreType": "WinIIS", "JEAEndpointName": "" },
+  { "Machine": "192.168.230.139", "StoreType": "WinIIS", "JEAEndpointName": "keyfactor.wincert" },
+  { "Machine": "{SQL-Server-IP-or-Hostname}", "StoreType": "WinSQL", "JEAEndpointName": "" },
+  { "Machine": "{SQL-JEA-Server-IP-or-Hostname}", "StoreType": "WinSQL", "JEAEndpointName": "keyfactor.wincert" },
+  { "Machine": "192.168.230.139", "StoreType": "WinCert", "JEAEndpointName": "" },
+  { "Machine": "192.168.230.139", "StoreType": "WinCert", "JEAEndpointName": "keyfactor.wincert" }
 ]

@@ -17,7 +17,7 @@ namespace WindowsCertStore.IntegrationTests.Factories
         /// <param name="subjectName">The subject name for the certificate (CN=...)</param>
         /// <param name="pfxPassword">The password to protect the PFX file</param>
         /// <returns>Tuple of Thumbprint and Base64 PFX string</returns>
-        public static (string Thumbprint, string Base64Pfx) CreateSelfSignedCert(string subjectName, string pfxPassword)
+        public static (string? Thumbprint, string? Base64Pfx) CreateSelfSignedCert(string subjectName, string pfxPassword)
         {
             using (RSA rsa = RSA.Create(2048))
             {
@@ -51,7 +51,7 @@ namespace WindowsCertStore.IntegrationTests.Factories
                     string base64Pfx = Convert.ToBase64String(pfxBytes);
 
                     // Thumbprint (uppercase, no spaces)
-                    string thumbprint = cert.Thumbprint?.Replace(" ", "").ToUpperInvariant();
+                    string? thumbprint = cert.Thumbprint?.Replace(" ", "").ToUpperInvariant();
 
                     return (thumbprint, base64Pfx);
                 }
