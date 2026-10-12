@@ -1,3 +1,8 @@
+3.0.4
+* Added an initialize script when creating an out of process PowerShell instance.  This is necessary due to a known bug in the PowerShell SDK that leaks environmental variables which then causes subsequent PowerShell instances to use the leaked values.
+ 
+3.0.3
+* Updated the PowerShell SDK to 7.4.17 to address a vulnerability in the System.Security.Cryptography.XML package.
 Unreleased
 
 * Added WinNetSH store type for managing SSL certificates bound to HTTP.sys via `netsh http sslcert` (e.g. the WinRM HTTPS listener, or any other HTTP.sys-hosted service without its own certificate-binding mechanism). Supports Inventory, Add, Remove, and Reenrollment (ODKG), following the same binding-based pattern as WinIIS, including local-agent, remote WinRM/SSH, and JEA connections. Since `netsh` has no native PowerShell cmdlet, bindings are managed by shelling out to `netsh.exe` and parsing its text output. `netsh http add sslcert` requires an AppId; when the entry parameter is left blank, this store type reuses an existing binding's AppId across a renewal (rather than changing it) or generates a new one for a brand-new binding, and reports back whichever value was actually used.
