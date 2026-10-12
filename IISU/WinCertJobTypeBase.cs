@@ -28,6 +28,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
         None,
         WinIIS,
         WinSQL,
-        WinLdap
+        WinLdap,
+        WinNetSH
     }
 }

@@ -680,3 +680,175 @@ curl -s -X POST "https://${KEYFACTOR_HOSTNAME}/${KEYFACTOR_API_PATH}/Certificate
   "CustomAliasAllowed": "Forbidden"
 }'
 
+echo "Creating store type: WinNetSH"
+curl -s -X POST "https://${KEYFACTOR_HOSTNAME}/${KEYFACTOR_API_PATH}/CertificateStoreTypes" \
+  -H "Authorization: Bearer ${KEYFACTOR_AUTH_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "x-keyfactor-requested-with: APIClient" \
+  -d '{
+  "Name": "NetSH HTTP Bound Certificate",
+  "ShortName": "WinNetSH",
+  "Capability": "WinNetSH",
+  "LocalStore": false,
+  "SupportedOperations": {
+    "Add": true,
+    "Create": false,
+    "Discovery": false,
+    "Enrollment": true,
+    "Remove": true
+  },
+  "Properties": [
+    {
+      "Name": "spnwithport",
+      "DisplayName": "SPN With Port",
+      "Type": "Bool",
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Required": false,
+      "Description": "Internally set the -IncludePortInSPN option when creating the remote PowerShell connection. Needed for some Kerberos configurations."
+    },
+    {
+      "Name": "WinRM Protocol",
+      "DisplayName": "WinRM Protocol",
+      "Type": "MultipleChoice",
+      "DependsOn": "",
+      "DefaultValue": "https,http,ssh",
+      "Required": true,
+      "Description": "Multiple choice value specifying which protocol to use.  Protocols https or http use WinRM to connect from Windows to Windows Servers.  Using ssh is only supported when running the orchestrator in a Linux environment."
+    },
+    {
+      "Name": "WinRM Port",
+      "DisplayName": "WinRM Port",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "5986",
+      "Required": true,
+      "Description": "String value specifying the port number that the Windows target server's WinRM listener is configured to use. Example: '5986' for HTTPS or '5985' for HTTP.  By default, when using ssh in a Linux environment, the default port number is 22."
+    },
+    {
+      "Name": "ServerUsername",
+      "DisplayName": "Server Username",
+      "Type": "Secret",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Username used to log into the target server for establishing the WinRM session. Example: 'administrator' or 'domain\\username'. (This field is automatically created)"
+    },
+    {
+      "Name": "ServerPassword",
+      "DisplayName": "Server Password",
+      "Type": "Secret",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Password corresponding to the Server Username used to log into the target server.  When establishing a SSH session from a Linux environment, the password must include the full SSH Private key. (This field is automatically created)"
+    },
+    {
+      "Name": "ServerUseSsl",
+      "DisplayName": "Use SSL",
+      "Type": "Bool",
+      "DependsOn": "",
+      "DefaultValue": "true",
+      "Required": true,
+      "Description": "Determine whether the server uses SSL or not (This field is automatically created)"
+    },
+    {
+      "Name": "JEAEndpointName",
+      "DisplayName": "JEA End Point Name",
+      "Type": "String",
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Required": false,
+      "Description": "Name of the JEA endpoint to use for the session (This field is automatically created)"
+    }
+  ],
+  "EntryParameters": [
+    {
+      "Name": "IPAddress",
+      "DisplayName": "IP Address",
+      "Type": "String",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": true,
+        "OnRemove": true,
+        "OnReenrollment": true
+      },
+      "DependsOn": "",
+      "DefaultValue": "0.0.0.0",
+      "Options": "",
+      "Description": "String value specifying the IP address of the netsh http sslcert binding. Example: '0.0.0.0' for all IP addresses or '192.168.1.1' for a specific IP address."
+    },
+    {
+      "Name": "Port",
+      "DisplayName": "Port",
+      "Type": "String",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "443",
+      "Options": "",
+      "Description": "String value specifying the TCP port of the netsh http sslcert binding. Example: '443'."
+    },
+    {
+      "Name": "HostName",
+      "DisplayName": "Host Name",
+      "Type": "String",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Options": "",
+      "Description": "String value specifying the host name for an SNI-based binding (netsh 'hostnameport'). Leave blank for a classic IP:Port binding, or enter a specific hostname such as 'www.example.com' to bind by SNI hostname instead."
+    },
+    {
+      "Name": "AppId",
+      "DisplayName": "Application ID",
+      "Type": "String",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Options": "",
+      "Description": "GUID identifying the application associated with this netsh http sslcert binding (netsh's 'appid' parameter). Leave blank to let this store type resolve one automatically: an existing binding at this IP/Port (or hostname/Port) keeps its current AppId when the certificate is renewed, and a brand-new binding is given a freshly generated GUID. Either way, the AppId actually used is reported back in the job result message and in Inventory results."
+    },
+    {
+      "Name": "ProviderName",
+      "DisplayName": "Crypto Provider Name",
+      "Type": "String",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "",
+      "Options": "",
+      "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    }
+  ],
+  "PasswordOptions": {
+    "EntrySupported": false,
+    "StoreRequired": false,
+    "Style": "Default"
+  },
+  "StorePathValue": "My",
+  "PrivateKeyAllowed": "Required",
+  "ServerRequired": true,
+  "PowerShell": false,
+  "BlueprintAllowed": true,
+  "CustomAliasAllowed": "Forbidden"
+}'
+

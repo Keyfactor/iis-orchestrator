@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "domainName": {
+      "value": "vmlab.local"
+    },
+    "netbiosName": {
+      "value": "VMLAB"
+    },
+    "subnetId": {
+      "value": "<supply-the-subnetId-output-from-phase1-here>"
+    },
+    "localAdminUsername": {
+      "value": "labadmin"
+    },
+    "localAdminPassword": {
+      "value": "<supply-the-same-password-used-in-phase1>"
+    },
+    "adfsServiceAccountName": {
+      "value": "svc-adfs"
+    },
+    "adfsServiceAccountPassword": {
+      "value": "<supply-at-deploy-time>"
+    }
+  }
+}

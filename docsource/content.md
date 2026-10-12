@@ -7,6 +7,7 @@ The Windows Certificate Orchestrator Extension is a multi-purpose integration th
 * WinIIS - IIS Bound certificates
 * WinSQL - Certificates that are bound to the specified SQL Instances
 * WinLDAP - Manages the AD DS (Active Directory Domain Services) LDAPS server certificate on a Domain Controller
+* WinNetSH - Certificates bound to HTTP.sys via `netsh http sslcert` (e.g. WinRM HTTPS listeners and other HTTP.sys-hosted services)
 
 By default, most certificates are stored in the “Personal” (My) and “Web Hosting” (WebHosting) stores.
 For a complete list of local machine cert stores you can execute the PowerShell command:
@@ -128,10 +129,11 @@ The WinCert extension ships four PowerShell modules. Each module contains a `Rol
 
 | Module | Store Types Supported | Purpose |
 |---|---|---|
-| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL, WinLDAP | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
+| `Keyfactor.WinCert.Common` | WinCert, WinIIS, WinSQL, WinLDAP, WinNetSH | Certificate inventory, add, remove, and re-enrollment (CSR generation and signed cert import). Required for all store types. |
 | `Keyfactor.WinCert.IIS` | WinIIS | IIS site binding management (get, create, remove bindings). |
 | `Keyfactor.WinCert.SQL` | WinSQL | SQL Server certificate binding management (get, bind, unbind). |
 | `Keyfactor.WinCert.LDAP` | WinLDAP | AD DS (NTDS) LDAPS certificate management on a Domain Controller (get, add, remove). Only install on Domain Controllers. |
+| `Keyfactor.WinCert.NetSH` | WinNetSH | HTTP.sys `netsh http sslcert` binding management (get, bind, unbind). Requires local Administrator rights on the target server. |
 
 Install only the modules needed for the store types you manage on that server. For example, a server that only hosts IIS certificates needs `Keyfactor.WinCert.Common` and `Keyfactor.WinCert.IIS`.
 
@@ -149,6 +151,7 @@ PowerShell\
   Keyfactor.WinCert.IIS\          ← Module: IIS binding management
   Keyfactor.WinCert.SQL\          ← Module: SQL Server binding management
   Keyfactor.WinCert.LDAP\         ← Module: AD DS (NTDS) LDAPS certificate management
+  Keyfactor.WinCert.NetSH\        ← Module: netsh http sslcert binding management
   Build\
     KeyfactorWinCert.pssc          ← JEA Session Configuration file
 ```
@@ -186,6 +189,11 @@ Copy-Item -Path "$sourcePath\Keyfactor.WinCert.SQL" `
 # Install the LDAP module ONLY on Domain Controllers hosting the LDAPS certificate (WinLDAP)
 Copy-Item -Path "$sourcePath\Keyfactor.WinCert.LDAP" `
           -Destination "$moduleBase\Keyfactor.WinCert.LDAP" `
+          -Recurse -Force
+
+# Install the NetSH module if this server hosts netsh http sslcert certificate bindings (WinNetSH)
+Copy-Item -Path "$sourcePath\Keyfactor.WinCert.NetSH" `
+          -Destination "$moduleBase\Keyfactor.WinCert.NetSH" `
           -Recurse -Force
 ```
 
@@ -289,6 +297,7 @@ Only list the `RoleCapabilities` whose corresponding modules are installed on th
 | WinSQL only or WinCert + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.SQL'` |
 | WinCert + WinIIS + WinSQL | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.IIS', 'Keyfactor.WinCert.SQL'` |
 | WinLDAP only (on a Domain Controller) | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.LDAP'` |
+| WinNetSH only | `'Keyfactor.WinCert.Common', 'Keyfactor.WinCert.NetSH'` |
 
 **Transcript Logging (Optional):**
 
@@ -544,6 +553,7 @@ In addition to PowerShell, IISU requires additional PowerShell modules to be ins
 | `Keyfactor.WinCert.IIS` | WinIIS stores |
 | `Keyfactor.WinCert.SQL` | WinSQL stores |
 | `Keyfactor.WinCert.LDAP` | WinLDAP stores (Domain Controllers only) |
+| `Keyfactor.WinCert.NetSH` | WinNetSH stores |
 
 In standard (non-JEA) WinRM and local-machine modes, the orchestrator automatically loads these modules from its own deployment at runtime — no pre-installation on the target server is required. JEA mode is the only mode that requires the modules to be pre-installed on the target server. See the **Just Enough Administration (JEA) Setup and Configuration** section for complete installation and setup instructions.
 
@@ -569,6 +579,7 @@ For customers wishing to use something other than the local administrator accoun
     -    Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    -	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.    *	Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
     -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    -	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.    *	Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
     -    Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates) when performing WinLDAP (AD DS / NTDS LDAPS) certificate operations on a Domain Controller. This has not been lab-validated for a JEA virtual/gMSA account - see the WinLDAP-specific note under Important Notes and Limitations above.
+    -    Execute netsh.exe commands (`netsh http show/add/delete sslcert`) when performing WinNetSH certificate binding operations. This requires local Administrator rights on the target server, the same as WinIIS.
 
 ### Using Crypto Service Providers (CSP)
 When adding or reenrolling certificates, you may specify an optional CSP to be used when generating and storing the private keys.  This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed.

@@ -59,6 +59,9 @@
     <None Update="PowerShell\Keyfactor.WinCert.LDAP\**\*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="PowerShell\Keyfactor.WinCert.NetSH\**\*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="PowerShell\Build\KeyfactorWinCert.pssc">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -74,5 +77,6 @@
     <Folder Include="PowerShell\Keyfactor.WinCert.SQL\" />
     <Folder Include="PowerShell\Keyfactor.WinCert.ADFS\" />
     <Folder Include="PowerShell\Keyfactor.WinCert.LDAP\" />
+    <Folder Include="PowerShell\Keyfactor.WinCert.NetSH\" />
   </ItemGroup>
 </Project>
