@@ -45,7 +45,7 @@ function Remove-KeyfactorNetSHCertificateIfUnused {
                 -Details @{ Thumbprint = $normalizedThumbprint }
         }
 
-        Remove-Item -Path "Cert:\LocalMachine\$StoreName\$normalizedThumbprint" -Force
+        Remove-Item -Path "Cert:\LocalMachine\$StoreName\$normalizedThumbprint" -Force -ErrorAction Stop
         Write-Information "[VERBOSE] Certificate $normalizedThumbprint removed from Cert:\LocalMachine\$StoreName"
 
         return New-KeyfactorResult -Status Success -Code 0 -Step RemoveCertificate `
