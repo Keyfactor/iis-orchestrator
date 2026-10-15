@@ -32,7 +32,7 @@ function Get-NtdsServiceStoreCertificate {
     }
 
     $items = @()
-    Get-ChildItem -Path $certsKeyPath -ErrorAction SilentlyContinue | ForEach-Object {
+    Get-ChildItem -Path $certsKeyPath -ErrorAction Stop | ForEach-Object {
         $thumbprint = $_.PSChildName
         try {
             $blob = (Get-ItemProperty -Path $_.PSPath -Name 'Blob' -ErrorAction Stop).Blob
