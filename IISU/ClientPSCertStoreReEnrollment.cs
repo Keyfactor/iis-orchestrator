@@ -30,6 +30,9 @@ using Keyfactor.Orchestrators.Extensions.Interfaces;
 using System.Linq;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinNetSH;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 using System.Numerics;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
@@ -94,7 +97,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string clientMachineName = config.CertificateStoreDetails.ClientMachine;
                 string storePath = config.CertificateStoreDetails.StorePath;
 
-                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired: bindingType == CertStoreBindingTypeENUM.WinIIS);
+                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired: bindingType == CertStoreBindingTypeENUM.WinIIS || bindingType == CertStoreBindingTypeENUM.WinNetSH);
                 _psHelper.Initialize();
 
                 using (_psHelper)
@@ -130,8 +133,13 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
 
                         if (myCert == null) { throw new Exception("Command was unable to sign the CSR."); }
 
-                        // Import the certificate
-                        string thumbprint = ImportCertificate(myCert.RawData, storePath);
+                        // Import the certificate. WinLDAP's storePath ("NTDS\My") is not a real
+                        // Cert: provider path - Import-KeyfactorSignedCertificate expects one, so
+                        // WinLDAP always imports into the Personal ("My") store first, matching
+                        // Add-KeyfactorLdapsCertificate's own staging step. The WinLdap case below
+                        // then registers that same certificate into the NTDS service store.
+                        string importStoreName = bindingType == CertStoreBindingTypeENUM.WinLdap ? "My" : storePath;
+                        string thumbprint = ImportCertificate(myCert.RawData, importStoreName);
 
                         // If there is binding, bind it to the correct store type
                         if (thumbprint != null)
@@ -220,13 +228,88 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                     break;
 
                                 case CertStoreBindingTypeENUM.None:
-                                    
+
                                     jobResult = new JobResult
                                     {
                                         Result = OrchestratorJobStatusJobResult.Success,
                                         JobHistoryId = config.JobHistoryId,
                                         FailureMessage = ""
                                     };
+
+                                    break;
+
+                                case CertStoreBindingTypeENUM.WinLdap:
+                                    // Certificate is already in Cert:\LocalMachine\My at this point
+                                    // (see importStoreName above) - register it into the NTDS
+                                    // service store (storePath, e.g. "NTDS\My"), the same
+                                    // eligibility-checked write Add-KeyfactorLdapsCertificate does.
+                                    ResultObject registerResult = WinLdapBinding.RegisterCertificate(_psHelper, thumbprint, storePath);
+
+                                    if (!registerResult.IsSuccess)
+                                    {
+                                        string detail = !string.IsNullOrEmpty(registerResult.ErrorMessage)
+                                            ? registerResult.ErrorMessage
+                                            : registerResult.Message;
+
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = $"Registering the re-enrolled certificate into the NTDS service store '{storePath}' failed at step '{registerResult.Step}' (code {registerResult.Code}): {detail}"
+                                        };
+                                    }
+                                    else
+                                    {
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = ""
+                                        };
+                                    }
+
+                                    break;
+
+                                case CertStoreBindingTypeENUM.WinNetSH:
+                                    // Certificate is already in Cert:\LocalMachine\<storePath> at this
+                                    // point (storePath is a real Cert: path for WinNetSH, unlike
+                                    // WinLdap's "NTDS\My") - bind it to the netsh http sslcert entry
+                                    // described by this store's entry parameters (IPAddress/Port/
+                                    // HostName/AppId), the same rebind logic Management.cs's Add uses.
+                                    NetSHBindingInfo netshBindingInfo = new NetSHBindingInfo(config.JobProperties);
+                                    ResultObject netshBindResult = WinNetSHBinding.BindCertificate(_psHelper, netshBindingInfo, thumbprint, storePath);
+
+                                    if (!netshBindResult.IsSuccess)
+                                    {
+                                        string detail = !string.IsNullOrEmpty(netshBindResult.ErrorMessage)
+                                            ? netshBindResult.ErrorMessage
+                                            : netshBindResult.Message;
+
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = $"Binding the re-enrolled certificate to {netshBindingInfo.IPAddress}:{netshBindingInfo.Port} failed at step '{netshBindResult.Step}' (code {netshBindResult.Code}): {detail}"
+                                        };
+                                    }
+                                    else
+                                    {
+                                        string netshMessage = "";
+                                        if (netshBindResult.Details != null &&
+                                            netshBindResult.Details.TryGetValue("AppId", out var resolvedAppId) &&
+                                            netshBindResult.Details.TryGetValue("AppIdSource", out var appIdSource) &&
+                                            !string.Equals(appIdSource?.ToString(), "Supplied", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            netshMessage = $"Certificate bound successfully. AppId was {appIdSource?.ToString()?.ToLowerInvariant()} for this binding: {resolvedAppId}";
+                                        }
+
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = netshMessage
+                                        };
+                                    }
 
                                     break;
                             }
