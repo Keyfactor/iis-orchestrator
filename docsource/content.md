@@ -579,7 +579,7 @@ For customers wishing to use something other than the local administrator accoun
     - Access any Cryptographic Service Provider (CSP) referenced in re-enrollment jobs.
     - Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server) when performing SQL Server certificate binding.
     - Read and Write values in the registry (HKLM:\SOFTWARE\Microsoft\Cryptography\Services\NTDS\SystemCertificates) when performing WinLDAP (AD DS / NTDS LDAPS) certificate operations on a Domain Controller. This has not been lab-validated for a JEA virtual/gMSA account - see the WinLDAP-specific note under Important Notes and Limitations above.
-    - Execute netsh.exe commands (`netsh http show/add/delete sslcert`) when performing WinNetSH certificate binding operations. This requires local Administrator rights on the target server, the same as WinIIS.
+    - Execute netsh.exe commands (`netsh http show/add/delete sslcert`) when performing WinNetSH certificate binding operations. This requires local Administrator rights on the target server, the same as WinIIS. 
 
 ### Using Crypto Service Providers (CSP)
 When adding or reenrolling certificates, you may specify an optional CSP to be used when generating and storing the private keys.  This value would typically be specified when leveraging a Hardware Security Module (HSM). The specified cryptographic provider must be available on the target server being managed.
