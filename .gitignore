@@ -341,3 +341,8 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+
+# Azure test lab - local parameter files may contain real passwords;
+# only the committed *.parameters.json templates (with placeholder values)
+# should ever be tracked.
+azure-test-lab/**/*.local.json

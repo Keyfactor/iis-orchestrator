@@ -42,7 +42,7 @@ function Remove-NtdsServiceStoreCertificate {
             }
         }
 
-        Remove-Item -Path $regPath -Recurse -Force
+        Remove-Item -Path $regPath -Recurse -Force -ErrorAction Stop
 
         return [PSCustomObject]@{
             Success      = $true

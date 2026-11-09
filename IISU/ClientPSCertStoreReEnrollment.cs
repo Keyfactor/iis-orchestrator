@@ -31,6 +31,7 @@ using System.Linq;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.IISU;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap;
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinNetSH;
 using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
 using System.Numerics;
 
@@ -96,7 +97,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                 string clientMachineName = config.CertificateStoreDetails.ClientMachine;
                 string storePath = config.CertificateStoreDetails.StorePath;
 
-                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired: bindingType == CertStoreBindingTypeENUM.WinIIS);
+                _psHelper = new(protocol, port, includePortInSPN, clientMachineName, serverUserName, serverPassword, jeaEndpoint: jeaEndpoint, adminPrivilegesRequired: bindingType == CertStoreBindingTypeENUM.WinIIS || bindingType == CertStoreBindingTypeENUM.WinNetSH);
                 _psHelper.Initialize();
 
                 using (_psHelper)
@@ -264,6 +265,49 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                                             Result = OrchestratorJobStatusJobResult.Success,
                                             JobHistoryId = config.JobHistoryId,
                                             FailureMessage = ""
+                                        };
+                                    }
+
+                                    break;
+
+                                case CertStoreBindingTypeENUM.WinNetSH:
+                                    // Certificate is already in Cert:\LocalMachine\<storePath> at this
+                                    // point (storePath is a real Cert: path for WinNetSH, unlike
+                                    // WinLdap's "NTDS\My") - bind it to the netsh http sslcert entry
+                                    // described by this store's entry parameters (IPAddress/Port/
+                                    // HostName/AppId), the same rebind logic Management.cs's Add uses.
+                                    NetSHBindingInfo netshBindingInfo = new NetSHBindingInfo(config.JobProperties);
+                                    ResultObject netshBindResult = WinNetSHBinding.BindCertificate(_psHelper, netshBindingInfo, thumbprint, storePath);
+
+                                    if (!netshBindResult.IsSuccess)
+                                    {
+                                        string detail = !string.IsNullOrEmpty(netshBindResult.ErrorMessage)
+                                            ? netshBindResult.ErrorMessage
+                                            : netshBindResult.Message;
+
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Failure,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = $"Binding the re-enrolled certificate to {netshBindingInfo.IPAddress}:{netshBindingInfo.Port} failed at step '{netshBindResult.Step}' (code {netshBindResult.Code}): {detail}"
+                                        };
+                                    }
+                                    else
+                                    {
+                                        string netshMessage = "";
+                                        if (netshBindResult.Details != null &&
+                                            netshBindResult.Details.TryGetValue("AppId", out var resolvedAppId) &&
+                                            netshBindResult.Details.TryGetValue("AppIdSource", out var appIdSource) &&
+                                            !string.Equals(appIdSource?.ToString(), "Supplied", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            netshMessage = $"Certificate bound successfully. AppId was {appIdSource?.ToString()?.ToLowerInvariant()} for this binding: {resolvedAppId}";
+                                        }
+
+                                        jobResult = new JobResult
+                                        {
+                                            Result = OrchestratorJobStatusJobResult.Success,
+                                            JobHistoryId = config.JobHistoryId,
+                                            FailureMessage = netshMessage
                                         };
                                     }
 
