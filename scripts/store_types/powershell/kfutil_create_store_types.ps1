@@ -13,3 +13,9 @@ kfutil store-types create WinSql
 Write-Host "Creating store type: WinAdfs"
 kfutil store-types create WinAdfs
 
+Write-Host "Creating store type: WinLDAP"
+kfutil store-types create WinLDAP
+
+Write-Host "Creating store type: WinNetSH"
+kfutil store-types create WinNetSH
+
