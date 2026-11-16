@@ -10,7 +10,10 @@ function Add-KeyfactorCertificate {
 		[string]$StoreName,
 
 		[Parameter(Mandatory = $false)]
-		[string]$CryptoServiceProvider
+		[string]$CryptoServiceProvider,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$Exportable
 	)
 
 	$thumbprint = $null
@@ -29,6 +32,10 @@ function Add-KeyfactorCertificate {
 
 			$keyStorageFlags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor `
 							   [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet
+
+			if ($Exportable) {
+				$keyStorageFlags = $keyStorageFlags -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+			}
 
 			$cert       = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($bytes, $securePassword, $keyStorageFlags)
 			$thumbprint = $cert.Thumbprint
@@ -80,6 +87,12 @@ function Add-KeyfactorCertificate {
 				$arguments += @('-p', $PrivateKeyPassword)
 			}
 			Write-Information "[VERBOSE] Has a CryptoServiceProvider: $CryptoServiceProvider"
+
+			if ($Exportable) {
+				Write-Information "[VERBOSE] Private key will be marked exportable"
+				$arguments += @('-exportable')
+			}
+
 			$arguments += @('-csp', $CryptoServiceProvider, '-importpfx', $StoreName, $tempPfx)
 
 			# Quote any argument containing whitespace

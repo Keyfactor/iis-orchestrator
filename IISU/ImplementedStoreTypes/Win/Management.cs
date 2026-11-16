@@ -101,9 +101,10 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                             string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
                             string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
+                            bool? exportable = (bool)config.JobProperties["ExportablePrivateKey"] == false;
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
-                            complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
+                            complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider, exportable == false);
                             _logger.LogTrace($"Completed adding the certificate to the store");
 
                             break;
@@ -139,7 +140,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
             }
         }
 
-        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
+        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider, bool exportPrivateKey = false)
         {
             try
             {
@@ -159,6 +160,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                     // Optional parameters
                     if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                     if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
+                    if (exportPrivateKey) { parameters.Add("Exportable", exportPrivateKey); }
 
                     _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
                     _logger.LogTrace("Returned from executing PS function (Add-KeyfactorCertificate)");
