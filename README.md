@@ -654,6 +654,15 @@ Below is a brief summary of the CSPs and their support for RSA and ECC algorithm
 |Microsoft Software Key Storage Provider        |✅|✅|
 |Microsoft Enhanced Cryptographic Provider        |✅|❌|
 
+### Exportable Private Key
+
+When adding or reenrolling certificates, you may specify the optional **Exportable Private Key** entry parameter (`ExportablePrivateKey`) to control whether the private key imported into the Windows certificate store is marked as exportable. This parameter is available on all WinCert-family store types (WinCert, IISU, WinSQL, WinADFS, WinLDAP, and WinNetSH).
+
+* When set to `true`, the private key is imported with the exportable flag so that it can later be exported from the certificate store (for example, via `Export-PfxCertificate` or the Certificates MMC snap-in).
+* When set to `false` (the default), the private key is imported as non-exportable, which is the more secure option and matches the previous behavior of this extension.
+
+This setting only affects how the private key is imported; it does not change the behavior of any other part of the Add or Reenrollment job.
+
 ## Certificate Store Types
 
 To use the Windows Certificate Universal Orchestrator extension, you **must** create the Certificate Store Types required for your use-case. This only needs to happen _once_ per Keyfactor Command instance.
@@ -825,7 +834,7 @@ the Keyfactor Command Portal
    | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
    | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
-   | ExportablePrivateKey | Exportable Private Key | Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key' | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | ExportablePrivateKey | Exportable Private Key | Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store. | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
 
    The Entry Parameters tab should look like this:
 
@@ -836,8 +845,13 @@ the Keyfactor Command Portal
    ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName.svg)
    ![WinCert Entry Parameter - ProviderName](docsource/images/WinCert-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
+
    ##### Exportable Private Key
-   Determines whether the private key imported into the Windows certificate store is marked as exportable. When set to `true`, the private key can later be exported (for example via `Export-PfxCertificate`). When set to `false` (the default), the private key is imported as non-exportable. For more information, refer to the section 'Exportable Private Key'.
+   Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store.
+
+   ![WinCert Entry Parameter - ExportablePrivateKey](docsource/images/WinCert-entry-parameters-store-type-dialog-ExportablePrivateKey.svg)
+   ![WinCert Entry Parameter - ExportablePrivateKey](docsource/images/WinCert-entry-parameters-store-type-dialog-ExportablePrivateKey-validation-options.svg)
+
 
    </details>
 </details>
@@ -1110,7 +1124,7 @@ the Keyfactor Command Portal
    | SniFlag | SSL Flags | A 128-Bit Flag that determines what type of SSL settings you wish to use.  The default is 0, meaning No SNI.  For more information, check IIS documentation for the appropriate bit setting.) | String | 0 | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
    | Protocol | Protocol | Multiple choice value specifying the protocol to bind to. Example: 'https' for secure communication. | MultipleChoice | https | 🔲 Unchecked | ✅ Checked | ✅ Checked | ✅ Checked |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
-   | ExportablePrivateKey | Exportable Private Key | Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key' | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | ExportablePrivateKey | Exportable Private Key | Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store. | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
 
    The Entry Parameters tab should look like this:
 
@@ -1163,8 +1177,13 @@ the Keyfactor Command Portal
    ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName.svg)
    ![IISU Entry Parameter - ProviderName](docsource/images/IISU-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
+
    ##### Exportable Private Key
-   Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key'.
+   Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store.
+
+   ![IISU Entry Parameter - ExportablePrivateKey](docsource/images/IISU-entry-parameters-store-type-dialog-ExportablePrivateKey.svg)
+   ![IISU Entry Parameter - ExportablePrivateKey](docsource/images/IISU-entry-parameters-store-type-dialog-ExportablePrivateKey-validation-options.svg)
+
 
    </details>
 </details>
@@ -1386,6 +1405,7 @@ the Keyfactor Command Portal
    | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
    | InstanceName | Instance Name | String value specifying the SQL Server instance name to bind the certificate to. Example: 'MSSQLServer' for the default instance or 'Instance1' for a named instance. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | ExportablePrivateKey | Exportable Private Key | Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store. | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
 
    The Entry Parameters tab should look like this:
 
@@ -1403,8 +1423,13 @@ the Keyfactor Command Portal
    ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName.svg)
    ![WinSql Entry Parameter - ProviderName](docsource/images/WinSql-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
+
    ##### Exportable Private Key
-   Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key'.
+   Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store.
+
+   ![WinSql Entry Parameter - ExportablePrivateKey](docsource/images/WinSql-entry-parameters-store-type-dialog-ExportablePrivateKey.svg)
+   ![WinSql Entry Parameter - ExportablePrivateKey](docsource/images/WinSql-entry-parameters-store-type-dialog-ExportablePrivateKey-validation-options.svg)
+
 
    </details>
 </details>
@@ -1562,7 +1587,7 @@ the Keyfactor Command Portal
    | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
    | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
-   | ExportablePrivateKey | Exportable Private Key | Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key' | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | ExportablePrivateKey | Exportable Private Key | Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store. | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
 
    The Entry Parameters tab should look like this:
 
@@ -1573,8 +1598,13 @@ the Keyfactor Command Portal
    ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName.svg)
    ![WinAdfs Entry Parameter - ProviderName](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
+
    ##### Exportable Private Key
-   Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key'.
+   Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store.
+
+   ![WinAdfs Entry Parameter - ExportablePrivateKey](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ExportablePrivateKey.svg)
+   ![WinAdfs Entry Parameter - ExportablePrivateKey](docsource/images/WinAdfs-entry-parameters-store-type-dialog-ExportablePrivateKey-validation-options.svg)
+
 
    </details>
 </details>
@@ -1764,7 +1794,7 @@ the Keyfactor Command Portal
    | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
    | ---- | ------------ | ---- | ------------- | ----------------------- | ---------------- | ----------------- | ------------------- | ----------- |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
-   | ExportablePrivateKey | Exportable Private Key | Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key' | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | ExportablePrivateKey | Exportable Private Key | Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store. | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
 
    The Entry Parameters tab should look like this:
 
@@ -1775,8 +1805,13 @@ the Keyfactor Command Portal
    ![WinLDAP Entry Parameter - ProviderName](docsource/images/WinLDAP-entry-parameters-store-type-dialog-ProviderName.svg)
    ![WinLDAP Entry Parameter - ProviderName](docsource/images/WinLDAP-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
+
    ##### Exportable Private Key
-   Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key'.
+   Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store.
+
+   ![WinLDAP Entry Parameter - ExportablePrivateKey](docsource/images/WinLDAP-entry-parameters-store-type-dialog-ExportablePrivateKey.svg)
+   ![WinLDAP Entry Parameter - ExportablePrivateKey](docsource/images/WinLDAP-entry-parameters-store-type-dialog-ExportablePrivateKey-validation-options.svg)
+
 
    </details>
 </details>
@@ -1957,6 +1992,7 @@ the Keyfactor Command Portal
    | HostName | Host Name | String value specifying the host name for an SNI-based binding (netsh 'hostnameport'). Leave blank for a classic IP:Port binding, or enter a specific hostname such as 'www.example.com' to bind by SNI hostname instead. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
    | AppId | Application ID | GUID identifying the application associated with this netsh http sslcert binding (netsh's 'appid' parameter). Leave blank to let this store type resolve one automatically: an existing binding at this IP/Port (or hostname/Port) keeps its current AppId when the certificate is renewed, and a brand-new binding is given a freshly generated GUID. Either way, the AppId actually used is reported back in the job result message and in Inventory results. | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
    | ProviderName | Crypto Provider Name | Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers' | String |  | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
+   | ExportablePrivateKey | Exportable Private Key | Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store. | Bool | false | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked | 🔲 Unchecked |
 
    The Entry Parameters tab should look like this:
 
@@ -1995,8 +2031,13 @@ the Keyfactor Command Portal
    ![WinNetSH Entry Parameter - ProviderName](docsource/images/WinNetSH-entry-parameters-store-type-dialog-ProviderName.svg)
    ![WinNetSH Entry Parameter - ProviderName](docsource/images/WinNetSH-entry-parameters-store-type-dialog-ProviderName-validation-options.svg)
 
+
    ##### Exportable Private Key
-   Determines whether the private key imported into the Windows certificate store is marked as exportable. For more information, refer to the section 'Exportable Private Key'.
+   Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store.
+
+   ![WinNetSH Entry Parameter - ExportablePrivateKey](docsource/images/WinNetSH-entry-parameters-store-type-dialog-ExportablePrivateKey.svg)
+   ![WinNetSH Entry Parameter - ExportablePrivateKey](docsource/images/WinNetSH-entry-parameters-store-type-dialog-ExportablePrivateKey-validation-options.svg)
+
 
    </details>
 </details>

@@ -106,6 +106,21 @@ $Body = @'
       "DefaultValue": "",
       "Options": "",
       "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    },
+    {
+      "Name": "ExportablePrivateKey",
+      "DisplayName": "Exportable Private Key",
+      "Type": "Bool",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Options": "",
+      "Description": "Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store."
     }
   ],
   "PasswordOptions": {
@@ -308,6 +323,21 @@ $Body = @'
       "DefaultValue": "",
       "Options": "",
       "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    },
+    {
+      "Name": "ExportablePrivateKey",
+      "DisplayName": "Exportable Private Key",
+      "Type": "Bool",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Options": "",
+      "Description": "Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store."
     }
   ],
   "PasswordOptions": {
@@ -441,6 +471,21 @@ $Body = @'
       "DefaultValue": "",
       "Options": "",
       "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    },
+    {
+      "Name": "ExportablePrivateKey",
+      "DisplayName": "Exportable Private Key",
+      "Type": "Bool",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Options": "",
+      "Description": "Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store."
     }
   ],
   "PasswordOptions": {
@@ -544,6 +589,21 @@ $Body = @'
       "DefaultValue": "",
       "Options": "",
       "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    },
+    {
+      "Name": "ExportablePrivateKey",
+      "DisplayName": "Exportable Private Key",
+      "Type": "Bool",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Options": "",
+      "Description": "Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store."
     }
   ],
   "PasswordOptions": {
@@ -665,6 +725,21 @@ $Body = @'
       "DefaultValue": "",
       "Options": "",
       "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    },
+    {
+      "Name": "ExportablePrivateKey",
+      "DisplayName": "Exportable Private Key",
+      "Type": "Bool",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Options": "",
+      "Description": "Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store."
     }
   ],
   "PasswordOptions": {
@@ -837,6 +912,21 @@ $Body = @'
       "DefaultValue": "",
       "Options": "",
       "Description": "Name of the Windows cryptographic service provider to use when generating and storing private keys. For more information, refer to the section 'Using Crypto Service Providers'"
+    },
+    {
+      "Name": "ExportablePrivateKey",
+      "DisplayName": "Exportable Private Key",
+      "Type": "Bool",
+      "RequiredWhen": {
+        "HasPrivateKey": false,
+        "OnAdd": false,
+        "OnRemove": false,
+        "OnReenrollment": false
+      },
+      "DependsOn": "",
+      "DefaultValue": "false",
+      "Options": "",
+      "Description": "Determines whether the imported private key is marked as exportable. Set to 'true' to allow the private key to be exported from the certificate store."
     }
   ],
   "PasswordOptions": {
