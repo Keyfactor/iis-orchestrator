@@ -452,27 +452,36 @@ function Install-AdfsCertificateOnNode {
         Path to the PFX certificate file
     .PARAMETER PfxPasswordText
         Password for the PFX file (as plain text - will be converted to SecureString)
+    .PARAMETER Exportable
+        When set, marks the imported private key as exportable. Defaults to $false.
     #>
     param(
         [Parameter(Mandatory=$true)]
         [string]$PfxFilePath,
-        
+
         [Parameter(Mandatory=$true)]
-        [string]$PfxPasswordText
+        [string]$PfxPasswordText,
+
+        [Parameter(Mandatory=$false)]
+        [bool]$Exportable = $false
     )
-    
+
     try {
         Write-Host "Installing certificate on $env:COMPUTERNAME..."
-        
+
         # Convert password to SecureString
         $securePassword = ConvertTo-SecureString -String $PfxPasswordText -AsPlainText -Force
-        
+
         # Import certificate
-        $cert = Import-PfxCertificate -FilePath $PfxFilePath `
-            -Password $securePassword `
-            -CertStoreLocation 'Cert:\LocalMachine\My' `
-            -Exportable `
-            -ErrorAction Stop
+        $importParams = @{
+            FilePath          = $PfxFilePath
+            Password          = $securePassword
+            CertStoreLocation = 'Cert:\LocalMachine\My'
+            ErrorAction       = 'Stop'
+        }
+        if ($Exportable) { $importParams.Exportable = $true }
+
+        $cert = Import-PfxCertificate @importParams
         
         Write-Host "✓ Certificate imported successfully"
         Write-Host "  Thumbprint: $($cert.Thumbprint)"

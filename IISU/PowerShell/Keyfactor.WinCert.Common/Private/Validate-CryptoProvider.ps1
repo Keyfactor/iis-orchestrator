@@ -3,17 +3,31 @@
         [Parameter(Mandatory)]
         [string]$ProviderName
     )
-    Write-Information "[VERBOSE] Validating CSP: $ProviderName"
+
+    Write-Information "[VERBOSE] Validating cryptographic provider: $ProviderName"
 
     $availableProviders = Get-CryptoProviders
 
     $trimmedProvider = $ProviderName.Trim()
-    if (-not ($availableProviders | Where-Object {
-            [string]::Equals($_.Trim(), $trimmedProvider, [System.StringComparison]::OrdinalIgnoreCase)
-        })) {
 
-        throw "Crypto Service Provider '$ProviderName' is either invalid or not found on this system."
+    $providerFound = $availableProviders | Where-Object {
+        [string]::Equals(
+            $_.Trim(),
+            $trimmedProvider,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
     }
 
-    Write-Information "[VERBOSE] Crypto Service Provider '$ProviderName' is valid."
+    if (-not $providerFound) {
+
+        $availableProviderList = @(
+            $availableProviders |
+                Sort-Object -Unique |
+                ForEach-Object { "'$_'" }
+        ) -join ", "
+
+        throw "The requested Crypto Service Provider '$ProviderName' was not found on the target system. Available providers: $availableProviderList"
+    }
+
+    Write-Information "[VERBOSE] Cryptographic provider '$ProviderName' is valid."
 }

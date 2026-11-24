@@ -51,6 +51,9 @@ function Add-KeyfactorLdapsCertificate {
         [string]$CryptoServiceProvider,
 
         [Parameter(Mandatory = $false)]
+        [switch]$Exportable,
+
+        [Parameter(Mandatory = $false)]
         [bool]$RestartService = $false
     )
 
@@ -105,6 +108,7 @@ function Add-KeyfactorLdapsCertificate {
         }
         if ($PrivateKeyPassword)    { $stageParams['PrivateKeyPassword']    = $PrivateKeyPassword }
         if ($CryptoServiceProvider) { $stageParams['CryptoServiceProvider'] = $CryptoServiceProvider }
+        if ($Exportable)            { $stageParams['Exportable']            = $true }
 
         $stageResult = Add-KeyfactorCertificate @stageParams
 

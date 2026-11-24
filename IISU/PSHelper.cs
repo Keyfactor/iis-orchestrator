@@ -142,6 +142,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
             scriptFileLocation = FindScriptsDirectory(AppDomain.CurrentDomain.BaseDirectory, "PowerShell");
             if (scriptFileLocation == null) { throw new Exception("Unable to find the accompanying PowerShell Script files."); }
 
+            _logger.LogTrace($"Orchestrator process is 64-bit: {Environment.Is64BitProcess}");
             _logger.LogTrace($"Script file located here: {scriptFileLocation}");
 
             if (isLocalMachine && useJea)
@@ -916,7 +917,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore
                         // names that break ConstrainedLanguage JEA sessions.
                         var paramBlock = string.Join(", ", parameters.Keys.Select(k => $"${k}"));
 
-                        var paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key} ${p.Key}"));
+                        var paramUsage = string.Join(" ", parameters.Select(p => $"-{p.Key}:${p.Key}"));
 
                         string scriptBlockWithParams = $@"
                             param({paramBlock})

@@ -1,4 +1,8 @@
 
+4.2.0
+
+* Added the option to mark private keys as exportable when adding certificates, across all supported store types (WinCert, IISU, WinSQL, WinADFS, WinLDAP, and WinNetSH). This is useful when you need to be able to export a certificate's private key later (for example, to back it up or move it to another server). By default, private keys continue to be imported as non-exportable, which is the more secure option.
+
 4.1.0
 
 * Added WinNetSH store type for managing SSL certificates bound to HTTP.sys via `netsh http sslcert` (e.g. the WinRM HTTPS listener, or any other HTTP.sys-hosted service without its own certificate-binding mechanism). Supports Inventory, Add, Remove, and Reenrollment (ODKG), following the same binding-based pattern as WinIIS, including local-agent, remote WinRM/SSH, and JEA connections. Since `netsh` has no native PowerShell cmdlet, bindings are managed by shelling out to `netsh.exe` and parsing its text output. `netsh http add sslcert` requires an AppId; when the entry parameter is left blank, this store type reuses an existing binding's AppId across a renewal (rather than changing it) or generates a new one for a brand-new binding, and reports back whichever value was actually used.

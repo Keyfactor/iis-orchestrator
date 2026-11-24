@@ -70,7 +70,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
             _logger.MethodExit();
         }
 
-        public CertificateRotationResult RotateServiceCommunicationCertificate(string pfxFilePath, string pfxPassword)
+        public CertificateRotationResult RotateServiceCommunicationCertificate(string pfxFilePath, string pfxPassword, bool exportPrivateKey = false)
         {
             _logger.MethodEntry();
 
@@ -115,12 +115,12 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
                     {
                         // Use existing local connection
                         Console.WriteLine($"  Using local connection (application is running on this node)");
-                        thumbprint = InstallCertificateOnLocalNode(pfxFilePath, pfxPassword, serviceAccountName);
+                        thumbprint = InstallCertificateOnLocalNode(pfxFilePath, pfxPassword, serviceAccountName, exportPrivateKey);
                     }
                     else
                     {
                         // Create direct remote connection
-                        thumbprint = InstallCertificateOnRemoteNode(node, pfxBytes, pfxPassword, serviceAccountName);
+                        thumbprint = InstallCertificateOnRemoteNode(node, pfxBytes, pfxPassword, serviceAccountName, exportPrivateKey);
                     }
 
                     if (!string.IsNullOrEmpty(thumbprint))
@@ -219,7 +219,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
             }
         }
 
-        private string InstallCertificateOnLocalNode(string pfxFilePath, string pfxPassword, string serviceAccountName)
+        private string InstallCertificateOnLocalNode(string pfxFilePath, string pfxPassword, string serviceAccountName, bool exportPrivateKey = false)
         {
             try
             {
@@ -231,7 +231,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
                 var parameters = new Dictionary<string, object>
                 {
                     { "PfxFilePath", pfxFilePath },
-                    { "PfxPasswordText", pfxPassword }
+                    { "PfxPasswordText", pfxPassword },
+                    { "Exportable", exportPrivateKey }
                 };
 
                 var results = _primaryPsHelper.InvokeFunction("Install-AdfsCertificateOnNode", parameters);
@@ -272,7 +273,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
             }
         }
 
-        private string InstallCertificateOnRemoteNode(string nodeName, byte[] pfxBytes, string pfxPassword, string serviceAccountName)
+        private string InstallCertificateOnRemoteNode(string nodeName, byte[] pfxBytes, string pfxPassword, string serviceAccountName, bool exportPrivateKey = false)
         {
             _logger.MethodEntry();
 
@@ -305,7 +306,8 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.ImplementedStoreTyp
                 var parameters = new Dictionary<string, object>
                 {
                     { "PfxFilePath", remoteTempPath },
-                    { "PfxPasswordText", pfxPassword }
+                    { "PfxPasswordText", pfxPassword },
+                    { "Exportable", exportPrivateKey }
                 };
 
                 var results = nodeHelper.InvokeFunction("Install-AdfsCertificateOnNode", parameters);

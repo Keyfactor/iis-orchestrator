@@ -114,7 +114,20 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap
                                     : null;
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
-                                complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider, renewalThumbprint);
+                                bool exportable = false;
+                                if (config.JobProperties.TryGetValue("ExportablePrivateKey", out var rawExportable) && rawExportable is not null)
+                                {
+                                    if (rawExportable is bool rawExportableBool)
+                                    {
+                                        exportable = rawExportableBool;
+                                    }
+                                    else if (!bool.TryParse(rawExportable.ToString(), out exportable))
+                                    {
+                                        exportable = false;
+                                    }
+                                }
+
+                                complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider, renewalThumbprint, exportable);
                                 _logger.LogTrace($"Completed adding the certificate to the NTDS (LDAPS) certificate store");
 
                                 break;
@@ -154,7 +167,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap
         // Assumes _psHelper is already Initialize()'d by the caller (ProcessJob) - does not open or
         // close the session itself, so it can share one session with the renewal-cleanup Remove call
         // below without a second, redundant connection.
-        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider, string renewalThumbprint = null)
+        public JobResult AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider, string renewalThumbprint = null, bool exportPrivateKey = false)
         {
             try
             {
@@ -171,6 +184,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinLdap
                 // Optional parameters
                 if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                 if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
+                if (exportPrivateKey) { parameters.Add("Exportable", exportPrivateKey); }
 
                 _results = _psHelper.ExecutePowerShell("Add-KeyfactorLdapsCertificate", parameters);
                 _logger.LogTrace("Returned from executing PS function (Add-KeyfactorLdapsCertificate)");

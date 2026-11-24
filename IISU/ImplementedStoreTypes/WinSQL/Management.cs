@@ -120,10 +120,23 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                                 string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
                                 string cryptoProvider = config.JobProperties["ProviderName"]?.ToString() ?? string.Empty;
 
+                                bool exportable = false;
+                                if (config.JobProperties.TryGetValue("ExportablePrivateKey", out var rawExportable) && rawExportable is not null)
+                                {
+                                    if (rawExportable is bool rawExportableBool)
+                                    {
+                                        exportable = rawExportableBool;
+                                    }
+                                    else if (!bool.TryParse(rawExportable.ToString(), out exportable))
+                                    {
+                                        exportable = false;
+                                    }
+                                }
+
                                 // Add Certificate to Cert Store
                                 try
                                 {
-                                    ResultObject addResult = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider);
+                                    ResultObject addResult = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider, exportable);
                                     _logger.LogTrace($"Completed adding the certificate to the store. Status={addResult.Status}, Code={addResult.Code}, Step={addResult.Step}");
 
                                     if (!addResult.IsSuccess)
@@ -293,7 +306,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
             }
         }
 
-        public ResultObject AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider)
+        public ResultObject AddCertificate(string certificateContents, string privateKeyPassword, string cryptoProvider, bool exportPrivateKey = false)
         {
             try
             {
@@ -309,6 +322,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinSql
                 // Optional parameters
                 if (!string.IsNullOrEmpty(privateKeyPassword)) { parameters.Add("PrivateKeyPassword", privateKeyPassword); }
                 if (!string.IsNullOrEmpty(cryptoProvider)) { parameters.Add("CryptoServiceProvider", cryptoProvider); }
+                if (exportPrivateKey) { parameters.Add("Exportable", exportPrivateKey); }
 
                 _results = _psHelper.ExecutePowerShell("Add-KeyfactorCertificate", parameters);
                 _logger.LogTrace("Returned from executing PS function (Add-KeyfactorCertificate)");

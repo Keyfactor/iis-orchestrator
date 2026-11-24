@@ -16,17 +16,20 @@
 
 // 021225 rcp   2.6.0   Cleaned up and verified code
 
+using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
+using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
-using System.Management.Automation;
-using Keyfactor.Logging;
-using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using Keyfactor.Extensions.Orchestrator.WindowsCertStore.Models;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
 {
@@ -101,10 +104,22 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinCert
                             string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
                             string? cryptoProvider = config.JobProperties["ProviderName"]?.ToString();
-                            bool? exportable = (bool)config.JobProperties["ExportablePrivateKey"] == false;
+
+                            bool exportable = false;
+                            if (config.JobProperties.TryGetValue("ExportablePrivateKey", out var raw) && raw is not null)
+                            {
+                                if (raw is bool rawBool)
+                                {
+                                    exportable = rawBool;
+                                }
+                                else if (!bool.TryParse(raw.ToString(), out exportable))
+                                {
+                                    exportable = false;
+                                }
+                            }
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
-                            complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider, exportable == false);
+                            complete = AddCertificate(certificateContents, privateKeyPassword, cryptoProvider, exportable);
                             _logger.LogTrace($"Completed adding the certificate to the store");
 
                             break;

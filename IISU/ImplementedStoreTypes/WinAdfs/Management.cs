@@ -89,6 +89,19 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs
                             string certificateContents = config.JobCertificate.Contents;
                             string privateKeyPassword = config.JobCertificate.PrivateKeyPassword;
 
+                            bool exportable = false;
+                            if (config.JobProperties.TryGetValue("ExportablePrivateKey", out var rawExportable) && rawExportable is not null)
+                            {
+                                if (rawExportable is bool rawExportableBool)
+                                {
+                                    exportable = rawExportableBool;
+                                }
+                                else if (!bool.TryParse(rawExportable.ToString(), out exportable))
+                                {
+                                    exportable = false;
+                                }
+                            }
+
                             string pfxPath = Certificate.Utilities.WriteCertificateToTempPfx(certificateContents);
                             using (var rotationManager = new AdfsCertificateRotationManager(
                                 _psHelper,           // Primary PSHelper connection
@@ -98,7 +111,7 @@ namespace Keyfactor.Extensions.Orchestrator.WindowsCertStore.WinAdfs
                                 serverUserName,      // For creating direct connections to other nodes
                                 serverPassword))
                             {
-                                var result = rotationManager.RotateServiceCommunicationCertificate(pfxPath, privateKeyPassword);
+                                var result = rotationManager.RotateServiceCommunicationCertificate(pfxPath, privateKeyPassword, exportable);
                                 if (result.Success)
                                 {
                                     AdfsCertificateRotationManager.UpdateFarmCertificateSettings(result.Thumbprint, _psHelper);

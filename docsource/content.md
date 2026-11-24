@@ -603,6 +603,15 @@ Below is a brief summary of the CSPs and their support for RSA and ECC algorithm
 |Microsoft Software Key Storage Provider        |✅|✅|
 |Microsoft Enhanced Cryptographic Provider        |✅|❌|
 
+### Exportable Private Key
+
+When adding or reenrolling certificates, you may specify the optional **Exportable Private Key** entry parameter (`ExportablePrivateKey`) to control whether the private key imported into the Windows certificate store is marked as exportable. This parameter is available on all WinCert-family store types (WinCert, IISU, WinSQL, WinADFS, WinLDAP, and WinNetSH).
+
+* When set to `true`, the private key is imported with the exportable flag so that it can later be exported from the certificate store (for example, via `Export-PfxCertificate` or the Certificates MMC snap-in).
+* When set to `false` (the default), the private key is imported as non-exportable, which is the more secure option and matches the previous behavior of this extension.
+
+This setting only affects how the private key is imported; it does not change the behavior of any other part of the Add or Reenrollment job.
+
 ## Client Machine Instructions
 
 Prior to version 2.6, this extension would only run in the Windows environment.  Version 2.6 and greater is capable of running on Linux, however, only the SSH protocol is supported.
